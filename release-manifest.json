@@ -1,10 +1,9 @@
 {
   "schema_version": 1,
-  "version": "0.6.5",
-  "summary": "Hands deployment secrets to the resident Composer updater without host ACLs.",
+  "version": "0.6.6",
+  "summary": "Trusts private-range front proxies in Caddy so forwarded client IP and scheme reach the app.",
   "highlights": [
-    "start.sh and start.ps1 pass the selected env file and key manifest to Composer 1.1.15+.",
-    "Composer self-update now triggers only when --update is the sole argument."
+    "Caddy forwards X-Forwarded-For/-Proto from a private front proxy instead of replacing them."
   ],
-  "release_url": "https://github.com/debeski/Sales-CRM/releases/tag/v0.6.5"
+  "release_url": "https://github.com/debeski/Sales-CRM/releases/tag/v0.6.6"
 }

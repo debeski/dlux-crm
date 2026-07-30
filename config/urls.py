@@ -5,7 +5,6 @@ Generated on: 2026-06-22.
 """
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib import admin
 from django.shortcuts import redirect
 from django.urls import include, path
 
@@ -23,7 +22,6 @@ staff_entry.sidebar_exclude = True
 
 staff_urlpatterns = [
     path("", staff_entry, name="staff_entry"),
-    path("admin/", admin.site.urls),
     # Project-scoped dynamic-modal routes: form-only (no embedded records table),
     # so add/edit modals show just the form. Row edit/view/delete on list pages
     # are wired to these by common/static/common/js/scoped_crud.js.

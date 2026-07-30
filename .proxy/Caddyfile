@@ -1,3 +1,16 @@
+# Trust a front proxy on a private address (pfSense/HAProxy, another nginx, a
+# cloud LB, ...) so its X-Forwarded-For / X-Forwarded-Proto are forwarded
+# (client IP appended) instead of replaced with the peer address. Public
+# clients are never trusted, so they cannot spoof either header. Inert while
+# Caddy terminates TLS facing the internet directly; makes client-IP
+# resolution (dlux per-IP lockout, audit logs) correct if the stack is ever
+# fronted by a private proxy hop.
+{
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
 # ---------------------------------------------------------------------------
 # Caddy reverse proxy for the Switch Django/DLux stack.
 #

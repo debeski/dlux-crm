@@ -1,4 +1,4 @@
-django-lux[updater]==1.5.6
+django-lux[updater]==1.6.1
 django-cors-headers
 django-csp
 gunicorn

@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.6.6
+- **Caddy Trusts Private-Range Front Proxies**: Added a global `servers { trusted_proxies static private_ranges }` block so `X-Forwarded-For`/`X-Forwarded-Proto` from a private front proxy are forwarded instead of replaced. Inert while Caddy terminates TLS directly; aligns with the django-lux 1.5.9 scaffold.
+
 ## v0.6.5
 - **Manifest-Sourced Project Version**: `config/settings.py` now sets `DLUX_APP_VERSION = get_project_version(BASE_DIR)` (django-lux 1.5.3), reading the version from root `release-manifest.json` instead of the intermediate `VERSION`-file read. The root `VERSION` file stays the release gate's input for `tools/validate_project_release_manifest.py`, CI, and the image smoke test. Bumped `compose.dev.yml` `DLUX_BAKED_VERSION` to `1.5.3` to match the pinned wheel.
 - **Private Resident-Updater Secrets Handoff**: Updated `start.sh` and `start.ps1` to pass the selected mode-`0600` env file and `COMPOSER_INHERITED_SECRET_KEYS` through Docker for Composer 1.1.15+, so recreating `composer-updater` provisions later image updates without host ACLs; also narrowed the tool self-update to `--update` as the sole argument so `--update <service>` reaches the app. Superseded scripts are archived under `.xpose/`.
