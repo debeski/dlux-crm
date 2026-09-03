@@ -1,5 +1,6 @@
 import json
 from decimal import Decimal
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -10,14 +11,18 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from django.views import View
 from django.views.generic import DetailView, TemplateView
 
+from dlux.translations import get_current_language_code, get_strings
 from dlux.utils import log_user_action
 
 from common.access import apply_ownership, user_can_view_all
-from common.views import ScopedListView, scope_filtered_queryset
+from common.editors import DocumentEditorView, sync_party
+from common.views import RibbonPageMixin, ScopedListView, scope_filtered_queryset
 from finance.models import CashDeposit, ExchangeRate
 from finance.services import (
     get_cbl_official_rate,
@@ -66,6 +71,7 @@ class CustomerListView(ScopedListView):
     table_class = CustomerTable
     filterset_class = CustomerFilter
     page_title_key = "page_customers"
+    page_subtitle_key = "page_customers_sub"
 
 
 class DeliveryListView(ScopedListView):
@@ -74,6 +80,7 @@ class DeliveryListView(ScopedListView):
     table_class = DeliveryTable
     filterset_class = DeliveryFilter
     page_title_key = "page_deliveries"
+    page_subtitle_key = "page_deliveries_sub"
 
 
 class PaymentListView(ScopedListView):
@@ -82,6 +89,7 @@ class PaymentListView(ScopedListView):
     table_class = PaymentTable
     filterset_class = PaymentFilter
     page_title_key = "page_payments"
+    page_subtitle_key = "page_payments_sub"
     allow_add = False
 
 
@@ -90,9 +98,21 @@ class InvoiceListView(ScopedListView):
     permission_required = "sales.view_invoice"
     table_class = InvoiceTable
     filterset_class = InvoiceFilter
-    template_name = "sales/invoice_list.html"
-    page_title = "Invoices"
+    template_name = "sales/invoice_list.html"  # adds the row-action CSRF input
+    page_title_key = "page_invoices"
+    page_subtitle_key = "page_invoices_sub"
     allow_add = False  # creation is a full-page flow, not a modal
+
+    def get_ribbon_action_specs(self):
+        if not self.request.user.has_perm("sales.add_invoice"):
+            return []
+        strings = get_strings(get_current_language_code(self.request))
+        return [{
+            "url": reverse("sales:invoice_create"),
+            "label": strings.get("ui_new_invoice", "New Invoice"),
+            "icon": "bi bi-plus-lg",
+            "css_class": "btn btn-primary rounded-pill",
+        }]
 
 
 # --------------------------------------------------------------------------- #
@@ -155,9 +175,19 @@ def _apply_item_price(item, invoice):
             item.unit_price_lyd = Decimal("0")
 
 
-class _InvoiceEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    raise_exception = True
+class _InvoiceEditorView(DocumentEditorView):
+    """The POS invoice editor: header form + cart formset + the tile picker.
+
+    The shared plumbing — atomic save, formset lifecycle, deleted lines, the
+    audit entry — lives in `common.editors.DocumentEditorView`; what stays here
+    is what is actually about invoices: the catalog payload, the frozen price
+    rule, and binding the customer.
+    """
+
     template_name = "sales/invoice_form.html"
+    document_form = InvoiceForm
+    item_formset = InvoiceItemFormSet
+    picker_context_key = "catalog_map_json"
 
     def _catalog_map(self, rate):
         """JSON catalog for the POS-style item picker: in-stock products (with
@@ -192,7 +222,7 @@ class _InvoiceEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 "name": p.name,
                 "category": p.category.name if p.category_id else "",
                 "category_id": p.category_id or 0,
-                "image": p.image.url if p.image else "",
+                "image": p.image_url,
                 "price": float(p.selling_price_lyd(rate) or 0),
                 "track_stock": bool(p.track_stock),
                 "stock_qty": float(p.stock_qty or 0),
@@ -208,23 +238,28 @@ class _InvoiceEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 "type": s.service_type,
                 "type_label": s.get_service_type_display(),
                 "icon": SERVICE_TYPE_ICONS.get(s.service_type, SERVICE_TYPE_ICONS["other"]),
-                "image": s.image.url if s.image else "",
+                "image": s.image_url,
                 "price": float(price) if price is not None else None,
             })
         return json.dumps({"products": products, "services": services})
 
-    def _context(self, request, form, formset, invoice=None):
+    def _rate(self, invoice=None):
+        return invoice.exchange_rate if invoice else get_current_rate()
+
+    def picker_map(self):
+        return self._catalog_map(self._rate(self.get_object()))
+
+    def form_kwargs(self):
+        return {"user": self.request.user}
+
+    def extra_context(self, invoice=None):
         from catalog.models import Category
 
-        rate = invoice.exchange_rate if invoice else get_current_rate()
         return {
-            "form": form,
-            "formset": formset,
+            # The template has always called it `invoice`, not `document`.
             "invoice": invoice,
-            "current_rate": rate,
+            "current_rate": self._rate(invoice),
             "has_rate": has_configured_rate(),
-            "is_edit": invoice is not None,
-            "catalog_map_json": self._catalog_map(rate),
             "categories": Category.objects.filter(is_active=True).order_by("name"),
             # Feeds the customer combobox <datalist> + JS autofill of phone/address.
             # Customers are private, so a rep only ever sees/binds their own book.
@@ -233,112 +268,60 @@ class _InvoiceEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
             ).order_by("name"),
         }
 
-    def _sync_customer(self, invoice, actor):
-        """Bind the invoice to a Customer record for the typed/selected name, and
-        persist any new phone/address so future invoices autofill from it.
+    def sync_counterparty(self, invoice, actor):
+        # Customers are private, so a rep only ever matches or creates within
+        # their own book — which is what the scoped queryset expresses.
+        sync_party(
+            invoice,
+            prefix="customer",
+            party_model=Customer,
+            queryset=apply_ownership(Customer.objects.all(), actor),
+        )
 
-        - Known customer picked (FK set): fill blank snapshot fields from it, and
-          backfill the customer's own blank phone/address from what was typed.
-        - New name typed (no FK): reuse an existing same-name customer if one
-          exists, else create one — so every customer entered is saved for reuse.
-        """
-        name = (invoice.customer_name or "").strip()
-        customer = invoice.customer if invoice.customer_id else None
-        if customer is None and name:
-            # Match only within the rep's own (private) customer book; a new name
-            # creates a fresh record owned by them.
-            customer = (
-                apply_ownership(Customer.objects.all(), actor)
-                .filter(name__iexact=name)
-                .first()
-            )
-            if customer is None:
-                customer = Customer(name=name)
-        if customer is None:
-            return  # true walk-in with no name at all
+    def apply_document_defaults(self, invoice):
+        # The rate is frozen onto the invoice, never typed: a draft saved today
+        # and issued next week must still price at today's rate.
+        if invoice.exchange_rate is None:
+            invoice.exchange_rate = get_current_rate()
 
-        # Snapshot onto the invoice (walk-in fields win if already provided).
-        invoice.customer_name = invoice.customer_name or customer.name
-        invoice.customer_phone = invoice.customer_phone or customer.phone
-        invoice.customer_address = invoice.customer_address or customer.address
+    def apply_line_defaults(self, item, invoice):
+        _apply_item_price(item, invoice)
 
-        # Backfill the durable customer record without clobbering existing values.
-        dirty = customer.pk is None
-        if not customer.name and name:
-            customer.name, dirty = name, True
-        if invoice.customer_phone and not customer.phone:
-            customer.phone, dirty = invoice.customer_phone, True
-        if invoice.customer_address and not customer.address:
-            customer.address, dirty = invoice.customer_address, True
-        if dirty:
-            customer.save()
-        invoice.customer = customer
+    def post_save(self, invoice):
+        invoice.recalc_totals()
 
-    def _save(self, request, form, formset, invoice=None):
-        with transaction.atomic():
-            invoice = form.save(commit=False)
-            if invoice.exchange_rate is None:
-                invoice.exchange_rate = get_current_rate()
-            self._sync_customer(invoice, request.user)
-            invoice.save()
-            formset.instance = invoice
-            items = formset.save(commit=False)
-            for obj in items:
-                _apply_item_price(obj, invoice)
-                obj.save()
-            for obj in formset.deleted_objects:
-                obj.delete()
-            invoice.recalc_totals()
-            log_user_action(request, "UPDATE" if invoice.pk else "CREATE", instance=invoice)
-        return invoice
+    def success_url(self, invoice):
+        return reverse("sales:invoice_detail", args=[invoice.pk])
 
 
 class InvoiceCreateView(_InvoiceEditorView):
     permission_required = "sales.add_invoice"
 
-    def get(self, request):
-        form = InvoiceForm(user=request.user)
-        formset = InvoiceItemFormSet()
-        return render(request, self.template_name, self._context(request, form, formset))
-
-    def post(self, request):
-        form = InvoiceForm(request.POST, user=request.user)
-        formset = InvoiceItemFormSet(request.POST)
-        if form.is_valid() and formset.is_valid():
-            invoice = self._save(request, form, formset)
-            messages.success(request, _("Invoice %(no)s saved as draft.") % {"no": invoice.number})
-            return redirect("sales:invoice_detail", pk=invoice.pk)
-        return render(request, self.template_name, self._context(request, form, formset))
+    def on_valid(self, request, invoice):
+        messages.success(request, _("Invoice %(no)s saved as draft.") % {"no": invoice.number})
 
 
 class InvoiceUpdateView(_InvoiceEditorView):
     permission_required = "sales.change_invoice"
 
-    def _get_invoice(self, pk):
+    def get_object(self):
         # Ownership-scoped: a rep can only edit their own/assigned invoices.
-        return get_object_or_404(_visible_invoices(self.request.user), pk=pk)
+        if not hasattr(self, "_invoice"):
+            self._invoice = get_object_or_404(
+                _visible_invoices(self.request.user), pk=self.kwargs["pk"]
+            )
+        return self._invoice
 
-    def get(self, request, pk):
-        invoice = self._get_invoice(pk)
-        if not invoice.is_editable:
+    def check_editable(self, request, invoice):
+        # Both GET and POST: without the GET guard the editor renders happily
+        # and only refuses on submit.
+        if invoice is not None and not invoice.is_editable:
             messages.warning(request, _("Only draft invoices can be edited."))
             return redirect("sales:invoice_detail", pk=invoice.pk)
-        form = InvoiceForm(instance=invoice, user=request.user)
-        formset = InvoiceItemFormSet(instance=invoice)
-        return render(request, self.template_name, self._context(request, form, formset, invoice))
+        return None
 
-    def post(self, request, pk):
-        invoice = self._get_invoice(pk)
-        if not invoice.is_editable:
-            messages.warning(request, _("Only draft invoices can be edited."))
-            return redirect("sales:invoice_detail", pk=invoice.pk)
-        form = InvoiceForm(request.POST, instance=invoice, user=request.user)
-        formset = InvoiceItemFormSet(request.POST, instance=invoice)
-        if form.is_valid() and formset.is_valid():
-            invoice = self._save(request, form, formset, invoice)
-            messages.success(request, _("Invoice %(no)s updated.") % {"no": invoice.number})
-            return redirect("sales:invoice_detail", pk=invoice.pk)
-        return render(request, self.template_name, self._context(request, form, formset, invoice))
+    def on_valid(self, request, invoice):
+        messages.success(request, _("Invoice %(no)s updated.") % {"no": invoice.number})
 
 
 # --------------------------------------------------------------------------- #
@@ -498,8 +481,36 @@ class PaymentCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 # --------------------------------------------------------------------------- #
 # Sales-focused overview. The project-wide landing dashboard is /workspace/.
 # --------------------------------------------------------------------------- #
-class DashboardView(LoginRequiredMixin, TemplateView):
+class DashboardView(RibbonPageMixin, LoginRequiredMixin, TemplateView):
     template_name = "sales/dashboard.html"
+    page_title_key = "sales_dashboard"
+    page_subtitle_key = "page_sales_dashboard_sub"
+
+    def get_ribbon_action_specs(self):
+        strings = self.get_page_strings()
+        return [
+            {
+                "url": reverse("sales:report"),
+                "label": strings.get("ui_reports", "Reports"),
+                "icon": "bi bi-graph-up",
+                "css_class": "btn btn-outline-secondary rounded-pill",
+                "permission": "sales.view_sales_report",
+            },
+            {
+                "url": reverse("sales:financial_report"),
+                "label": strings.get("page_financial_report", "Financial"),
+                "icon": "bi bi-cash-stack",
+                "css_class": "btn btn-outline-secondary rounded-pill",
+                "permission": "sales.view_financial_report",
+            },
+            {
+                "url": reverse("sales:invoice_create"),
+                "label": strings.get("ui_new_invoice", "New Invoice"),
+                "icon": "bi bi-plus-lg",
+                "css_class": "btn btn-primary rounded-pill",
+                "permission": "sales.add_invoice",
+            },
+        ]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -577,39 +588,94 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 # --------------------------------------------------------------------------- #
 # Sales reporting (+ XLSX export)
 # --------------------------------------------------------------------------- #
-class SalesReportView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class SalesReportView(RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     permission_required = "sales.view_sales_report"
     raise_exception = True
     template_name = "sales/report.html"
+    page_title_key = "ui_sales_report"
+    page_subtitle_key = "page_sales_report_sub"
+
+    def get_window(self):
+        if not hasattr(self, "_window"):
+            self._window = parse_window(
+                self.request.GET.get("date_from"), self.request.GET.get("date_to")
+            )
+        return self._window
+
+    def get_ribbon_action_specs(self):
+        """The XLSX export, carrying the window the page is currently showing."""
+        date_from, date_to = self.get_window()
+        query = urlencode({
+            "date_from": date_from.strftime("%Y-%m-%d"),
+            "date_to": date_to.strftime("%Y-%m-%d"),
+        })
+        return [{
+            "url": f"{reverse('sales:report_export')}?{query}",
+            "label": self.get_page_strings().get("ui_export_xlsx", "Export XLSX"),
+            "icon": "bi bi-file-earmark-excel",
+            "css_class": "btn btn-success rounded-pill",
+        }]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        date_from, date_to = parse_window(
-            self.request.GET.get("date_from"), self.request.GET.get("date_to")
-        )
+        date_from, date_to = self.get_window()
         ctx["report"] = build_sales_report(date_from, date_to, self.request.user)
         ctx["date_from"] = date_from
         ctx["date_to"] = date_to
         return ctx
 
 
-class FinancialReportView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class FinancialReportView(RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     """Whole-store fiscal-year P&L (owner/manager). Not row-scoped — its own
     permission gates it (COGS / margins / capital-in-stock are sensitive)."""
 
     permission_required = "sales.view_financial_report"
     raise_exception = True
     template_name = "sales/financial_report.html"
+    page_title_key = "page_financial_report"
+    page_subtitle_key = "page_financial_report_sub"
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        years = available_fiscal_years()
+    def get_years(self):
+        if not hasattr(self, "_years"):
+            self._years = available_fiscal_years()
+        return self._years
+
+    def get_year(self):
+        years = self.get_years()
         try:
             year = int(self.request.GET.get("year", ""))
         except (TypeError, ValueError):
-            year = years[0]
-        if year not in years:
-            year = years[0]
+            return years[0]
+        return year if year in years else years[0]
+
+    def get_ribbon_action_specs(self):
+        """The fiscal-year picker.
+
+        Raw `html` rather than a button: it is a GET form that reloads the page
+        on change, and the ribbon has no filter band here — this view has no
+        FilterSet to derive one from.
+        """
+        strings = self.get_page_strings()
+        selected = self.get_year()
+        options = format_html_join(
+            "", '<option value="{}"{}>{}</option>',
+            ((y, mark_safe(' selected') if y == selected else "", y) for y in self.get_years()),
+        )
+        return [{
+            "html": format_html(
+                '<form method="get" class="d-flex align-items-center gap-2 no-print">'
+                '<label class="text-muted small mb-0" for="fiscal-year">{}</label>'
+                '<select id="fiscal-year" name="year" class="form-select form-select-sm w-auto"'
+                ' onchange="this.form.submit()">{}</select></form>',
+                strings.get("ui_fiscal_year", "Fiscal year"),
+                options,
+            ),
+        }]
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        years = self.get_years()
+        year = self.get_year()
         date_from, date_to = fiscal_year_window(year)
         ctx["report"] = build_financial_report(date_from, date_to)
         ctx["year"] = year

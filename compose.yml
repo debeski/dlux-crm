@@ -68,7 +68,7 @@ services:
     image: ${WEB_IMAGE:-debeski/sales:latest}
     restart: always
     entrypoint: []
-    command: ["python", "-m", "tools.smtp_relay"]
+    command: ["python", "-m", "dlux.smtp_relay"]
     environment:
       <<: *de
       POSTGRES_USER: ${POSTGRES_USER:-admin}
@@ -92,38 +92,6 @@ services:
       - egress
       - internal
 
-  # DjangoLux updater start
-  dlux-updater:
-    image: ${WEB_IMAGE:-debeski/sales:latest}
-    restart: always
-    command: ["python", "-m", "tools.dlux_runtime_supervisor", "--no-watch", "--", "bash", "-c", "python manage.py migrator && exec python manage.py dlux_update_worker"]
-    entrypoint: ["/app/entrypoint.sh"]
-    volumes:
-      - dlux_runtime:/opt/dlux-runtime:rw
-      - static:/app/staticfiles:rw
-      - ./media/:/app/media:rw
-      - ./logs/:/app/logs:rw
-    environment:
-      <<: *de
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_pass}
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local_secret}
-      ADMIN_PASS: ${ADMIN_PASS:-admin}
-    healthcheck:
-      test: ["CMD", "python", "-m", "dlux.updater.health"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 60s
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - egress
-      - internal
-  # DjangoLux updater end
 
   caddy:
     image: caddy:latest
@@ -168,7 +136,7 @@ services:
     image: ${WEB_IMAGE:-debeski/sales:latest}
     restart: always
     command: >
-      python -m tools.dlux_runtime_supervisor -- bash -c ' if [ "$$DEBUG_STATUS" = "True" ]; then
+      python -m dlux.updater.supervisor -- bash -c ' if [ "$$DEBUG_STATUS" = "True" ]; then
           echo "Starting in DEBUG mode with Django development server..."
           python manage.py runserver 0.0.0.0:8000
       else
@@ -201,21 +169,26 @@ services:
         condition: service_healthy
       smtp-relay:
         condition: service_healthy
-      dlux-updater:
-        condition: service_healthy
     networks:
       - internal
 
   celery:
     image: ${WEB_IMAGE:-debeski/sales:latest}
     restart: always
-    command: ["python", "-m", "tools.dlux_runtime_supervisor", "--", "python", "-m", "celery", "-A", "config", "worker", "-B", "--loglevel=info"]
+    command: ["python", "-m", "dlux.updater.supervisor", "--", "python", "-m", "celery", "-A", "config", "worker", "-B", "--loglevel=info"]
     entrypoint: ["/app/entrypoint.sh"]
+    pre_start:
+      - environment:
+          DLUX_BOOT_GATE: "off"
+        command: ["python", "-m", "dlux.updater.supervisor", "--no-watch", "--", "python", "manage.py", "dlux_reconcile"]
+      - environment:
+          DLUX_BOOT_GATE: "off"
+        command: ["sh", "-c", "python -m dlux.updater.supervisor --no-watch -- python manage.py migrator ${DLUX_MIGRATOR_FLAGS:-}"]
     volumes:
-      - static:/app/staticfiles:ro
+      - static:/app/staticfiles:rw
       - ./media/:/app/media:rw
       - ./logs/:/app/logs:rw
-      - dlux_runtime:/opt/dlux-runtime:ro
+      - dlux_runtime:/opt/dlux-runtime:rw
     environment:
       <<: *de
       POSTGRES_USER: ${POSTGRES_USER:-admin}
@@ -233,74 +206,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      dlux-updater:
-        condition: service_healthy
     networks:
       - internal
       # Public egress so the periodic rate-scrape task (finance.tasks.refresh_market_rates)
       # can reach cbl.gov.ly / eanlibya.com. web stays internal-only and reads the
       # scraped rates from the shared Redis cache.
       - egress
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    restart: unless-stopped
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@local.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80').read()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal
-
-  db-backup:
-    image: postgres:17
-    restart: always
-    command: >
-      bash -c ' while true; do
-          export PGPASSWORD=$$POSTGRES_PASSWORD
-          backup_file="/.backups/backup_$$(date +%Y-%m-%d_%H-%M-%S).pgdump"
-          echo "Starting backup: $$backup_file"
-          attempts=0
-          max_attempts=5
-          until pg_dump -Fc -h $$POSTGRES_HOST -U $$POSTGRES_USER $$POSTGRES_DB -f $$backup_file || [ $$attempts -ge $$max_attempts ]; do
-              echo "pg_dump failed, retrying..."
-              attempts=$$((attempts+1))
-              sleep 5
-          done
-          if [ $$attempts -ge $$max_attempts ]; then
-              echo "Backup failed after $$attempts attempts" >&2
-              rm -f $$backup_file
-          else
-              echo "Backup successful: $$backup_file"
-              cd /.backups && ls -tp *.pgdump | grep -v "/$$" | tail -n +4 | xargs -I {} rm -- {}
-          fi
-          sleep $$BACKUP_INTERVAL
-      done'
-    volumes:
-      - ./.backups/:/.backups:rw
-    environment:
-      <<: *de
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_pass}
-    healthcheck:
-      test: ["CMD-SHELL", "[ -d /.backups ] || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal
 
   # DjangoLux Composer agent start
   docker-socket-proxy:
@@ -313,16 +224,57 @@ services:
     environment:
       CONTAINERS: 1
       IMAGES: 1
-      NETWORKS: 1
-      VOLUMES: 1
       EVENTS: 1
-      EXEC: 1
-      POST: 1
       INFO: 1
       PING: 1
       VERSION: 1
+      NETWORKS: 0
+      VOLUMES: 0
+      POST: 0
+      EXEC: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker_proxy
+
+  composer-executor:
+    image: debeski/composer:latest
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Read-only file override so this uncapped UID-0 process can read the
+    # project's 0600 .secrets/.env to deploy. No write/exec/setuid bypass.
+    cap_add:
+      - DAC_READ_SEARCH
+    working_dir: "${PWD}"
+    command:
+      - executor
+      - --socket
+      - /run/composer-exec/composer-exec.sock
+      - --trigger-file
+      - /opt/dlux-runtime/state/image-update-request.json
+      - --status-file
+      - /opt/dlux-runtime/state/deploy-status.json
+      - --interval
+      - "2"
+    environment:
+      WEB_IMAGE: "${WEB_IMAGE:-debeski/sales:latest}"
+      COMPOSER_EXECUTOR_SOCKET: "/run/composer-exec/composer-exec.sock"
+      COMPOSER_VERSION_LABEL: "org.switchlibya.dlux_baked_version"
+      COMPOSER_RELEASE_MANIFEST_LABEL: "org.dlux.project.release-manifest"
+      COMPOSER_ACTIVE_VERSION_FILE: "/opt/dlux-runtime/state/active.json"
+      COMPOSER_ACTIVE_VERSION_KEY: "version"
+      COMPOSER_STATUS_FILE: "/opt/dlux-runtime/state/deploy-status.json"
+      COMPOSER_WATCH_SELF_SERVICE: "composer-executor"
+      COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,docker-socket-proxy,db,redis"
+      COMPOSER_AGENT_RESTART_SERVICES: "web,celery,smtp-relay,caddy"
+    volumes:
+      - "${PWD}:${PWD}:ro"
+      - dlux_runtime:/opt/dlux-runtime:rw
+      - composer_exec_sock:/run/composer-exec:rw
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     networks:
       - docker_proxy
 
@@ -356,20 +308,24 @@ services:
       COMPOSER_CONTROL_URL: "${COMPOSER_CONTROL_URL:-}"
       COMPOSER_ENROLLMENT_TOKEN: "${COMPOSER_ENROLLMENT_TOKEN:-}"
       COMPOSER_AGENT_STATE_DIR: "/var/lib/composer-agent"
+      COMPOSER_EXECUTOR_SOCKET: "/run/composer-exec/composer-exec.sock"
       COMPOSER_VERSION_LABEL: "org.switchlibya.dlux_baked_version"
       COMPOSER_RELEASE_MANIFEST_LABEL: "org.dlux.project.release-manifest"
       COMPOSER_ACTIVE_VERSION_FILE: "/opt/dlux-runtime/state/active.json"
       COMPOSER_ACTIVE_VERSION_KEY: "version"
       COMPOSER_STATUS_FILE: "/opt/dlux-runtime/state/deploy-status.json"
       COMPOSER_WATCH_SELF_SERVICE: "composer-agent"
-      COMPOSER_EXCLUDE_SERVICES: "composer-agent,docker-socket-proxy,db,redis,db-backup,pgadmin"
+      COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,docker-socket-proxy,db,redis"
       COMPOSER_AGENT_RESTART_SERVICES: "web,celery,smtp-relay,caddy"
     volumes:
       - "${PWD}:${PWD}:ro"
       - dlux_runtime:/opt/dlux-runtime:rw
       - composer_agent_state:/var/lib/composer-agent:rw
+      - composer_exec_sock:/run/composer-exec:rw
     depends_on:
       docker-socket-proxy:
+        condition: service_started
+      composer-executor:
         condition: service_started
     networks:
       - egress
@@ -383,6 +339,7 @@ volumes:
   static:
   dlux_runtime:
   composer_agent_state:
+  composer_exec_sock:
   caddy_data:
   caddy_config:
 

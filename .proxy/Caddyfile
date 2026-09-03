@@ -59,13 +59,6 @@
 			file_server
 		}
 
-		# pgAdmin under /pgadmin4/ (served even during app maintenance, like nginx).
-		handle_path /pgadmin4/* {
-			reverse_proxy pgadmin:80 {
-				header_up X-Script-Name /pgadmin4
-			}
-		}
-
 		# Live update status/log for the maintenance progress page. Served even
 		# during maintenance (composer-updater writes these on the shared
 		# dlux_runtime volume, which stays up while web is recreated).

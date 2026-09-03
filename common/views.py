@@ -18,16 +18,17 @@ from django_filters.views import FilterView
 from django_tables2 import SingleTableMixin
 from django.views.generic import TemplateView
 
+from dlux.ribbon import RibbonMixin, build_action
 from dlux.translations import get_current_language_code, get_strings
-from dlux.utils import advanced_filter_helper, get_user_scope, is_scope_enabled
+from dlux.utils import get_user_scope, is_scope_enabled
 
 from common.access import apply_ownership
+from common.formatting import format_money
 from common.forms import translate_choice_fields
 
 
 def _money(value):
-    value = value or Decimal("0.00")
-    return f"{value:,.2f}"
+    return format_money(value)
 
 
 def _count(value):
@@ -60,6 +61,27 @@ def _tile(
     }
 
 
+def _config_names(entries):
+    """Flatten a FilterSet ``advanced_config`` section into filter names.
+
+    Entries are a name, a ``{"name": ...}`` dict carrying presentation hints, or
+    a nested list standing for one rendered row. Only the names survive: the
+    Ribbon derives placeholders and From/To range labels itself, from the field
+    names and the `_gte`/`_lte` suffix convention.
+    """
+    names = []
+    for entry in entries or ():
+        if isinstance(entry, (list, tuple)):
+            names.extend(_config_names(entry))
+        elif isinstance(entry, dict):
+            name = entry.get("name")
+            if name:
+                names.append(name)
+        elif entry:
+            names.append(str(entry))
+    return names
+
+
 def scope_filtered_queryset(queryset, user):
     """Defence-in-depth scope guard (the ScopedManager already scopes; this keeps
     parity with the dlux scaffold and protects custom querysets)."""
@@ -75,7 +97,70 @@ def scope_filtered_queryset(queryset, user):
     return queryset.filter(scope=user_scope)
 
 
-class ScopedListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableMixin, FilterView):
+class RibbonPageMixin(RibbonMixin):
+    """A dlux ribbon on a page that is not a scoped list.
+
+    Reports, dashboards and the public-site builders have a heading and a row
+    of actions like every list does, but no model, table or FilterSet — so the
+    ribbon here carries a title, a description and whatever the page's own
+    buttons are. Titles use the same ``page_title_key`` / ``page_subtitle_key``
+    contract the lists use, so a string is named the same wherever it lives.
+
+    The template renders it with ``{% dlux_ribbon %}``.
+    """
+
+    page_title_key = ""
+    page_subtitle_key = ""
+    page_title = ""
+    page_subtitle = ""
+
+    def get_page_strings(self):
+        return get_strings(get_current_language_code(self.request))
+
+    def get_ribbon_title(self):
+        strings = self.get_page_strings()
+        return (self.page_title_key and strings.get(self.page_title_key)) or self.page_title or ""
+
+    def get_ribbon_subtitle(self):
+        strings = self.get_page_strings()
+        return (self.page_subtitle_key and strings.get(self.page_subtitle_key)) or self.page_subtitle or ""
+
+    def get_ribbon_actions(self):
+        """Same contract as the list pages: specs in, `RibbonAction`s out.
+
+        A bare dict has neither `is_html` nor `is_link`, which the ribbon
+        template dispatches on, so every spec goes through `build_action`.
+        """
+        built = [
+            action
+            for action in (
+                build_action(spec, request=self.request)
+                for spec in self.get_ribbon_action_specs()
+            )
+            if action is not None
+        ]
+        return built + list(super().get_ribbon_actions())
+
+    def get_ribbon_action_specs(self):
+        return []
+
+    #: Set by `refresh_ribbon()` — the page context an action's markup needs.
+    ribbon_page_context = None
+
+    def refresh_ribbon(self, context):
+        """Rebuild the ribbon once the page's own context exists.
+
+        `RibbonMixin` builds it inside `super().get_context_data()`, which runs
+        *before* a subclass adds anything — fine for a title and a link, not for
+        an action whose markup is one of the page's own stateful controls. A
+        view with such an action calls this at the end of `get_context_data`.
+        """
+        self.ribbon_page_context = context
+        context[self.ribbon_context_key] = self.get_ribbon(context)
+        return context
+
+
+class ScopedListView(RibbonMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableMixin, FilterView):
     """Standard list page: filter form + DluxTable + a permission-gated "Add"
     button that opens the framework dynamic-modal create form.
 
@@ -83,7 +168,12 @@ class ScopedListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableMix
     ``permission_required`` and (optionally) ``page_title`` / ``page_subtitle``.
     """
 
-    raise_exception = True
+    #: Left False so Django's AccessMixin splits the two cases the way a user
+    #: expects: an anonymous visitor — most often somebody whose session simply
+    #: expired — is sent to the login page, while a signed-in user who lacks the
+    #: permission gets 403. Setting it True gave *everyone* a bare 403, so an
+    #: expired session looked like a permissions problem.
+    raise_exception = False
     template_name = "common/scoped_list.html"
     ordering = "-created_at"
     #: DLUX_STRINGS keys (preferred — bilingual). Fall back to the literals below.
@@ -93,15 +183,29 @@ class ScopedListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableMix
     page_subtitle = ""
     #: set False for models that should not be created from the list page
     allow_add = True
-    #: optional advanced_filter_helper config (see dlux.utils.advanced_filter_helper)
-    filter_config = None
+    #: Extra query keys that are not filters but must survive a filter submit
+    #: and a Clear. The ribbon adds its own strip's key automatically; a
+    #: hand-drawn second strip names its key here.
+    ribbon_preserve_keys = ("sort", "page")
     #: static paths (relative to STATIC_URL) appended to the page's scripts block —
     #: e.g. per-model modal-form enhancers. Loaded on the list page so they are
     #: present when its create/edit modal opens.
     extra_scripts = ()
+    extra_styles = ()
+    #: Shared by every scoped list, emitted ahead of a subclass's own entries so
+    #: the CRUD wiring stays beneath what a view overrides. `scoped_crud.js`
+    #: reads the `data-scoped-crud` attributes `common/scoped_list.html` puts on
+    #: the list wrapper and drives the create/edit/view/delete dynamic modals;
+    #: `ribbon_actions.css` repairs a `.btn-group` sitting in the ribbon.
+    base_styles = ("common/css/ribbon_actions.css",)
+    base_scripts = ("common/js/scoped_crud.js",)
 
     def get_queryset(self):
-        qs = self.model._default_manager.all()
+        # Through super() rather than straight to the manager: RibbonMixin sits
+        # first in the MRO and narrows by the active ribbon tab there. Starting
+        # from the manager skipped it, so a declared tab strip rendered but did
+        # not filter, and every tabbed list had to narrow by hand.
+        qs = super().get_queryset()
         if self.ordering:
             order = [self.ordering] if isinstance(self.ordering, str) else list(self.ordering)
             qs = qs.order_by(*order)
@@ -112,16 +216,106 @@ class ScopedListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableMix
 
     def get_filterset(self, filterset_class):
         filterset = super().get_filterset(filterset_class)
-        # advanced_filter_helper builds the pill-shaped search bar + an advanced
-        # collapse and, via set_field_attrs, gives every dropdown a first-choice
-        # label and every text field a placeholder. Each FilterSet declares its
-        # own layout in an ``advanced_config`` attribute (primary row vs. the
-        # advanced collapse); the view may override it via ``filter_config``.
-        config = self.filter_config or getattr(filterset_class, "advanced_config", None)
-        advanced_filter_helper(filterset, config=config, request=self.request)
-        # Localize the dropdown *option* labels (status/method/… -> Arabic/English).
+        # The Ribbon derives the whole filter band from the FilterSet, but it
+        # does not touch the choices *inside* a field, so the option labels
+        # (status/method/… -> Arabic/English) are still localized here.
         translate_choice_fields(filterset.form, self.request)
         return filterset
+
+    def get_ribbon_actions(self):
+        """Build this page's action specs into `RibbonAction`s.
+
+        The ribbon template dispatches on `action.is_html` / `action.is_link`,
+        which are properties on `RibbonAction` — a bare dict has neither, so it
+        renders as an empty `<button>` however well-formed the dict is. Every
+        spec therefore goes through `build_action`, which also marks raw `html`
+        safe and applies the spec's own `permission` / `permissions` gate.
+        """
+        built = [
+            action
+            for action in (
+                build_action(spec, request=self.request)
+                for spec in self.get_ribbon_action_specs()
+            )
+            if action is not None
+        ]
+        return built + list(super().get_ribbon_actions())
+
+    def get_ribbon_action_specs(self):
+        """Action dicts for this list — the Add button by default.
+
+        An action with a `url` renders as a link and one without renders as a
+        button, so a modal opener carries only its `data-dynamic-modal` attrs.
+        """
+        opts = self.model._meta
+        strings = get_strings(get_current_language_code(self.request))
+        can_add = self.allow_add and self.request.user.has_perm(
+            f"{opts.app_label}.add_{opts.model_name}"
+        )
+        if not can_add:
+            return []
+        label = strings.get("ui_add", "Add")
+        return [{
+            "label": label,
+            "icon": "bi bi-plus-lg",
+            "css_class": "btn btn-primary rounded-pill",
+            "attrs": {
+                "data-dynamic-modal": self.get_add_modal_url(),
+                "data-modal-title": label,
+            },
+        }]
+
+    def get_ribbon_title(self):
+        return self.get_context_data_titles()[0]
+
+    def get_ribbon_subtitle(self):
+        return self.get_context_data_titles()[1]
+
+    @property
+    def ribbon_primary(self):
+        """Which filters sit in the ribbon's own row, not the advanced panel.
+
+        Read from the FilterSet's ``advanced_config`` — the layout each one has
+        always declared beside the fields it describes. Without this the Ribbon
+        would infer, and it promotes only ``keyword``/``q``/``search`` and
+        ``year``: every status and method dropdown these lists keep in the front
+        row would quietly move into the advanced panel.
+        """
+        return _config_names(self._filter_layout().get("fields")) or None
+
+    @property
+    def ribbon_advanced(self):
+        return _config_names(self._filter_layout().get("advanced_fields")) or None
+
+    def _filter_layout(self):
+        return getattr(self.filterset_class, "advanced_config", None) or {}
+
+    def get_ribbon_preserve_keys(self):
+        keys = list(self.ribbon_preserve_keys or ())
+        for key in self._filter_layout().get("clear_preserve_keys") or ():
+            if key not in keys:
+                keys.append(key)
+        return tuple(keys)
+
+    def get_context_data_titles(self):
+        """``(title, subtitle)`` for the page, resolved once.
+
+        Both the Ribbon and the template need them, and duplicating this
+        fallback chain is how the two paths drift apart.
+        """
+        opts = self.model._meta
+        strings = get_strings(get_current_language_code(self.request))
+        title = (
+            (self.page_title_key and strings.get(self.page_title_key))
+            or self.page_title
+            or strings.get(f"model_{opts.model_name}")
+            or str(opts.verbose_name_plural).title()
+        )
+        subtitle = (
+            (self.page_subtitle_key and strings.get(self.page_subtitle_key))
+            or self.page_subtitle
+        )
+        return title, subtitle
 
     def get_add_modal_url(self):
         opts = self.model._meta
@@ -145,13 +339,7 @@ class ScopedListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableMix
         can_add = self.allow_add and self.request.user.has_perm(
             f"{opts.app_label}.add_{opts.model_name}"
         )
-        title = (
-            (self.page_title_key and strings.get(self.page_title_key))
-            or self.page_title
-            or strings.get(f"model_{opts.model_name}")
-            or str(opts.verbose_name_plural).title()
-        )
-        subtitle = (self.page_subtitle_key and strings.get(self.page_subtitle_key)) or self.page_subtitle
+        title, subtitle = self.get_context_data_titles()
         context.update(
             {
                 "page_title": title,
@@ -162,7 +350,8 @@ class ScopedListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableMix
                 # Consumed by scoped_crud.js to open form-only edit/view/delete modals.
                 "modal_base_url": self.get_modal_base_url(),
                 "modal_delete_url": self.get_modal_delete_url(),
-                "extra_scripts": list(self.extra_scripts),
+                "extra_scripts": [*self.base_scripts, *self.extra_scripts],
+                "extra_styles": [*self.base_styles, *self.extra_styles],
             }
         )
         return context

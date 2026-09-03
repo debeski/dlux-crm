@@ -1,29 +1,5 @@
-{% extends "dlux/list_base.html" %}
-{% load crispy_forms_tags %}
-{% load render_table from django_tables2 %}
+{% extends "common/scoped_list.html" %}
 
-{% block title %}{{ DLUX_STRINGS.page_invoices }}{% endblock %}
-
-{% block content %}
-<div class="container-fluid py-4">
+{% block list_before_table %}
     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}" data-dlux-row-action-csrf>
-
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-        <div>
-            <h1 class="h3 mb-1">{{ DLUX_STRINGS.page_invoices }}</h1>
-            <p class="text-muted mb-0">{{ DLUX_STRINGS.page_invoices_sub }}</p>
-        </div>
-        {% if perms.sales.add_invoice %}
-        <a href="{% url 'sales:invoice_create' %}" class="btn btn-primary rounded-pill">
-            <i class="bi bi-plus-lg me-1"></i>{{ DLUX_STRINGS.ui_new_invoice }}
-        </a>
-        {% endif %}
-    </div>
-
-    {% if filter %}
-        <div class="no-print mb-3">{% crispy filter.form %}</div>
-    {% endif %}
-
-    {% render_table table %}
-</div>
 {% endblock %}

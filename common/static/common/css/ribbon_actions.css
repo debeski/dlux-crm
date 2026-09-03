@@ -1,0 +1,23 @@
+/* Ribbon action groups.
+
+   The panel skin pills every button in the actions area
+   (`.dlux-ribbon-skin-panel .dlux-ribbon-actions .btn { border-radius: 50rem }`).
+   That rule ties with Bootstrap's "square the trailing corners" group rule and
+   loses to its "square the leading corners" one, so a `.btn-group` came out as
+   two half-pills and one detached pill instead of one segmented control.
+
+   Square every segment, then round only the two outer ends. Logical
+   properties, so the leading end is the right one in Arabic. */
+.dlux-ribbon-skin-panel .dlux-ribbon-actions .btn-group > .btn {
+    border-radius: 0;
+}
+
+.dlux-ribbon-skin-panel .dlux-ribbon-actions .btn-group > .btn:first-child {
+    border-start-start-radius: 50rem;
+    border-end-start-radius: 50rem;
+}
+
+.dlux-ribbon-skin-panel .dlux-ribbon-actions .btn-group > .btn:last-child {
+    border-start-end-radius: 50rem;
+    border-end-end-radius: 50rem;
+}

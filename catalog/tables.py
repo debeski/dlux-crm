@@ -5,6 +5,7 @@ from django.utils.safestring import mark_safe
 from dlux.tables import DluxTable
 
 from common.i18n import t
+from common.tables import ModalRowActionsMixin
 
 from django.urls import reverse
 
@@ -17,13 +18,17 @@ _STOCKTAKE_BADGE = {
 }
 
 
-def _render_thumb(image):
-    """A small square thumbnail for a list row, or a neutral placeholder icon."""
-    if image:
+def _render_thumb(url):
+    """A small square thumbnail for a list row, or a neutral placeholder icon.
+
+    Takes the resolved URL rather than a file field: the picture may live in the
+    asset library or, until the backfill has run, still in the old column.
+    """
+    if url:
         return format_html(
             '<img src="{}" alt="" class="rounded border" '
             'style="width:38px;height:38px;object-fit:cover">',
-            image.url,
+            url,
         )
     # Static markup (no interpolation) — mark_safe, since Django 6's format_html
     # requires a placeholder arg.
@@ -36,21 +41,21 @@ def _fmt_lyd(value):
     return f"{value:,.2f}"
 
 
-class CategoryTable(DluxTable):
+class CategoryTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = Category
         fields = ("name", "is_active", "created_at")
         dlux_actions = True
 
 
-class SupplierTable(DluxTable):
+class SupplierTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = Supplier
         fields = ("name", "phone", "address", "is_active", "created_at")
         dlux_actions = True
 
 
-class ProductTable(DluxTable):
+class ProductTable(ModalRowActionsMixin, DluxTable):
     image = tables.Column(verbose_name="", orderable=False)
     price_lyd = tables.Column(
         empty_values=(), verbose_name="Price (LYD)", orderable=False
@@ -66,7 +71,7 @@ class ProductTable(DluxTable):
         dlux_actions = True
 
     def render_image(self, record):
-        return _render_thumb(record.image)
+        return _render_thumb(record.image_url)
 
     def render_price_lyd(self, record):
         return _fmt_lyd(record.selling_price_lyd())
@@ -99,7 +104,7 @@ class ProductTable(DluxTable):
         return f"{record.stock_qty:g}"
 
 
-class ProductLightTable(DluxTable):
+class ProductLightTable(ModalRowActionsMixin, DluxTable):
     """Minimal Products table for the "light" layout — name, price, stock and
     active only. Everything else (image, sku, barcode, category, unit, variants)
     stays in the record's detail modal (`Product.get_modal_context`), for a
@@ -126,7 +131,7 @@ class ProductLightTable(DluxTable):
         return f"{record.stock_qty:g}"
 
 
-class ServiceTable(DluxTable):
+class ServiceTable(ModalRowActionsMixin, DluxTable):
     image = tables.Column(verbose_name="", orderable=False)
     price_lyd = tables.Column(empty_values=(), verbose_name="Price (LYD)", orderable=False)
 
@@ -136,7 +141,7 @@ class ServiceTable(DluxTable):
         dlux_actions = True
 
     def render_image(self, record):
-        return _render_thumb(record.image)
+        return _render_thumb(record.image_url)
 
     def render_price_lyd(self, record):
         price = record.selling_price_lyd()
@@ -146,7 +151,11 @@ class ServiceTable(DluxTable):
         return t(f"svctype_{record.service_type}", record.get_service_type_display())
 
 
-class StockMovementTable(DluxTable):
+class StockMovementTable(ModalRowActionsMixin, DluxTable):
+    # The ledger is append-only — see StockMovement.delete(). A movement is
+    # undone by cancelling its source document, which posts a compensating row.
+    row_delete_action = False
+
     class Meta(DluxTable.Meta):
         model = StockMovement
         fields = ("product", "variant", "movement_type", "quantity", "reference", "created_by", "created_at")

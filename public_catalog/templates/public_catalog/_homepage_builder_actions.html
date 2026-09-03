@@ -1,0 +1,19 @@
+    <div class="hpb__head-actions">
+        <label class="hpb-live {% if not can_edit %}is-disabled{% endif %}">
+            <input type="checkbox" role="switch" data-homepage-toggle
+                   {% if public_config.homepage_enabled %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
+            <span class="hpb-live__dot"></span>
+            <b data-homepage-label>{% if public_config.homepage_enabled %}{{ DLUX_STRINGS.hp_homepage_live|default:"Homepage is live" }}{% else %}{{ DLUX_STRINGS.hp_homepage_offline|default:"Homepage is offline" }}{% endif %}</b>
+        </label>
+        {% if homepage_languages|length > 1 %}
+        <div class="lang-toggle-container hpb-langtoggle" role="tablist" aria-label="{{ DLUX_STRINGS.hp_edit_language|default:'Editing language' }}">
+            {% for code, lname in homepage_languages %}
+            <button type="button" class="lang-option {% if code == homepage_active_lang %}active{% endif %}" data-hpb-lang="{{ code }}" title="{{ lname }}">{{ code|upper }}</button>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <span class="hpb__status" data-hpb-status aria-live="polite"></span>
+        <a class="btn btn-outline-secondary rounded-pill" href="{% url 'public_catalog:landing' %}" target="_blank" rel="noopener">
+            <i class="bi bi-box-arrow-up-right me-1"></i>{{ DLUX_STRINGS.hp_open_site|default:"Open live site" }}
+        </a>
+    </div>

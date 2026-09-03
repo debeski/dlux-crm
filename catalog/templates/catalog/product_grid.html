@@ -1,4 +1,4 @@
-{% extends "catalog/product_list.html" %}
+{% extends "common/scoped_list.html" %}
 {% load dlux_tags %}
 
 {% block list_body %}
@@ -10,8 +10,8 @@
             <div class="d-flex gap-3">
                 <span class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded border overflow-hidden"
                       style="width:56px;height:56px;background:var(--table-row,#f8f9fa)">
-                    {% if p.image %}
-                    <img src="{{ p.image.url }}" alt="" style="width:56px;height:56px;object-fit:cover">
+                    {% if p.image_url %}
+                    <img src="{{ p.image_url }}" alt="" style="width:56px;height:56px;object-fit:cover">
                     {% else %}
                     <i class="bi bi-image text-muted fs-4"></i>
                     {% endif %}

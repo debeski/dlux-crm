@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.7.0
+- **Images Use The Dlux Asset Library**: `Product.image`, `Service.image` and `PublicCatalogListing.image_override` gained `ManagedAssetField` companions namespaced per model; read `image_url`, backfill with `adopt_image_assets --apply`.
+- **Stock Balances Rebuild After A Data Reset**: `catalog/stock_balance.py` recomputes product/variant balances from the live ledger on dlux's `data_reset_finished`; clearing movements no longer leaves products claiming stock.
+- **Ribbons On The Reports And Builders**: New `common.views.RibbonPageMixin` puts the ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders, replacing hand-rolled headers.
+- **Ribbon Descriptions And Segmented Actions**: Categories, Suppliers, Stock Takes, Customers, Payments and Deliveries gained `page_subtitle_key`; `common/css/ribbon_actions.css` renders a ribbon `.btn-group` as one control instead of loose half-pills.
+- **List Pages Are The Ribbon**: `ScopedListView` runs on `RibbonMixin` + `dlux/list_page.html`; layouts come from each FilterSet's `advanced_config`, buttons are ribbon action specs, and row menus open modals directly. Five list templates retired.
+- **One Document Editor**: `common/editors.py` owns the atomic save, formset lifecycle and audit entry; `sync_party` replaces the duplicate customer/supplier binding. Fixes CREATE logged as UPDATE and the draft guard skipping GET.
+- **Append-Only Stock Ledger**: `StockMovement.delete()` raises `IntegrityError` and the row menu offers no Delete — undo by compensating movement, as `cancel_invoice` already did.
+- **Date Filters On Invoices, Payments And Expenses**: These FilterSets extend `common.filters.DatedFilterSet` for a year dropdown plus a `date_gte`/`date_lte` range. `InvoiceFilter`'s `date_from`/`date_to` are renamed, so old bookmarks stop narrowing.
+- **Shared Helpers**: `common/filters.py` and `common/formatting.py` hold the dated filters and money formatting; `apply_dlux_file_widgets` gives every `FileField` the dlux uploader by form.
+- **Row Ownership Is Registered**: `OWNER_FIELDS` + `common.access.apply_ownership` replace the dynamic-modal monkeypatch; notification recipients are permission-checked and expired sessions reach the login page instead of a bare 403.
+- **django-lux 1.8.4 And The Composer Scaffold**: `composer check --fix` resolved six drifts — launcher wrappers v1, Docker authority moved to `composer-executor`, `db-backup`/`pgadmin`/`dlux-updater` retired, `org.dlux.post-start` migrator label. `DLUX_BAKED_VERSION` removed; dev stack on port 84.
+- **Date Filter Timezone Fix**: `DatedFilterSet`'s `__date` lookup runs in `Africa/Tripoli`, but its test asserted the stored UTC date — failing nightly between 22:00 UTC and midnight. Test-only.
+
 ## v0.6.6
 - **Caddy Trusts Private-Range Front Proxies**: Added a global `servers { trusted_proxies static private_ranges }` block so `X-Forwarded-For`/`X-Forwarded-Proto` from a private front proxy are forwarded instead of replaced. Inert while Caddy terminates TLS directly; aligns with the django-lux 1.5.9 scaffold.
 

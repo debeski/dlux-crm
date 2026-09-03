@@ -11,17 +11,13 @@ class CommonConfig(AppConfig):
 
     def ready(self):
         # Enforce per-employee row ownership on the dlux dynamic-modal
-        # edit/view/delete object lookup (see common.access). Installed on the
-        # first request rather than here: importing dlux.views at app-init time
-        # triggers section discovery (a DB query during startup). request_started
-        # fires before any view dispatch, so the patch is always in place before
-        # a modal can resolve an object.
-        from django.core.signals import request_started
+        # edit/view/delete object lookup (see common.access). Registered rather
+        # than patched, and registered here rather than on the first request:
+        # `dlux.access` imports nothing, so this costs no startup query — the
+        # reason the old monkey-patch had to wait for `request_started` was that
+        # importing `dlux.views` triggered section discovery.
+        from dlux.access import register_modal_queryset_filter
 
-        def _install(sender, **kwargs):
-            from common.access import install_modal_ownership_patch
+        from .access import apply_ownership
 
-            install_modal_ownership_patch()
-            request_started.disconnect(_install)
-
-        request_started.connect(_install, weak=False)
+        register_modal_queryset_filter(apply_ownership)

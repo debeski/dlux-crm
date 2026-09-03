@@ -4,11 +4,14 @@ from django import forms
 from django.forms import formset_factory
 from django.utils.html import format_html, format_html_join
 
-from dlux.forms import _build_archive_file_widget
+from dlux.forms import ManagedAssetFormMixin
 from dlux.translations import get_strings
 from dlux.utils import set_field_attrs
 
-from common.forms import build_grid_helper, translate_choice_fields, translate_help_text
+from common.forms import (
+    apply_dlux_file_widgets, build_grid_helper, translate_choice_fields,
+    translate_help_text,
+)
 from finance.services import get_current_rate
 
 from .models import Category, Product, PurchaseInvoice, Service, StockMovement, Supplier, PRODUCT_COLOR_SWATCHES
@@ -78,34 +81,24 @@ class ColorPaletteWidget(forms.Widget):
         )
 
 
-def _use_dlux_image_widget(form, field_name="image"):
-    """Swap the plain file input for dlux's rich archive file field (drag-drop
-    card + thumbnail preview + upload button). ``accept="image/*"`` is preserved
-    on the underlying input, so a phone still offers camera-or-gallery. Call this
-    AFTER set_field_attrs so the captured label is already translated; the card
-    renders its own label, so the field's crispy label is cleared to avoid a
-    duplicate. ``show_scan`` is left off — that button is dlux's desktop TWAIN
-    scanner (ScanLink), not the mobile camera."""
-    field = form.fields.get(field_name)
-    if field is None:
-        return
-    field.widget = _build_archive_file_widget(
-        field_label=field.label, show_scan=False, attrs={"accept": "image/*"}
-    )
-    field.label = ""
+def _use_dlux_image_widget(form):
+    """Every file field on the form gets dlux's uploader, images accept-gated.
+
+    ``accept="image/*"`` reaches the underlying input, so a phone still offers
+    camera-or-gallery. ``show_scan`` is left off — that button is dlux's desktop
+    TWAIN scanner (ScanLink), not the mobile camera. Call after
+    ``set_field_attrs`` so the captured label is already translated.
+    """
+    apply_dlux_file_widgets(form, accept={"image": "image/*"})
 
 
-def _use_dlux_document_widget(form, field_name="attachment"):
+def _use_dlux_document_widget(form):
     """Rich file input for supporting purchase-invoice scans/photos/PDFs."""
-    field = form.fields.get(field_name)
-    if field is None:
-        return
-    field.widget = _build_archive_file_widget(
-        field_label=field.label,
-        show_scan=True,
-        attrs={"accept": "image/*,application/pdf"},
+    apply_dlux_file_widgets(
+        form,
+        accept={"attachment": "image/*,application/pdf"},
+        show_scan=("attachment",),
     )
-    field.label = ""
 
 
 def _tag_lyd_field(form, field_name):
@@ -144,15 +137,19 @@ class SupplierForm(forms.ModelForm):
         build_grid_helper(self, [("name", "phone"), ("address", "is_active"), ("notes",)])
 
 
-class ProductForm(forms.ModelForm):
+class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
     refresh_parent = True
+    #: A stored file predating the asset library is adopted on first save.
+    legacy_asset_files = {"image_asset": "image"}
+    #: A clerk photographing stock wants the camera, not the file browser.
+    asset_capture = "environment"
 
     class Meta:
         model = Product
         # stock_qty is intentionally excluded: stock is driven by StockMovement so
         # the ledger stays authoritative. Use a "Stock In" movement to seed quantity.
         fields = [
-            "name", "sku", "category", "barcode", "image", "unit",
+            "name", "sku", "category", "barcode", "image_asset", "unit",
             "description",
             "cost_usd", "markup_percent", "price_usd", "price_lyd_override",
             "track_stock", "reorder_level", "is_active",
@@ -178,7 +175,7 @@ class ProductForm(forms.ModelForm):
             ("name", "sku"),
             ("category", "unit"),
             ("barcode",),
-            ("image",),
+            ("image_asset",),
             ("cost_usd", "markup_percent", "price_usd"),
             ("price_lyd_override", "reorder_level"),
             ("track_stock", "is_active"),
@@ -186,12 +183,14 @@ class ProductForm(forms.ModelForm):
         ])
 
 
-class ServiceForm(forms.ModelForm):
+class ServiceForm(ManagedAssetFormMixin, forms.ModelForm):
     refresh_parent = True
+    legacy_asset_files = {"image_asset": "image"}
+    asset_capture = "environment"
 
     class Meta:
         model = Service
-        fields = ["name", "service_type", "image", "description", "price_usd", "price_lyd_override", "is_active"]
+        fields = ["name", "service_type", "image_asset", "description", "price_usd", "price_lyd_override", "is_active"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -205,7 +204,7 @@ class ServiceForm(forms.ModelForm):
         _use_dlux_image_widget(self)
         build_grid_helper(self, [
             ("name", "service_type"),
-            ("image",),
+            ("image_asset",),
             ("price_usd", "price_lyd_override", "is_active"),
             ("description",),
         ])

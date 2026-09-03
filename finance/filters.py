@@ -1,6 +1,8 @@
 import django_filters
 from django.db.models import Q
 
+from common.filters import DatedFilterSet
+
 from .models import CashDeposit, ExchangeRate, Expense, ExpenseCategory, StaffAccount, StaffLedgerEntry
 
 
@@ -64,12 +66,18 @@ class ExpenseCategoryFilter(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value))
 
 
-class ExpenseFilter(django_filters.FilterSet):
+class ExpenseFilter(DatedFilterSet):
     keyword = django_filters.CharFilter(method="filter_keyword", label="")
 
+    #: The date a user means when they say "when" for an expense.
+    date_field = "expense_date"
+
     advanced_config = {
-        "fields": [{"name": "keyword", "placeholder_key": "search_placeholder"}, "category"],
-        "advanced_fields": [["method", "status"], ["paid_by"]],
+        "fields": [
+            {"name": "keyword", "placeholder_key": "search_placeholder"},
+            "category", "year",
+        ],
+        "advanced_fields": [["method", "status"], ["paid_by"], ["date_gte", "date_lte"]],
         "clear_preserve_keys": ["sort", "page"],
     }
 

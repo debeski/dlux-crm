@@ -137,23 +137,28 @@ class PaymentReceiptVisibilityTests(TestCase):
 
 
 class ModalOwnershipPatchTests(TestCase):
-    """The dynamic-modal edit/view/delete lookup (dlux
-    _scope_filtered_modal_queryset, wrapped by common.access) must exclude rows a
-    rep doesn't own, so guessing an id can't open another rep's private record."""
+    """The dynamic-modal edit/view/delete lookup must exclude rows a rep doesn't
+    own, so guessing an id can't open another rep's private record.
+
+    `common.apps` registers `apply_ownership` with dlux's modal queryset registry
+    at app-init; dlux runs it inside `_scope_filtered_modal_queryset`, which is
+    the single choke point all three edit/view/delete call sites resolve through."""
 
     def setUp(self):
         self.a = User.objects.create_user("rep_a", password="x")
         self.b = User.objects.create_user("rep_b", password="x")
         self.cust_b = Customer.objects.create(name="B's client", created_by=self.b)
 
+    def test_ownership_filter_is_registered_at_app_init(self):
+        from dlux.access import get_modal_queryset_filters
+
+        from common.access import apply_ownership
+
+        self.assertIn(apply_ownership, get_modal_queryset_filters())
+
     def test_modal_queryset_excludes_foreign_record(self):
-        from common.access import install_modal_ownership_patch
         from dlux.views import sections
 
-        # The patch installs on the first request in production; install it here
-        # explicitly (idempotent) so the test is deterministic.
-        install_modal_ownership_patch()
-        self.assertTrue(getattr(sections._scope_filtered_modal_queryset, "_ownership_wrapped", False))
         qs_a = sections._scope_filtered_modal_queryset(Customer, self.a)
         qs_b = sections._scope_filtered_modal_queryset(Customer, self.b)
         self.assertNotIn(self.cust_b, list(qs_a))

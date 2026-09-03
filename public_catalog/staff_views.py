@@ -6,9 +6,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.views.generic import TemplateView
 
 from catalog.models import Product, Service
+from common.views import RibbonPageMixin
 
 from .models import PublicCatalogListing
 from .settings import PUBLIC_CATALOG_NS, get_public_catalog_config, set_public_catalog_config
@@ -146,9 +148,34 @@ def _resolve_listing(request, *, create):
     return listing, True
 
 
-class PublicCatalogBuilderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class PublicCatalogBuilderView(RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "public_catalog/shop_builder.html"
     permission_required = "public_catalog.view_publiccataloglisting"
+    ribbon_title_icon = "bi bi-shop-window"
+    page_title_key = "builder_title"
+    page_subtitle_key = "builder_subtitle"
+
+    def get_ribbon_action_specs(self):
+        strings = self.get_page_strings()
+        settings_label = strings.get("builder_settings", "Shop settings")
+        return [
+            {
+                "url": reverse("public_catalog:shop"),
+                "label": strings.get("builder_open_shop", "View live shop"),
+                "icon": "bi bi-box-arrow-up-right",
+                "css_class": "btn btn-outline-secondary rounded-pill",
+                "attrs": {"target": "_blank", "rel": "noopener"},
+            },
+            {
+                "label": settings_label,
+                "icon": "bi bi-sliders",
+                "css_class": "btn btn-primary rounded-pill",
+                "attrs": {
+                    "data-dynamic-modal": reverse("dlux_app_settings_modal", args=[PUBLIC_CATALOG_NS]),
+                    "data-modal-title": settings_label,
+                },
+            },
+        ]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -189,9 +216,25 @@ def builder_update_listing(request):
         except (TypeError, ValueError):
             pass
     if request.POST.get("clear_image") in ("1", "true", "on"):
+        # Clear both: the old column may still hold a file the backfill has not
+        # adopted yet, and leaving it would make the override reappear.
         listing.image_override = ""
+        listing.image_override_asset = None
     if "image_override" in request.FILES:
-        listing.image_override = request.FILES["image_override"]
+        # The builder posts the file with the rest of the row rather than through
+        # a picker, so register it here — into this listing's own namespace, the
+        # one its asset field declares.
+        from dlux.assets import create_managed_asset
+
+        field = PublicCatalogListing._meta.get_field("image_override_asset")
+        asset, _created = create_managed_asset(
+            request.FILES["image_override"],
+            kind="image",
+            namespace=field.namespace,
+            user=request.user,
+        )
+        listing.image_override_asset = asset
+        listing.image_override = ""
     if listing.is_featured and not listing.is_published:
         listing.is_featured = False
 
@@ -249,9 +292,33 @@ def _save_homepage_image(uploaded, prefix):
     return default_storage.url(saved)
 
 
-class PublicHomepageBuilderView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class PublicHomepageBuilderView(RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "public_catalog/homepage_builder.html"
     permission_required = "public_catalog.view_publiccataloglisting"
+    ribbon_title_icon = "bi bi-easel2"
+    page_title_key = "hp_builder_title"
+    page_subtitle_key = "hp_builder_sub"
+
+    def get_ribbon_action_specs(self):
+        """The live toggle, the editing-language switch, the save status and the
+        link to the site — one block of raw markup rather than four actions.
+
+        They are stateful controls the builder's JS binds to and its stylesheet
+        lays out as a group, and they read the page's own context, so they move
+        into the ribbon whole. See `refresh_ribbon`.
+        """
+        from django.template.loader import render_to_string
+
+        context = self.ribbon_page_context
+        if context is None:
+            return []
+        return [{
+            "html": render_to_string(
+                "public_catalog/_homepage_builder_actions.html",
+                context,
+                request=self.request,
+            ),
+        }]
 
     def get_context_data(self, **kwargs):
         from common.i18n import t
@@ -337,7 +404,7 @@ class PublicHomepageBuilderView(LoginRequiredMixin, PermissionRequiredMixin, Tem
             "accent_secondary_presets": ["#14b8a6", "#f97316", "#84cc16", "#e11d48", "#8b5cf6", "#64748b", "#111827"],
             "can_edit": self.request.user.has_perm(EDIT_PERM),
         })
-        return ctx
+        return self.refresh_ribbon(ctx)
 
 
 @mutation_endpoint

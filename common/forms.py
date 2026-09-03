@@ -1,4 +1,6 @@
 """Shared form helpers."""
+from functools import lru_cache
+
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from django import forms
@@ -77,6 +79,36 @@ def translate_choice_fields(form, request=None):
         field.widget.choices = translate_choices(list(source), strings)
 
 
+@lru_cache(maxsize=1)
+def _own_generic_help_keys():
+    """Generic ``help_<field>`` keys declared by this project's own apps.
+
+    ``get_strings()`` returns dlux's strings merged with every app's, and dlux
+    declares generic help keys written for its user-account forms —
+    ``help_is_active`` reads "Unselect this instead of deleting accounts", which
+    is true of a user account and nonsense on a Product. Restricting the generic
+    fallback to keys we declare ourselves keeps that wording out of every model
+    that happens to share a field name, while ``help_<model>_<field>`` stays
+    unrestricted because it cannot collide.
+    """
+    from importlib import import_module
+
+    from django.apps import apps as django_apps
+
+    keys = set()
+    for app_config in django_apps.get_app_configs():
+        if app_config.name == "dlux":
+            continue
+        try:
+            module = import_module(f"{app_config.name}.translations")
+        except ModuleNotFoundError:
+            continue
+        for language_strings in (getattr(module, "DLUX_STRINGS", None) or {}).values():
+            if isinstance(language_strings, dict):
+                keys.update(k for k in language_strings if k.startswith("help_"))
+    return frozenset(keys)
+
+
 def translate_help_text(form, request=None):
     """Localize each field's ``help_text`` from DLUX_STRINGS.
 
@@ -86,8 +118,12 @@ def translate_help_text(form, request=None):
     it looks up ``help_<model>_<field>`` (then the generic ``help_<field>``) and,
     when found, overrides ``field.help_text``. Fields without a key keep whatever
     help text they already have, so partial coverage is safe.
+
+    The generic fallback only consults keys this project declares — see
+    ``_own_generic_help_keys``.
     """
     strings = get_strings(get_current_language_code(request))
+    own_keys = _own_generic_help_keys()
     model_name = ""
     if hasattr(form, "_meta") and getattr(form._meta, "model", None):
         model_name = form._meta.model.__name__.lower()
@@ -95,7 +131,41 @@ def translate_help_text(form, request=None):
         text = None
         if model_name:
             text = strings.get(f"help_{model_name}_{field_name}")
-        if not text:
+        if not text and f"help_{field_name}" in own_keys:
             text = strings.get(f"help_{field_name}")
         if text:
             field.help_text = text
+
+
+def apply_dlux_file_widgets(form, *, accept=None, show_scan=()):
+    """Render every file field with dlux's uploader instead of the raw input.
+
+    Django's ClearableFileInput is an unstyled "Choose file" control; dlux ships
+    a drop zone with a preview, size guard and clear action, and the modal CSS is
+    written for it. Applied per *form* rather than per field so a new FileField
+    cannot be added without it — which is how `Product.image` and
+    `Expense.attachment` each ended up wiring their widget by hand.
+
+    ``accept`` maps a field name to its accept attribute, and ``show_scan`` names
+    the fields that offer dlux's desktop scanner button (ScanLink); everything
+    else gets the plain uploader. The field's own label is cleared because the
+    card renders its own, and this must run *after* `set_field_attrs` so the
+    label it captures is already translated.
+    """
+    from dlux.widgets import DluxFileInput
+
+    accept = accept or {}
+    for field_name, field in form.fields.items():
+        if not isinstance(field, forms.FileField):
+            continue
+        if isinstance(field.widget, DluxFileInput):
+            continue
+        attrs = dict(getattr(field.widget, "attrs", {}) or {})
+        if field_name in accept:
+            attrs["accept"] = accept[field_name]
+        field.widget = DluxFileInput(
+            attrs=attrs,
+            field_label=str(field.label or field_name.replace("_", " ").title()),
+            show_scan=field_name in show_scan,
+        )
+        field.label = ""

@@ -1,5 +1,6 @@
 {% extends "dlux/base.html" %}
 {% load static %}
+{% load dlux_tags %}
 
 {% block title %}{{ DLUX_STRINGS.builder_title|default:"Public Catalog Builder" }}{% endblock %}
 
@@ -23,22 +24,7 @@
      data-txt-live="{{ DLUX_STRINGS.builder_shop_live|default:'Shop is live' }}"
      data-txt-offline="{{ DLUX_STRINGS.builder_shop_offline|default:'Shop is offline' }}">
 
-    <header class="shop-builder__head dlux-table-shell">
-        <div class="shop-builder__head-copy">
-            <h1><i class="bi bi-shop-window me-2"></i>{{ DLUX_STRINGS.builder_title|default:"Public Catalog Builder" }}</h1>
-            <p>{{ DLUX_STRINGS.builder_subtitle|default:"Curate your public shop from live stock — publish items, feature the best, and tune what customers see." }}</p>
-        </div>
-        <div class="shop-builder__head-actions">
-            <a class="btn btn-outline-secondary rounded-pill" href="{% url 'public_catalog:shop' %}" target="_blank" rel="noopener">
-                <i class="bi bi-box-arrow-up-right me-1"></i>{{ DLUX_STRINGS.builder_open_shop|default:"View live shop" }}
-            </a>
-            <button type="button" class="btn btn-primary rounded-pill"
-                    data-dynamic-modal="{% url 'dlux_app_settings_modal' public_settings_ns %}"
-                    data-modal-title="{{ DLUX_STRINGS.builder_settings|default:'Shop settings' }}">
-                <i class="bi bi-sliders me-1"></i>{{ DLUX_STRINGS.builder_settings|default:"Shop settings" }}
-            </button>
-        </div>
-    </header>
+    {% dlux_ribbon %}
 
     <section class="shop-builder__bar dlux-table-shell">
         <label class="storefront-switch {% if not can_edit %}is-disabled{% endif %}">

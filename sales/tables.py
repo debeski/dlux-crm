@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from dlux.tables import DluxTable
 
 from common.i18n import t
+from common.tables import ModalRowActionsMixin
 
 from .models import Customer, Delivery, Invoice, Payment
 
@@ -125,7 +126,7 @@ class InvoiceTable(DluxTable):
         return format_html('<span class="{}">{}</span>', css, f"{bal:,.2f}")
 
 
-class CustomerTable(DluxTable):
+class CustomerTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = Customer
         fields = ("name", "phone", "address", "is_active", "created_at")
@@ -176,7 +177,7 @@ class PaymentTable(DluxTable):
         ]
 
 
-class DeliveryTable(DluxTable):
+class DeliveryTable(ModalRowActionsMixin, DluxTable):
     recipient = tables.Column(verbose_name="Recipient")
     status = tables.Column(verbose_name="Status")
     assigned_to = tables.Column(verbose_name="Assigned To")

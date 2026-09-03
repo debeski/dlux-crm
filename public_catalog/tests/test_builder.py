@@ -154,10 +154,10 @@ class PublicCatalogBuilderTests(TestCase):
         self.assertFalse(PublicCatalogListing.objects.filter(product=self.product).exists())
 
     def test_sidebar_discovery_only_exposes_builder_page(self):
-        from dlux.discovery import _discover_sidebar_catalog_uncached
+        from dlux.discovery import discover_sidebar_catalog
 
-        en_catalog = _discover_sidebar_catalog_uncached(lang_code="en", include_system_items=True, config={})
-        ar_catalog = _discover_sidebar_catalog_uncached(lang_code="ar", include_system_items=True, config={})
+        en_catalog = discover_sidebar_catalog(lang_code="en", include_system_items=True)
+        ar_catalog = discover_sidebar_catalog(lang_code="ar", include_system_items=True)
 
         names = {
             entry["url_name"]

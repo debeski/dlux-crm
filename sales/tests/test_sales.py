@@ -322,7 +322,7 @@ class CustomerComboboxSyncTests(TestCase):
     def _sync(self, **kwargs):
         from sales.views import InvoiceCreateView
         inv = Invoice(exchange_rate=Decimal("6.50"), **kwargs)
-        InvoiceCreateView()._sync_customer(inv, self.actor)
+        InvoiceCreateView().sync_counterparty(inv, self.actor)
         return inv
 
     def test_new_name_creates_and_persists_customer(self):

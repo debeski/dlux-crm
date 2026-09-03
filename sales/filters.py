@@ -1,33 +1,34 @@
 import django_filters
 from django.db.models import Q
 
+from common.filters import DatedFilterSet
+
 from .models import Customer, Delivery, Invoice, Payment
 
 
-class InvoiceFilter(django_filters.FilterSet):
+class InvoiceFilter(DatedFilterSet):
     keyword = django_filters.CharFilter(method="filter_keyword", label="")
-    date_from = django_filters.DateFilter(field_name="invoice_date", lookup_expr="gte", label="From")
-    date_to = django_filters.DateFilter(field_name="invoice_date", lookup_expr="lte", label="To")
 
-    # advanced_filter_helper layout: keyword + status in the primary row, the
-    # date range inside the advanced collapse.
+    #: The date a user means when they say "when" for an invoice.
+    date_field = "invoice_date"
+
+    # Ribbon layout: keyword + status + the year jump in the ribbon's own row,
+    # the date range inside the advanced panel. Read by
+    # `ScopedListView.ribbon_primary`. The range fields are named for the
+    # `_gte`/`_lte` suffix convention `set_field_attrs` labels From/To from.
     advanced_config = {
         "fields": [
             {"name": "keyword", "placeholder_key": "search_placeholder"},
             "status",
+            "year",
         ],
-        "advanced_fields": [
-            [
-                {"name": "date_from", "range_label_key": "label_invoice_date", "range_direction": "from"},
-                {"name": "date_to", "range_label_key": "label_invoice_date", "range_direction": "to"},
-            ],
-        ],
+        "advanced_fields": [["date_gte", "date_lte"]],
         "clear_preserve_keys": ["sort", "page"],
     }
 
     class Meta:
         model = Invoice
-        fields = ["keyword", "status", "date_from", "date_to"]
+        fields = ["keyword", "status"]
 
     def filter_keyword(self, queryset, name, value):
         if not value:
@@ -59,12 +60,18 @@ class CustomerFilter(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(phone__icontains=value))
 
 
-class PaymentFilter(django_filters.FilterSet):
+class PaymentFilter(DatedFilterSet):
     keyword = django_filters.CharFilter(method="filter_keyword", label="")
 
+    #: A DateTimeField, so `_lookup` adds the `__date` transform — without it a
+    #: payment taken at 14:00 falls outside `date_lte` set to that same day.
+    date_field = "paid_at"
+
     advanced_config = {
-        "fields": [{"name": "keyword", "placeholder_key": "search_placeholder"}],
-        "advanced_fields": [["method"]],
+        "fields": [
+            {"name": "keyword", "placeholder_key": "search_placeholder"}, "year",
+        ],
+        "advanced_fields": [["method"], ["date_gte", "date_lte"]],
         "clear_preserve_keys": ["sort", "page"],
     }
 

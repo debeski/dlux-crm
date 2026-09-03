@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils.text import slugify
 
 from dlux.managers import ScopedManager
-from dlux.models import ScopedModel
+from dlux.models import ManagedAssetField, ScopedModel
 
 from catalog.models import Product, Service, product_color_hex
 
@@ -43,6 +43,15 @@ class PublicCatalogListing(ScopedModel):
     public_summary = models.CharField(max_length=280, blank=True)
     public_body = models.TextField(blank=True)
     image_override = models.ImageField(upload_to="public_catalog/listings/", blank=True)
+    #: Reads the catalog pools as well as its own: this field exists to show a
+    #: *different shot of the same item*, so the product and service photos are
+    #: exactly what an operator wants to choose between. Uploads still land in
+    #: this listing's own namespace and never back into the catalog's.
+    image_override_asset = ManagedAssetField(
+        kind="image",
+        reads=["catalog.product", "catalog.service"],
+        verbose_name="Public image",
+    )
     is_published = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=100)
@@ -120,8 +129,16 @@ class PublicCatalogListing(ScopedModel):
 
     @property
     def image_url(self):
-        image = self.image_override or getattr(self.source, "image", None)
-        return image.url if image else ""
+        """The override if there is one, otherwise whatever the source shows.
+
+        Each step prefers the asset library and falls back to the old column, so
+        a half-backfilled database renders the same as a finished one.
+        """
+        if self.image_override_asset_id and self.image_override_asset.url:
+            return self.image_override_asset.url
+        if self.image_override:
+            return self.image_override.url
+        return getattr(self.source, "image_url", "") or ""
 
     def public_price_lyd(self, rate=None):
         if not self.show_price:

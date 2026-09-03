@@ -1,11 +1,13 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from dlux.forms import _build_archive_file_widget
 from dlux.translations import get_strings
 from dlux.utils import set_field_attrs
 
-from common.forms import build_grid_helper, translate_choice_fields, translate_help_text
+from common.forms import (
+    apply_dlux_file_widgets, build_grid_helper, translate_choice_fields,
+    translate_help_text,
+)
 
 from .models import CashDeposit, ExchangeRate, Expense, ExpenseCategory, StaffAccount, StaffLedgerEntry
 
@@ -87,12 +89,11 @@ class ExpenseForm(forms.ModelForm):
         set_field_attrs(self)
         translate_choice_fields(self)
         translate_help_text(self)
-        self.fields["attachment"].widget = _build_archive_file_widget(
-            field_label=self.fields["attachment"].label,
-            show_scan=True,
-            attrs={"accept": "image/*,application/pdf"},
+        apply_dlux_file_widgets(
+            self,
+            accept={"attachment": "image/*,application/pdf"},
+            show_scan=("attachment",),
         )
-        self.fields["attachment"].label = ""
         build_grid_helper(self, [
             ("category", "amount_lyd"),
             ("expense_date", "method"),

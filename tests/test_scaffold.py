@@ -35,10 +35,15 @@ class ProjectScaffoldTests(SimpleTestCase):
         self.assertIn("fetch('/', { cache: 'no-store', credentials: 'same-origin' })", contents)
         self.assertIn("window.location.reload()", contents)
 
-    def test_dlux_version_sources_match_for_the_baked_version_gate(self):
+    def test_dlux_requirement_is_an_exact_pin(self):
+        """The baked version now comes from the installed package at runtime.
+
+        DjangoLux 1.8.0 retired the ``DLUX_BAKED_VERSION`` entry in
+        ``compose.dev.yml`` that this test used to compare against, so the
+        requirement pin is the only remaining source to validate.
+        """
         project_root = Path(__file__).resolve().parents[1]
-        requirements_path = project_root / "requirements.txt"
-        contents = requirements_path.read_text(encoding="utf-8")
+        contents = (project_root / "requirements.txt").read_text(encoding="utf-8")
         requirement = re.search(
             r"^django-lux\[updater\]==(?P<version>\d+\.\d+\.\d+)$",
             contents,
@@ -47,13 +52,7 @@ class ProjectScaffoldTests(SimpleTestCase):
         self.assertIsNotNone(requirement)
 
         dev_compose = (project_root / "compose.dev.yml").read_text(encoding="utf-8")
-        runtime_version = re.search(
-            r'^\s+DLUX_BAKED_VERSION:\s+"(?P<version>\d+\.\d+\.\d+)"$',
-            dev_compose,
-            re.MULTILINE,
-        )
-        self.assertIsNotNone(runtime_version)
-        self.assertEqual(requirement["version"], runtime_version["version"])
+        self.assertNotIn("DLUX_BAKED_VERSION", dev_compose)
 
     def test_project_release_manifest_matches_image_build_contract(self):
         project_root = Path(__file__).resolve().parents[1]

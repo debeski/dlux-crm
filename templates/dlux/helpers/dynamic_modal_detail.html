@@ -1,11 +1,17 @@
 {% comment %}
 Project override of dlux's generic detail partial.
 
-Adds an `extra_detail_fields` section on top of the framework's auto-generated
-`auto_detail_fields`. Models expose extra computed rows via `get_modal_context()`
-(merged into the modal context by DynamicModalManagerView) — used here to show the
-live-converted "Selling Price (LYD)" for catalog Products/Services, which is a
-derived property and therefore not one of the model's stored fields.
+The ONLY thing this adds is the `extra_detail_fields` section: models expose
+computed rows via `get_modal_context()` — used for the live-converted "Selling
+Price (LYD)" on catalog Products/Services, which is a derived property and so
+not one of the model's stored fields. `DynamicModalManagerView` merges that
+extra context BEFORE it sets `auto_detail_fields`, so a model cannot append to
+the generated list and this override is the only place the rows can go.
+
+Everything else is dlux 1.8.3's own partial, kept in step deliberately: the
+previous copy predated the audit trail and dropped `{% dlux_audit_trail %}` from
+every detail modal in the project. Re-check this file against
+`dlux/templates/dlux/helpers/dynamic_modal_detail.html` on each dlux upgrade.
 {% endcomment %}
 {% load dlux_tags %}
 {% load dlux_translation %}
@@ -25,10 +31,12 @@ derived property and therefore not one of the model's stored fields.
             </div>
         </div>
     {% empty %}
+        {% if not extra_detail_fields %}
         <div class="col-12 text-center text-muted py-4">
             <i class="bi bi-inbox fs-1 d-block mb-2"></i>
             {{ DLUX_STRINGS.no_details|default:"No details recorded." }}
         </div>
+        {% endif %}
     {% endfor %}
 
     {% for field in extra_detail_fields %}
@@ -53,10 +61,12 @@ derived property and therefore not one of the model's stored fields.
     </div>
 {% endif %}
 
-{% if request.GET.action == 'view' %}
+{% dlux_audit_trail object %}
+
+{% if request.GET.action == 'view' and not ribbon %}
 <div class="mt-4 text-end border-top pt-3">
-    <button type="button" class="btn btn-outline-secondary px-4 rounded-pill dynamic-back-btn">
-        <i class="bi bi-arrow-right me-1"></i> {{ DLUX_STRINGS.btn_back|default:"رجوع" }}
+    <button type="button" class="btn btn-outline-secondary px-4 rounded-pill dlux-back-link dynamic-back-btn">
+        <i class="bi bi-arrow-left me-1"></i> {{ DLUX_STRINGS.btn_back|default:"رجوع" }}
     </button>
 </div>
 {% endif %}

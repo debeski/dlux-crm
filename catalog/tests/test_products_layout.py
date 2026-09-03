@@ -124,11 +124,14 @@ class ProductListViewLayoutTests(TestCase):
 
     def test_table_layout_default(self):
         resp = self._render(self.user)
-        self.assertIn("catalog/product_list.html", resp.template_name)
+        # Table and Light are the shared list page; only the columns differ.
+        self.assertIn("common/scoped_list.html", resp.template_name)
         html = resp.content.decode()
         self.assertIn("data-products-layout-switch", html)  # toggle present
         self.assertIn('data-app-pref-url-template="/staff/sys/api/preferences/app/__namespace__/"', html)
-        self.assertIn("catalog/js/products_layout.js?v=20260711b", html)
+        # `dlux_static` busts the cache from the asset's own mtime, replacing the
+        # hand-bumped `?v=` the retired template carried.
+        self.assertRegex(html, r"catalog/js/products_layout\.js\?v=[^\"']+")
 
     def test_light_layout_uses_light_table(self):
         user = _set_layout(self.user, "light")
@@ -138,7 +141,7 @@ class ProductListViewLayoutTests(TestCase):
         # sanity: default/grid keep the full table
         self.assertIs(ProductListView.table_class, ProductTable)
         resp = self._render(user)
-        self.assertIn("catalog/product_list.html", resp.template_name)
+        self.assertIn("common/scoped_list.html", resp.template_name)
 
     def test_grid_layout_renders_cards(self):
         user = _set_layout(self.user, "grid")

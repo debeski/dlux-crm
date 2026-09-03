@@ -142,10 +142,10 @@ class WorkspaceDashboardTests(TestCase):
         self.assertEqual(set(SALES_STRINGS["en"]), set(SALES_STRINGS["ar"]))
 
     def test_workspace_sidebar_label_is_translated(self):
-        from dlux.discovery import _discover_sidebar_catalog_uncached
+        from dlux.discovery import discover_sidebar_catalog
 
-        en_catalog = _discover_sidebar_catalog_uncached(lang_code="en", config={})
-        ar_catalog = _discover_sidebar_catalog_uncached(lang_code="ar", config={})
+        en_catalog = discover_sidebar_catalog(lang_code="en")
+        ar_catalog = discover_sidebar_catalog(lang_code="ar")
 
         en_entry = next(entry for entry in en_catalog if entry["id"] == "common:workspace_dashboard")
         ar_entry = next(entry for entry in ar_catalog if entry["id"] == "common:workspace_dashboard")

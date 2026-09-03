@@ -1,20 +1,12 @@
 {% extends "dlux/base.html" %}
+{% load dlux_tags %}
 {% block title %}{{ DLUX_STRINGS.page_financial_report|default:"Financial Report" }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-        <div>
-            <h1 class="h3 mb-1">{{ DLUX_STRINGS.page_financial_report|default:"Financial Report" }}</h1>
-            <p class="text-muted mb-0">{{ DLUX_STRINGS.ui_fiscal_year|default:"Fiscal year" }} {{ year }} · {{ report.date_from }} → {{ report.date_to }}</p>
-        </div>
-        <form method="get" class="d-flex align-items-center gap-2 no-print">
-            <label class="text-muted small mb-0">{{ DLUX_STRINGS.ui_fiscal_year|default:"Fiscal year" }}</label>
-            <select name="year" class="form-select" onchange="this.form.submit()" style="width:auto">
-                {% for y in years %}<option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>{% endfor %}
-            </select>
-        </form>
-    </div>
+    {% dlux_ribbon %}
+
+    <p class="text-muted small mb-3">{{ DLUX_STRINGS.ui_fiscal_year|default:"Fiscal year" }} {{ year }} · {{ report.date_from }} → {{ report.date_to }}</p>
 
     {# Period figures #}
     <div class="row g-3 mb-2">

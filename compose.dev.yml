@@ -10,36 +10,19 @@ services:
     volumes: !override
       - /Users/debeski/Desktop/depy/pkg-django-lux/dlux:/app/dlux:ro
 
-  dlux-updater:
-    build: .
-    image: !reset null
-    volumes: !override
-      - /Users/debeski/Desktop/depy/pkg-django-lux/dlux:/app/dlux:ro
-      - ./catalog:/app/catalog:rw
-      - ./common:/app/common:rw
-      - ./config:/app/config:rw
-      - ./finance:/app/finance:rw
-      - ./public_catalog:/app/public_catalog:rw
-      - ./sales:/app/sales:rw
-      - dlux_runtime:/opt/dlux-runtime:rw
-      - static:/app/staticfiles:rw
-      - ./media/:/app/media/:rw
-      - ./logs/:/app/logs:rw
-    environment:
-      DLUX_BAKED_VERSION: "1.5.3"
-
   caddy:
-    # Local dev: plain HTTP only (no ACME/TLS), served on host port 90.
+    # Local dev: plain HTTP only (no ACME/TLS), served on host port 84.
+    # 90 belongs to the gov edition's stack on this host.
     # The Django/DLux app is the catch-all on :80; the legacy ERP host redirects
     # back to /staff/ on the same local app.
     ports: !override
       - target: 80
-        published: "90"
+        published: "84"
         protocol: tcp
     environment:
       CADDY_SITE_ADDRESS: ":80"
       CADDY_ERP_ADDRESS: "http://erp.localhost"
-      CADDY_PRIMARY_URL: "http://localhost:90"
+      CADDY_PRIMARY_URL: "http://localhost:84"
 
   web:
     build: .
@@ -58,9 +41,9 @@ services:
       - dlux_runtime:/opt/dlux-runtime:ro
       - ./imports/:/app/imports:ro
     environment:
-      BASE_URL: "http://localhost:90"
+      BASE_URL: "http://localhost:84"
       DEBUG_STATUS: "True"
-      NGINX_PORT: "90"
+      NGINX_PORT: "84"
 
   celery:
     build: .

@@ -6,13 +6,18 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.html import format_html
 from django.utils.translation import gettext as _
 from django.views import View
 from django.views.generic import DetailView, TemplateView
 
+from django.urls import reverse
+
+from dlux.translations import get_current_language_code, get_strings
 from dlux.utils import log_user_action
 
-from common.views import ScopedListView
+from common.editors import sync_party
+from common.views import RibbonPageMixin, ScopedListView
 from finance.services import get_current_rate, usd_to_lyd
 
 from .filters import (
@@ -112,6 +117,7 @@ class CategoryListView(ScopedListView):
     table_class = CategoryTable
     filterset_class = CategoryFilter
     page_title_key = "page_categories"
+    page_subtitle_key = "page_categories_sub"
 
 
 class SupplierListView(ScopedListView):
@@ -120,6 +126,7 @@ class SupplierListView(ScopedListView):
     table_class = SupplierTable
     filterset_class = SupplierFilter
     page_title_key = "page_suppliers"
+    page_subtitle_key = "page_suppliers_sub"
 
 
 class ProductListView(ScopedListView):
@@ -145,8 +152,30 @@ class ProductListView(ScopedListView):
     def get_template_names(self):
         if self.get_layout() == PRODUCTS_LAYOUT_GRID:
             return ["catalog/product_grid.html"]
-        # Table + Light both use the product list template (adds the layout toggle).
-        return ["catalog/product_list.html"]
+        # Table and Light are the shared list page; only the columns differ.
+        return [self.template_name]
+
+    def get_ribbon_action_specs(self):
+        """The table/grid/light switch, ahead of the Add button.
+
+        Raw `html` rather than three ribbon buttons: the control is one
+        `btn-group` whose pressed state and app-preference wiring live in the
+        partial, and splitting it into separate actions would lose both. The
+        layout is a per-user dlux app preference, not a query key, so it needs
+        no `ribbon_preserve_keys` entry.
+        """
+        from django.template.loader import render_to_string
+
+        toggle = render_to_string(
+            "catalog/_products_layout_toggle.html",
+            {
+                "products_layout": self.get_layout(),
+                "products_layout_ns": PRODUCTS_LAYOUT_NS,
+                "products_layouts": PRODUCTS_LAYOUTS,
+            },
+            request=self.request,
+        )
+        return [{"html": toggle}] + list(super().get_ribbon_action_specs())
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -171,7 +200,6 @@ class StockMovementListView(ScopedListView):
     permission_required = "catalog.view_stockmovement"
     table_class = StockMovementTable
     filterset_class = StockMovementFilter
-    template_name = "catalog/stock_movement_list.html"  # adds the Opening-Stock button
     page_title_key = "page_stock_movements"
     page_subtitle_key = "page_stock_movements_sub"
     extra_scripts = ("catalog/js/stock_movement.js",)
@@ -181,16 +209,82 @@ class StockMovementListView(ScopedListView):
         ctx["opening_stock_used"] = _opening_stock_used()
         return ctx
 
+    def get_ribbon_action_specs(self):
+        """Opening Stock, Add Stock, and the manual movement modal.
+
+        Each button needs *every* permission it lists, not any of them — adding a
+        movement by hand also creates the product it moves — so the checks are
+        made here rather than handed to the ribbon's any-of `permissions` gate.
+        """
+        strings = get_strings(get_current_language_code(self.request))
+        user = self.request.user
+        actions = []
+        if user.has_perm("catalog.add_product") and user.has_perm("catalog.add_stockmovement"):
+            if _opening_stock_used():
+                actions.append({
+                    "url": reverse("catalog:opening_stock_detail"),
+                    "label": strings.get("ui_view_opening_stock", "View Opening Stock"),
+                    "icon": "bi bi-eye",
+                    "css_class": "btn btn-outline-primary rounded-pill",
+                })
+            else:
+                actions.append({
+                    "url": reverse("catalog:opening_stock"),
+                    "label": strings.get("ui_new_opening_stock", "Opening Stock (bulk)"),
+                    "icon": "bi bi-box-seam",
+                    "css_class": "btn btn-primary rounded-pill",
+                })
+        if (
+            user.has_perm("catalog.add_purchaseinvoice")
+            and user.has_perm("catalog.add_product")
+            and user.has_perm("catalog.add_stockmovement")
+        ):
+            actions.append({
+                "url": reverse("catalog:purchase_invoice_create"),
+                "label": strings.get("ui_add_stock", "Add Stock"),
+                "icon": "bi bi-plus-lg",
+                "css_class": "btn btn-success rounded-pill",
+            })
+        label = strings.get("ui_manual_stock_movement", "Manual Movement")
+        if self.allow_add and user.has_perm("catalog.add_stockmovement"):
+            actions.append({
+                "label": label,
+                "icon": "bi bi-sliders",
+                "css_class": "btn btn-outline-secondary rounded-pill",
+                "attrs": {
+                    "data-dynamic-modal": self.get_add_modal_url(),
+                    "data-modal-title": label,
+                },
+            })
+        # Deliberately not calling super(): the manual-movement button above IS
+        # this list's Add, with its own label and a secondary style.
+        return actions
+
 
 class PurchaseInvoiceListView(ScopedListView):
     model = PurchaseInvoice
     permission_required = "catalog.view_purchaseinvoice"
     table_class = PurchaseInvoiceTable
     filterset_class = PurchaseInvoiceFilter
-    template_name = "catalog/purchase_invoice_list.html"
     page_title_key = "page_purchase_invoices"
     page_subtitle_key = "page_purchase_invoices_sub"
-    allow_add = False
+    allow_add = False  # created through the full-page editor, not a modal
+
+    def get_ribbon_action_specs(self):
+        user = self.request.user
+        if not (
+            user.has_perm("catalog.add_purchaseinvoice")
+            and user.has_perm("catalog.add_product")
+            and user.has_perm("catalog.add_stockmovement")
+        ):
+            return []
+        strings = get_strings(get_current_language_code(self.request))
+        return [{
+            "url": reverse("catalog:purchase_invoice_create"),
+            "label": strings.get("ui_new_purchase_invoice", "New Purchase Invoice"),
+            "icon": "bi bi-plus-lg",
+            "css_class": "btn btn-primary rounded-pill",
+        }]
 
 
 # --------------------------------------------------------------------------- #
@@ -212,9 +306,28 @@ class StockTakeListView(ScopedListView):
     permission_required = "catalog.view_stocktake"
     table_class = StockTakeTable
     filterset_class = StockTakeFilter
-    template_name = "catalog/stock_take_list.html"  # adds New-count + Valuation buttons
     page_title_key = "page_stock_takes"
+    page_subtitle_key = "page_stock_takes_sub"
     allow_add = False  # created via the full-page count flow, not a modal
+
+    def get_ribbon_action_specs(self):
+        strings = get_strings(get_current_language_code(self.request))
+        actions = []
+        if self.request.user.has_perm("catalog.view_inventory_valuation"):
+            actions.append({
+                "url": reverse("catalog:inventory_valuation"),
+                "label": strings.get("page_inventory_valuation", "Valuation"),
+                "icon": "bi bi-cash-coin",
+                "css_class": "btn btn-outline-secondary rounded-pill",
+            })
+        if self.request.user.has_perm("catalog.add_stocktake"):
+            actions.append({
+                "url": reverse("catalog:stock_take_create"),
+                "label": strings.get("ui_new_stock_take", "New Count"),
+                "icon": "bi bi-plus-lg",
+                "css_class": "btn btn-primary rounded-pill",
+            })
+        return actions
 
 
 class StockTakeCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
@@ -286,16 +399,37 @@ class StockTakeApplyView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return redirect("catalog:stock_take_detail", pk=pk)
 
 
-class InventoryValuationView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class InventoryValuationView(RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     """What the stock on hand is worth right now: Σ(stock_qty × unit cost)."""
 
     permission_required = "catalog.view_inventory_valuation"
     raise_exception = True
     template_name = "catalog/inventory_valuation.html"
+    page_title_key = "page_inventory_valuation"
+    page_subtitle_key = "page_inventory_valuation_sub"
+
+    def get_rate(self):
+        # Memoized: the ribbon chip and the figures below it must quote the
+        # same rate, and it is one lookup either way.
+        if not hasattr(self, "_rate"):
+            self._rate = get_current_rate()
+        return self._rate
+
+    def get_ribbon_action_specs(self):
+        """The live USD → LYD rate every figure on the page is priced at."""
+        strings = self.get_page_strings()
+        return [{
+            "html": format_html(
+                '<span class="badge rounded-pill text-bg-light border">'
+                '<i class="bi bi-currency-exchange me-1"></i>{}: 1 USD = {} LYD</span>',
+                strings.get("ui_rate", "Rate"),
+                self.get_rate(),
+            ),
+        }]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        rate = get_current_rate()
+        rate = self.get_rate()
         rows = []
         total_usd = Decimal("0.00")
         for p in Product.objects.filter(is_active=True, track_stock=True).order_by("name"):
@@ -441,29 +575,8 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
         }
 
     def _sync_supplier(self, invoice):
-        name = (invoice.supplier_name or "").strip()
-        supplier = invoice.supplier if invoice.supplier_id else None
-        if supplier is None and name:
-            supplier = Supplier.objects.filter(name__iexact=name).first()
-            if supplier is None:
-                supplier = Supplier(name=name)
-        if supplier is None:
-            return
-
-        invoice.supplier_name = invoice.supplier_name or supplier.name
-        invoice.supplier_phone = invoice.supplier_phone or supplier.phone
-        invoice.supplier_address = invoice.supplier_address or supplier.address
-
-        dirty = supplier.pk is None
-        if not supplier.name and name:
-            supplier.name, dirty = name, True
-        if invoice.supplier_phone and not supplier.phone:
-            supplier.phone, dirty = invoice.supplier_phone, True
-        if invoice.supplier_address and not supplier.address:
-            supplier.address, dirty = invoice.supplier_address, True
-        if dirty:
-            supplier.save()
-        invoice.supplier = supplier
+        # Suppliers are shared reference data, so no ownership narrowing here.
+        sync_party(invoice, prefix="supplier", party_model=Supplier)
 
     def _kept_forms(self, formset):
         kept = []

@@ -16,10 +16,10 @@ Any item may carry a manual ``price_lyd_override`` for ad-hoc / unrelated goods.
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import IntegrityError, models
 from django.utils import timezone
 
-from dlux.models import ScopedModel
+from dlux.models import ManagedAssetField, ScopedModel
 
 from finance.services import get_current_rate, usd_to_lyd
 
@@ -56,11 +56,35 @@ def product_color_label(color):
     return t(f"color_{color}", dict(Product.COLOR_CHOICES).get(color, color))
 
 
+class ImageAssetMixin(models.Model):
+    """A picture held in the dlux asset library, with the old file as a fallback.
+
+    ``image_asset`` is the field of record; the plain ``image`` column stays
+    readable until the backfill has adopted every file (see the
+    ``adopt_image_assets`` command). Read through ``image_url`` rather than
+    either field so a half-migrated database renders the same as a finished one.
+    """
+
+    class Meta:
+        abstract = True
+
+    @property
+    def image_url(self):
+        if self.image_asset_id and self.image_asset.url:
+            return self.image_asset.url
+        return self.image.url if self.image else ""
+
+    @property
+    def has_image(self):
+        return bool(self.image_url)
+
+
 def _image_detail_row(instance, label):
     """A dlux detail row rendering the instance's image as a thumbnail (HTML), or
     ``None`` when there's no image. Consumed by ``get_modal_context`` and rendered
     via the project's ``extra_detail_fields`` (is_html) override."""
-    if not instance.image:
+    url = getattr(instance, "image_url", "")
+    if not url:
         return None
     from django.utils.html import format_html
 
@@ -69,7 +93,7 @@ def _image_detail_row(instance, label):
         "is_html": True,
         "value": format_html(
             '<img src="{}" alt="" class="img-fluid rounded border" style="max-height:180px">',
-            instance.image.url,
+            url,
         ),
     }
 
@@ -109,7 +133,7 @@ class Supplier(ScopedModel):
         return self.name
 
 
-class Product(ScopedModel):
+class Product(ImageAssetMixin, ScopedModel):
     """A stock item. Priced in USD; sold in LYD via the live rate."""
 
     COLOR_BLACK = "black"
@@ -168,7 +192,10 @@ class Product(ScopedModel):
     )
     description = models.TextField(blank=True, verbose_name="Description")
     barcode = models.CharField(max_length=64, blank=True, db_index=True, verbose_name="Barcode")
+    #: Superseded by `image_asset`; kept readable until the backfill has
+    #: adopted every stored file. Read `image_url`, never either field.
     image = models.ImageField(upload_to="catalog/products/", blank=True, verbose_name="Image")
+    image_asset = ManagedAssetField(kind="image", verbose_name="Image")
     unit = models.CharField(max_length=12, choices=UNIT_CHOICES, default=UNIT_PIECE, verbose_name="Unit")
     color = models.CharField(
         max_length=16, choices=COLOR_CHOICES, null=True, blank=True, verbose_name="Color",
@@ -394,7 +421,7 @@ class ProductVariant(models.Model):
         return " / ".join(parts)
 
 
-class Service(ScopedModel):
+class Service(ImageAssetMixin, ScopedModel):
     """A labour / after-sale offering. Priced in USD, LYD, or quoted per job."""
 
     TYPE_INSTALLATION = "installation"
@@ -417,6 +444,7 @@ class Service(ScopedModel):
     )
     description = models.TextField(blank=True, verbose_name="Description")
     image = models.ImageField(upload_to="catalog/services/", blank=True, verbose_name="Image")
+    image_asset = ManagedAssetField(kind="image", verbose_name="Image")
     price_usd = models.DecimalField(
         max_digits=12, decimal_places=2, null=True, blank=True,
         validators=[MinValueValidator(Decimal("0.00"))], verbose_name="Price (USD)",
@@ -670,6 +698,28 @@ class StockMovement(ScopedModel):
 
     def __str__(self):
         return f"{self.get_movement_type_display()} {self.quantity} × {self.product_id}"
+
+    def delete(self, *args, **kwargs):
+        """The ledger is append-only: a movement is never removed.
+
+        ``save()`` applies its delta to ``Product.stock_qty`` on insert only, so
+        deleting the row would drop the ledger entry and leave the stock figure
+        it moved standing — the balance would silently drift from its history.
+
+        A movement is undone by posting a compensating one, which is what
+        ``sales.services.cancel_invoice`` does: it writes a Stock In for every
+        line the cancelled invoice drew down, and leaves the original Stock Out
+        in place as the record of what happened. Corrections go the same way,
+        as an Adjustment.
+
+        Nothing in the project deletes a movement, and no seeded role holds
+        ``catalog.delete_stockmovement``; this closes the remaining paths — the
+        admin, a shell, and a superuser's row menu.
+        """
+        raise IntegrityError(
+            "Stock movements are an append-only ledger and cannot be deleted. "
+            "Post a compensating movement (or cancel the source document) instead."
+        )
 
     def get_movement_type_display(self):
         """Translated movement-type label (dlux's generic detail view calls this)."""

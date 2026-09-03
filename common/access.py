@@ -52,30 +52,3 @@ def apply_ownership(queryset, user):
         predicate |= Q(**{lookup: user})
     # OR across related lookups can multiply rows via joins — collapse them.
     return queryset.filter(predicate).distinct()
-
-
-def install_modal_ownership_patch():
-    """Layer ownership onto dlux's dynamic-modal object lookup.
-
-    The project's ``scoped_modal_manager`` / ``scoped_modal_delete`` routes use
-    dlux ``DynamicModalManagerView`` / ``DynamicModalDeleteView``, which resolve
-    the edited/deleted object through a module-level
-    ``_scope_filtered_modal_queryset(model, user)`` helper. Without this, a rep
-    could open another rep's Customer/Payment/Delivery by guessing its id. We
-    wrap that single helper (all three edit/view/delete call sites route through
-    it) so the owner filter is enforced everywhere the modal touches an object.
-    Idempotent and a no-op for shared models.
-    """
-    try:
-        from dlux.views import sections
-    except Exception:  # pragma: no cover - dlux always present at runtime
-        return
-    original = getattr(sections, "_scope_filtered_modal_queryset", None)
-    if original is None or getattr(original, "_ownership_wrapped", False):
-        return
-
-    def wrapped(model, user):
-        return apply_ownership(original(model, user), user)
-
-    wrapped._ownership_wrapped = True
-    sections._scope_filtered_modal_queryset = wrapped

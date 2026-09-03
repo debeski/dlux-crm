@@ -1,9 +1,0 @@
-{% extends "common/scoped_list.html" %}
-
-{% block list_actions %}
-    {% if perms.catalog.add_purchaseinvoice and perms.catalog.add_product and perms.catalog.add_stockmovement %}
-    <a href="{% url 'catalog:purchase_invoice_create' %}" class="btn btn-primary rounded-pill">
-        <i class="bi bi-plus-lg me-1"></i>{{ DLUX_STRINGS.ui_new_purchase_invoice|default:"New Purchase Invoice" }}
-    </a>
-    {% endif %}
-{% endblock %}

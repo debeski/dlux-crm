@@ -22,8 +22,9 @@ Lower layers **never** import higher ones. The stock ledger references invoices 
 their string number (not a FK) so `catalog` stays independent of `sales`.
 
 `common/` is a plain Python package (not a Django app, no models). It holds
-`ScopedListView` and the generic `templates/common/scoped_list.html` so every
-simple list page stays a few lines.
+`ScopedListView`, `RibbonPageMixin` and the generic
+`common/templates/common/scoped_list.html` so every simple list page stays a few
+lines.
 
 ## Public/staff URL split
 
@@ -120,6 +121,35 @@ For **simple models** (products, services, categories, rates, deposits, customer
   manager** (`modal_manager`), which auto-resolves `<Model>Form` from the app's
   `forms.py`. No per-model create/update/delete views or templates needed.
 - The list page's "Add" button and the `DluxTable` row context menu open those modals.
+
+`Product.stock_qty` and `ProductVariant.stock_qty` are running balances, applied once per movement by
+`StockMovement.save()` — the ledger is the source of truth and the column is a cache of it. Anything that writes
+movements in bulk therefore leaves the balance stale, which is why `catalog/stock_balance.py` rebuilds it from the
+live ledger and runs on dlux's `data_reset_finished` signal. Call `rebuild_stock_balances()` after any other bulk
+write to that table.
+
+Images are held in the **dlux asset library**, never as a plain `ImageField`. `Product.image_asset`,
+`Service.image_asset` and `PublicCatalogListing.image_override_asset` are `ManagedAssetField`s namespaced after
+their own model, so one model's photos stay out of another's picker; the listing override also `reads` the catalog
+pools because it exists to show a different shot of the same item. Always read `image_url`, never the field: the
+old columns stay populated until `adopt_image_assets --apply` has adopted every stored file.
+
+Every staff page carries the **dlux ribbon** — its title, description, filters
+and actions. A list gets it from `ScopedListView`; a page with no model, table or
+FilterSet (the reports, the sales overview, both public-site builders) gets it
+from `common.views.RibbonPageMixin` and renders it with `{% dlux_ribbon %}`.
+Both resolve the heading from `page_title_key` / `page_subtitle_key` against
+`DLUX_STRINGS`, so a page's strings are named the same wherever they live, and
+both build their buttons by overriding `get_ribbon_action_specs()`. An action
+whose markup needs the page's own context (the homepage builder's live toggle,
+language switch and save status) is raw `html` and the view calls
+`refresh_ribbon(ctx)` at the end of `get_context_data`, because `RibbonMixin`
+otherwise builds the ribbon before a subclass has added anything.
+
+A `.btn-group` inside the ribbon's action area needs
+`common/css/ribbon_actions.css` (already on `ScopedListView.base_styles`): the
+panel skin pills every action button individually, which breaks a segmented
+control into loose half-pills.
 
 For the **invoice** (a multi-line document) we use custom full-page views
 (`InvoiceCreateView` / `InvoiceUpdateView`) with a Django inline formset, plus

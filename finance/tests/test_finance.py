@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import SimpleTestCase, TestCase
 
 from common.forms import translate_choice_fields
@@ -53,6 +54,17 @@ class StaffLedgerTests(TestCase):
         settings.save(update_fields=["is_configured"])
         self.manager = User.objects.create_user("manager", password="x")
         self.staff = User.objects.create_user("staff", password="x")
+        # dlux only delivers a notification to a recipient who could open the
+        # object it points at (`_recipient_can_view_event`), so the staff user
+        # needs the same view permission `seed_roles` grants the Rep and Courier
+        # groups. Row-scoping still limits them to their own entries.
+        self.staff.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="finance",
+                codename="view_staffledgerentry",
+            )
+        )
+        self.staff = User.objects.get(pk=self.staff.pk)
         self.account = StaffAccount.for_user(self.staff)
 
     def test_balance_counts_posted_signed_entries_only(self):

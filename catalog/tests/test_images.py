@@ -1,5 +1,9 @@
 """
 Product/Service image field — upload, list thumbnail, and detail rendering.
+
+The picture is a `ManagedAssetField` now, so a form upload posts through the
+asset picker's own input (`<field>_upload`) and lands in the dlux asset library
+under the model's namespace, rather than in a per-model media directory.
 """
 import tempfile
 from decimal import Decimal
@@ -32,21 +36,29 @@ class ProductImageTests(TestCase):
                 "name": "Smart Lock", "unit": "piece", "cost_usd": "10",
                 "markup_percent": "0", "price_usd": "10", "reorder_level": "0",
             },
-            files={"image": _png_upload()},
+            files={"image_asset_upload": _png_upload()},
         )
         self.assertTrue(form.is_valid(), form.errors)
         product = form.save()
-        self.assertTrue(product.image.name.startswith("catalog/products/"))
+        self.assertIsNotNone(product.image_asset)
+        # Namespaced by the model it was uploaded to, so no other picker lists it.
+        self.assertEqual(product.image_asset.namespace, "catalog.product")
+        self.assertTrue(product.image_url)
 
-    def test_form_uses_dlux_archive_widget_with_accept(self):
+    def test_form_uses_the_asset_picker(self):
         form = ProductForm()
-        self.assertIn("image", form.fields)
-        widget = form.fields["image"].widget
-        # dlux's rich archive file field (drag-drop card), not the plain input.
+        self.assertIn("image_asset", form.fields)
+        widget = form.fields["image_asset"].widget
+        # The picker is the dlux file card plus a library popover.
         self.assertEqual(widget.template_name, "dlux/forms/file_input.html")
-        self.assertEqual(widget.attrs.get("accept"), "image/*")  # phone camera preserved
-        self.assertFalse(form.fields["image"].required)
-        self.assertIn("data-archive-file-widget", str(form["image"]))  # renders the card
+        self.assertEqual(widget.namespace, "catalog.product")
+        self.assertEqual(widget.identity, "catalog.product.image_asset")
+        self.assertFalse(form.fields["image_asset"].required)
+        html = str(form["image_asset"])
+        self.assertIn("data-dlux-file-widget", html)
+        self.assertIn('data-asset-field="catalog.product.image_asset"', html)
+        # A clerk on a phone gets the camera.
+        self.assertIn('capture="environment"', html)
 
     def test_table_thumbnail_and_placeholder(self):
         with_img = Product.objects.create(name="A", cost_usd=Decimal("1"), image=_png_upload("a.png"))
@@ -78,9 +90,12 @@ class GridLayoutTests(TestCase):
         self.assertIn('class="row', html)          # at least one grid row
         self.assertIn("col-md-6", html)            # paired fields
         self.assertIn("col-md-4", html)            # the 3-across price row
-        # No field is silently dropped by the custom layout.
+        # No field is silently dropped by the custom layout. The asset picker is
+        # the exception to the naming: it renders three inputs of its own
+        # (`_asset`, `_clear`, `_upload`) and never a bare `name="image_asset"`.
         for name in form.fields:
-            self.assertIn(f'name="{name}"', html, f"field {name} missing from layout")
+            needle = f'name="{name}_asset"' if name.endswith("_asset") else f'name="{name}"'
+            self.assertIn(needle, html, f"field {name} missing from layout")
 
     def test_track_stock_has_help_text(self):
         # track_stock now carries an explanatory description (help_product_track_stock).
@@ -106,10 +121,10 @@ class ServiceImageTests(TestCase):
     def test_service_form_and_thumbnail(self):
         form = ServiceForm(
             data={"name": "Install", "service_type": "installation", "price_usd": "5"},
-            files={"image": _png_upload("s.png")},
+            files={"image_asset_upload": _png_upload("s.png")},
         )
         self.assertTrue(form.is_valid(), form.errors)
         svc = form.save()
-        self.assertTrue(svc.image.name.startswith("catalog/services/"))
+        self.assertEqual(svc.image_asset.namespace, "catalog.service")
         self.assertIn("<img", ServiceTable([]).render_image(svc))
         self.assertIn("<img", Service.objects.get(pk=svc.pk).get_modal_context()["extra_detail_fields"][0]["value"])

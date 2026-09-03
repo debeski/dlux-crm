@@ -3,11 +3,12 @@ from dlux.tables import DluxTable
 from django.urls import reverse
 
 from common.i18n import t
+from common.tables import ModalRowActionsMixin
 
 from .models import CashDeposit, ExchangeRate, Expense, ExpenseCategory, StaffAccount, StaffLedgerEntry
 
 
-class ExchangeRateTable(DluxTable):
+class ExchangeRateTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = ExchangeRate
         fields = ("rate", "source", "note", "created_by", "created_at")
@@ -17,7 +18,7 @@ class ExchangeRateTable(DluxTable):
         return t(f"source_{record.source}", record.get_source_display())
 
 
-class CashDepositTable(DluxTable):
+class CashDepositTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = CashDeposit
         fields = ("amount", "method", "deposited_at", "status", "created_by", "created_at")
@@ -30,14 +31,14 @@ class CashDepositTable(DluxTable):
         return t(f"status_{record.status}", record.get_status_display())
 
 
-class ExpenseCategoryTable(DluxTable):
+class ExpenseCategoryTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = ExpenseCategory
         fields = ("name", "is_active", "created_at")
         dlux_actions = True
 
 
-class ExpenseTable(DluxTable):
+class ExpenseTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = Expense
         fields = ("category", "amount_lyd", "expense_date", "method", "status", "paid_by", "created_at")
@@ -78,7 +79,7 @@ class StaffAccountTable(DluxTable):
         return record.pending_count
 
 
-class StaffLedgerEntryTable(DluxTable):
+class StaffLedgerEntryTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = StaffLedgerEntry
         fields = ("account", "entry_type", "amount_lyd", "signed_amount", "entry_date", "status", "created_by", "created_at")
