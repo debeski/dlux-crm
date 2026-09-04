@@ -1,12 +1,11 @@
 {
   "schema_version": 1,
-  "version": "0.7.0",
-  "summary": "Upgrades django-lux to 1.8.4, moves product/service/listing images into the dlux asset library, puts the reports and builders on the Ribbon, and rebuilds stock balances after a data reset.",
+  "version": "0.7.1",
+  "summary": "Pins django-lux 1.8.6 for the updater state-row and runtime-volume fixes, retires the forked detail modal, and refreshes the system-settings snapshot.",
   "highlights": [
-    "Images are ManagedAssetFields namespaced per model, with instant upload and camera capture; adopt_image_assets backfills the old files.",
-    "Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders now carry the dlux Ribbon.",
-    "Six more list pages gained descriptions, and the ribbon's layout switch renders as one segmented control.",
-    "Stock balances rebuild from the live ledger after a data reset, fixing products that kept stock once their movements were cleared."
+    "django-lux 1.8.6: the update panel reports the installed version again and no longer offers a stale rollback target.",
+    "The forked dynamic_modal_detail.html is archived under .xpose/ now that dlux renders extra_detail_fields itself.",
+    "config.json refreshed from the live stack: public storefront and homepage builder settings, mono theme, tabbed options."
   ],
-  "release_url": "https://github.com/debeski/Sales-CRM/releases/tag/v0.7.0"
+  "release_url": "https://github.com/debeski/Sales-CRM/releases/tag/v0.7.1"
 }

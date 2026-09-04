@@ -1,7 +1,7 @@
 {
   "format": "django-lux.system-settings",
   "version": 1,
-  "dlux_version": "1.4.4",
+  "dlux_version": "1.6.1",
   "settings": {
     "system_names": {
       "ar": "SWITCH",
@@ -10,10 +10,11 @@
     "logo": "dlux/branding/WhatsApp_Image_2026-07-07_at_12.04.09_AM.jpeg",
     "favicon": "dlux/branding/WhatsApp_Image_2026-07-07_at_12_Mym2MGT.04.09_AM.jpeg",
     "home_url": "/staff/workspace/",
-    "default_language": "ar",
+    "default_language": "en",
     "default_theme": "light",
     "allowed_themes": [
       "light",
+      "mono",
       "dark",
       "gothic",
       "retro",
@@ -32,8 +33,12 @@
     "default_form_density": "balanced",
     "default_modal_size": "standard",
     "sticky_table_headers": true,
+    "resizable_table_columns": true,
     "zebra_striping": true,
-    "options_style": "cards",
+    "show_audit_fields": false,
+    "show_soft_deleted": false,
+    "options_style": "tabs",
+    "row_actions_style": "context",
     "footer_enabled": true,
     "footer_text": "SwitchLibya 2026",
     "footer_link_text": "",
@@ -55,13 +60,13 @@
       "trusted_proxy_hops": 1,
       "custom_header": ""
     },
-    "public_root": false,
-    "public_root_split_enabled": false,
-    "public_root_url": "/sales/dashboard/",
+    "public_root": true,
+    "public_root_split_enabled": true,
+    "public_root_url": "/",
     "public_root_theme": "",
-    "public_root_title": "",
-    "public_root_meta_description": "",
-    "show_titlebar_on_public": true,
+    "public_root_title": "Switch Libya",
+    "public_root_meta_description": "Smart locks, access control, installation and after-sale services from Switch Libya.",
+    "show_titlebar_on_public": false,
     "show_sidebar_on_public": false,
     "public_registration_enabled": false,
     "registration_activation_mode": "auto_login_after_verify",
@@ -102,241 +107,305 @@
       "home_url_name": null,
       "entries": [
         {
-          "kind": "group",
           "id": "catalog-1782148573608-493",
-          "label": "Catalog",
           "icon": "bi-folder2-open",
+          "kind": "group",
           "items": [
             {
-              "kind": "item",
               "id": "catalog:category_list",
-              "url_name": "catalog:category_list",
-              "label": "تصنيف",
               "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "تصنيف",
+              "url_name": "catalog:category_list",
+              "group_key": "catalog",
+              "group_label": "Catalog",
               "permissions": [
                 "catalog.view_category"
-              ],
-              "group_key": "catalog",
-              "group_label": "Catalog"
+              ]
             },
             {
-              "kind": "item",
               "id": "catalog:product_list",
-              "url_name": "catalog:product_list",
-              "label": "صنف",
               "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "صنف",
+              "url_name": "catalog:product_list",
+              "group_key": "catalog",
+              "group_label": "Catalog",
               "permissions": [
                 "catalog.view_product"
-              ],
-              "group_key": "catalog",
-              "group_label": "Catalog"
+              ]
             },
             {
-              "kind": "item",
               "id": "catalog:supplier_list",
-              "url_name": "catalog:supplier_list",
-              "label": "مورد",
               "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "مورد",
+              "url_name": "catalog:supplier_list",
+              "group_key": "catalog",
+              "group_label": "الأصناف",
               "permissions": [
                 "catalog.view_supplier"
-              ],
-              "group_key": "catalog",
-              "group_label": "الأصناف"
+              ]
             },
             {
-              "kind": "item",
               "id": "catalog:service_list",
-              "url_name": "catalog:service_list",
-              "label": "خدمة",
               "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "خدمة",
+              "url_name": "catalog:service_list",
+              "group_key": "catalog",
+              "group_label": "Catalog",
               "permissions": [
                 "catalog.view_service"
-              ],
-              "group_key": "catalog",
-              "group_label": "Catalog"
+              ]
             },
             {
-              "kind": "item",
               "id": "catalog:stock_movement_list",
-              "url_name": "catalog:stock_movement_list",
-              "label": "حركة مخزون",
               "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "حركة مخزون",
+              "url_name": "catalog:stock_movement_list",
+              "group_key": "catalog",
+              "group_label": "Catalog",
               "permissions": [
                 "catalog.view_stockmovement"
-              ],
-              "group_key": "catalog",
-              "group_label": "Catalog"
+              ]
             },
             {
-              "kind": "item",
-              "id": "catalog:inventory_valuation",
-              "url_name": "catalog:inventory_valuation",
-              "label": "تقييم المخزون",
+              "id": "catalog:purchase_invoice_list",
               "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "فواتير الشراء",
+              "url_name": "catalog:purchase_invoice_list",
+              "group_key": "catalog",
+              "group_label": "الأصناف",
+              "permissions": [
+                "catalog.view_purchaseinvoice"
+              ]
+            },
+            {
+              "id": "catalog:inventory_valuation",
+              "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "تقييم المخزون",
+              "url_name": "catalog:inventory_valuation",
+              "group_key": "catalog",
+              "group_label": "الأصناف",
               "permissions": [
                 "catalog.view_inventory"
-              ],
-              "group_key": "catalog",
-              "group_label": "الأصناف"
+              ]
             },
             {
-              "kind": "item",
               "id": "catalog:stock_take_list",
-              "url_name": "catalog:stock_take_list",
-              "label": "جرد مخزون",
               "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "جرد مخزون",
+              "url_name": "catalog:stock_take_list",
+              "group_key": "catalog",
+              "group_label": "الأصناف",
               "permissions": [
                 "catalog.view_stocktake"
-              ],
-              "group_key": "catalog",
-              "group_label": "الأصناف"
+              ]
             }
-          ]
+          ],
+          "label": "Catalog"
         },
         {
-          "kind": "group",
           "id": "finance-1782148576617-41",
-          "label": "Finance",
           "icon": "bi-wallet2",
+          "kind": "group",
           "items": [
             {
-              "kind": "item",
-              "id": "finance:cash_deposit_list",
-              "url_name": "finance:cash_deposit_list",
-              "label": "إيداع نقدي",
-              "icon": "bi-wallet2",
-              "permissions": [
-                "finance.view_cashdeposit"
-              ],
-              "group_key": "finance",
-              "group_label": "Finance"
-            },
-            {
-              "kind": "item",
               "id": "finance:exchange_rate_list",
-              "url_name": "finance:exchange_rate_list",
-              "label": "سعر الصرف",
               "icon": "bi-wallet2",
+              "kind": "item",
+              "label": "سعر الصرف",
+              "url_name": "finance:exchange_rate_list",
+              "group_key": "finance",
+              "group_label": "Finance",
               "permissions": [
                 "finance.view_exchangerate"
-              ],
+              ]
+            },
+            {
+              "id": "finance:expense_category_list",
+              "icon": "bi-wallet2",
+              "kind": "item",
+              "label": "تصنيفات الصرف",
+              "url_name": "finance:expense_category_list",
               "group_key": "finance",
-              "group_label": "Finance"
+              "group_label": "المالية",
+              "permissions": [
+                "finance.view_expensecategory"
+              ]
+            },
+            {
+              "id": "finance:cash_deposit_list",
+              "icon": "bi-wallet2",
+              "kind": "item",
+              "label": "الإيداعات النقدية",
+              "url_name": "finance:cash_deposit_list",
+              "group_key": "finance",
+              "group_label": "المالية",
+              "permissions": [
+                "finance.view_cashdeposit"
+              ]
+            },
+            {
+              "id": "finance:expense_list",
+              "icon": "bi-wallet2",
+              "kind": "item",
+              "label": "المصروفات",
+              "url_name": "finance:expense_list",
+              "group_key": "finance",
+              "group_label": "المالية",
+              "permissions": [
+                "finance.view_expense"
+              ]
+            },
+            {
+              "id": "finance:staff_account_list",
+              "icon": "bi-wallet2",
+              "kind": "item",
+              "label": "حسابات الموظفين",
+              "url_name": "finance:staff_account_list",
+              "group_key": "finance",
+              "group_label": "المالية",
+              "permissions": [
+                "finance.view_staffaccount"
+              ]
+            },
+            {
+              "id": "finance:staff_ledger_entry_list",
+              "icon": "bi-book",
+              "kind": "item",
+              "label": "حركات حسابات الموظفين",
+              "url_name": "finance:staff_ledger_entry_list",
+              "group_key": "finance",
+              "group_label": "المالية",
+              "permissions": [
+                "finance.view_staffledgerentry"
+              ]
             }
+          ],
+          "label": "Finance"
+        },
+        {
+          "id": "sales-1782148581467-723",
+          "icon": "bi-folder2-open",
+          "kind": "group",
+          "items": [
+            {
+              "id": "sales:dashboard",
+              "icon": "bi-speedometer2",
+              "kind": "item",
+              "label": "نظرة عامة على المبيعات",
+              "url_name": "sales:dashboard",
+              "group_key": "sales",
+              "group_label": "المبيعات",
+              "permissions": [
+                "sales.view_dashboard"
+              ]
+            },
+            {
+              "id": "sales:customer_list",
+              "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "عميل",
+              "url_name": "sales:customer_list",
+              "group_key": "sales",
+              "group_label": "Sales",
+              "permissions": [
+                "sales.view_customer"
+              ]
+            },
+            {
+              "id": "sales:invoice_list",
+              "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "فاتورة",
+              "url_name": "sales:invoice_list",
+              "group_key": "sales",
+              "group_label": "Sales",
+              "permissions": [
+                "sales.view_invoice"
+              ]
+            },
+            {
+              "id": "sales:payment_list",
+              "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "دفعة",
+              "url_name": "sales:payment_list",
+              "group_key": "sales",
+              "group_label": "Sales",
+              "permissions": [
+                "sales.view_payment"
+              ]
+            },
+            {
+              "id": "sales:report",
+              "icon": "bi-file-earmark-bar-graph",
+              "kind": "item",
+              "label": "تقرير المبيعات",
+              "url_name": "sales:report",
+              "group_key": "sales",
+              "group_label": "Sales",
+              "permissions": [
+                "sales.view_report"
+              ]
+            },
+            {
+              "id": "sales:delivery_list",
+              "icon": "bi-link-45deg",
+              "kind": "item",
+              "label": "توصيل",
+              "url_name": "sales:delivery_list",
+              "group_key": "sales",
+              "group_label": "المبيعات",
+              "permissions": [
+                "sales.view_delivery"
+              ]
+            },
+            {
+              "id": "sales:financial_report",
+              "icon": "bi-file-earmark-bar-graph",
+              "kind": "item",
+              "label": "التقرير المالي",
+              "url_name": "sales:financial_report",
+              "group_key": "sales",
+              "group_label": "المبيعات",
+              "permissions": [
+                "sales.view_financial"
+              ]
+            }
+          ],
+          "label": "المبيعات"
+        },
+        {
+          "id": "public_catalog_staff:builder",
+          "icon": "bi-shop-window",
+          "kind": "item",
+          "label": "منشئ المتجر العام",
+          "url_name": "public_catalog_staff:builder",
+          "group_key": "catalog",
+          "group_label": "الأصناف",
+          "permissions": [
+            "public_catalog.view_publiccataloglisting"
           ]
         },
         {
+          "id": "public_catalog_staff:homepage_builder",
+          "icon": "bi-easel2",
           "kind": "item",
-          "id": "common:workspace_dashboard",
-          "url_name": "common:workspace_dashboard",
-          "label": "Workspace Dashboard",
-          "icon": "bi-grid-1x2",
-          "permissions": [
-            "sales.add_invoice",
-            "sales.view_invoice",
-            "sales.view_customer",
-            "sales.view_delivery",
-            "sales.view_payment",
-            "sales.view_sales_report",
-            "sales.view_financial_report",
-            "catalog.add_purchaseinvoice",
-            "catalog.add_stocktake",
-            "catalog.view_product",
-            "catalog.view_purchaseinvoice",
-            "catalog.view_supplier",
-            "catalog.view_inventory_valuation",
-            "catalog.view_stockmovement",
-            "catalog.view_stocktake",
-            "finance.add_exchangerate",
-            "finance.view_exchangerate",
-            "finance.view_cashdeposit",
-            "finance.view_expense",
-            "finance.view_staffaccount",
-            "finance.view_staffledgerentry"
-          ],
-          "group_key": "workspace",
-          "group_label": "مساحة العمل",
+          "label": "إدارة الصفحة العامة",
+          "url_name": "public_catalog_staff:homepage_builder",
+          "group_key": "catalog",
+          "is_system": false,
           "group_icon": "bi-folder2-open",
-          "is_system": false
-        },
-        {
-          "kind": "group",
-          "id": "sales-1782148581467-723",
-          "label": "Sales",
-          "icon": "bi-folder2-open",
-          "items": [
-            {
-              "kind": "item",
-              "id": "sales:customer_list",
-              "url_name": "sales:customer_list",
-              "label": "عميل",
-              "icon": "bi-link-45deg",
-              "permissions": [
-                "sales.view_customer"
-              ],
-              "group_key": "sales",
-              "group_label": "Sales"
-            },
-            {
-              "kind": "item",
-              "id": "sales:invoice_list",
-              "url_name": "sales:invoice_list",
-              "label": "فاتورة",
-              "icon": "bi-link-45deg",
-              "permissions": [
-                "sales.view_invoice"
-              ],
-              "group_key": "sales",
-              "group_label": "Sales"
-            },
-            {
-              "kind": "item",
-              "id": "sales:payment_list",
-              "url_name": "sales:payment_list",
-              "label": "دفعة",
-              "icon": "bi-link-45deg",
-              "permissions": [
-                "sales.view_payment"
-              ],
-              "group_key": "sales",
-              "group_label": "Sales"
-            },
-            {
-              "kind": "item",
-              "id": "sales:report",
-              "url_name": "sales:report",
-              "label": "تقرير المبيعات",
-              "icon": "bi-file-earmark-bar-graph",
-              "permissions": [
-                "sales.view_report"
-              ],
-              "group_key": "sales",
-              "group_label": "Sales"
-            },
-            {
-              "kind": "item",
-              "id": "sales:delivery_list",
-              "url_name": "sales:delivery_list",
-              "label": "توصيل",
-              "icon": "bi-link-45deg",
-              "permissions": [
-                "sales.view_delivery"
-              ],
-              "group_key": "sales",
-              "group_label": "المبيعات"
-            },
-            {
-              "kind": "item",
-              "id": "sales:financial_report",
-              "url_name": "sales:financial_report",
-              "label": "التقرير المالي",
-              "icon": "bi-file-earmark-bar-graph",
-              "permissions": [
-                "sales.view_financial"
-              ],
-              "group_key": "sales",
-              "group_label": "المبيعات"
-            }
+          "group_label": "الأصناف",
+          "permissions": [
+            "public_catalog.view_publiccataloglisting"
           ]
         }
       ],
@@ -351,6 +420,10 @@
       "enabled": true,
       "default_mode": "hierarchy",
       "allow_user_mode_override": true,
+      "root": {
+        "mode": "neutral",
+        "url_name": ""
+      },
       "hierarchy": {
         "nodes": [
           {
@@ -521,7 +594,7 @@
       "show_title": true,
       "show_logo": true,
       "show_home_button": true,
-      "hide_on_public_unauthenticated_index": false,
+      "hide_on_public_unauthenticated_index": true,
       "buttons_shape": "circle",
       "home_shape": "circle",
       "title_align": "center",
@@ -531,6 +604,7 @@
       "logo_treatment": "halo",
       "logo_treatment_shape": "soft",
       "user_hub_style": "dropdown",
+      "show_language_switcher": false,
       "actions_order": [
         "notifications",
         "home",
@@ -590,10 +664,133 @@
       "logo_treatment": "plate",
       "logo_treatment_shape": "soft",
       "hero_message": {
-        "en": "## Switch - **lock it down**",
-        "ar": ""
+        "ar": "",
+        "en": "## Switch - **lock it down**"
       }
     },
-    "extra_config": {}
+    "extra_config": {
+      "app": {
+        "switch_pos.public_catalog": {
+          "shop_title": "Switch Shop",
+          "show_price": true,
+          "shop_enabled": false,
+          "contact_email": "",
+          "contact_phone": "0914447788",
+          "shop_subtitle": "Smart locks, access control, installation and after-sale services.",
+          "featured_limit": 4,
+          "contact_whatsapp": "+218914447788",
+          "homepage_enabled": false,
+          "show_availability": true,
+          "storefront_enabled": false
+        },
+        "switch_pos.public_homepage": {
+          "accent": "#0ea5e9",
+          "sections": [
+            {
+              "key": "featured",
+              "enabled": true,
+              "variant": "grid"
+            },
+            {
+              "key": "categories",
+              "enabled": true,
+              "variant": "tiles"
+            },
+            {
+              "key": "services",
+              "enabled": true,
+              "variant": "grid"
+            },
+            {
+              "key": "story",
+              "enabled": true,
+              "variant": "split"
+            },
+            {
+              "key": "contact",
+              "enabled": true,
+              "variant": "band"
+            }
+          ],
+          "hero_focus": "center",
+          "hero_image": "",
+          "hero_media": "featured",
+          "hero_title": {
+            "ar": "SWITCH LIBYA",
+            "en": ""
+          },
+          "show_stats": true,
+          "story_body": {
+            "ar": "",
+            "en": ""
+          },
+          "hero_height": "balanced",
+          "hero_kicker": {
+            "ar": "SWITCH LIBYA",
+            "en": ""
+          },
+          "hero_layout": "poster",
+          "story_image": "",
+          "hero_overlay": 55,
+          "motion_level": "subtle",
+          "story_kicker": {
+            "ar": "Who we are",
+            "en": ""
+          },
+          "style_preset": "signature",
+          "hero_subtitle": {
+            "ar": "",
+            "en": ""
+          },
+          "nav_treatment": "glass",
+          "story_heading": {
+            "ar": "About Switch",
+            "en": ""
+          },
+          "card_treatment": "showcase",
+          "contact_kicker": {
+            "ar": "Contact",
+            "en": ""
+          },
+          "contact_heading": {
+            "ar": "Talk to Switch about supply and installation",
+            "en": ""
+          },
+          "featured_kicker": {
+            "ar": "Featured catalog",
+            "en": ""
+          },
+          "section_density": "comfortable",
+          "services_kicker": {
+            "ar": "What we do",
+            "en": ""
+          },
+          "accent_secondary": "",
+          "featured_heading": {
+            "ar": "Ready for customer viewing",
+            "en": ""
+          },
+          "hero_primary_url": "",
+          "services_heading": {
+            "ar": "Services we provide",
+            "en": ""
+          },
+          "categories_kicker": {
+            "ar": "Categories",
+            "en": ""
+          },
+          "hero_show_contact": true,
+          "categories_heading": {
+            "ar": "Browse by category",
+            "en": ""
+          },
+          "hero_primary_label": {
+            "ar": "Shop",
+            "en": ""
+          },
+          "background_treatment": "clean"
+        }
+      }
+    }
   }
 }

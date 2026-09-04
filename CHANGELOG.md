@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.1
+- **django-lux 1.8.6**: Pinned exact. Fixes the update panel reporting versions recorded before an upgrade and offering a rollback to a release that is no longer installed — the state row is reconciled again on the first Celery tick after boot. The panel also stops being disabled by `web`'s read-only runtime mount, which this stack has always used.
+- **Detail Modal Fork Retired**: dlux 1.8.5 renders `extra_detail_fields` itself, so the local copy of `dlux/helpers/dynamic_modal_detail.html` is archived under `.xpose/` and no longer needs re-checking on every upgrade.
+- **System Settings Snapshot**: `config.json` refreshed from the live stack — public root split on with the Switch Libya storefront and homepage builder config, mono theme allowed, tabs options style, context row actions, resizable columns, and the public catalog/homepage `extra_config` blocks.
+
 ## v0.7.0
 - **Images Use The Dlux Asset Library**: `Product.image`, `Service.image` and `PublicCatalogListing.image_override` gained `ManagedAssetField` companions namespaced per model; read `image_url`, backfill with `adopt_image_assets --apply`.
 - **Stock Balances Rebuild After A Data Reset**: `catalog/stock_balance.py` recomputes product/variant balances from the live ledger on dlux's `data_reset_finished`; clearing movements no longer leaves products claiming stock.

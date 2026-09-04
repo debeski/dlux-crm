@@ -2,7 +2,7 @@
 
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- Django POS/ERP v0.7.0 (untagged) after tagged v0.6.6; pins `django-lux[updater]==1.8.4` (unreleased — dev mounts the local dlux source); images live in the dlux asset library; apps: finance, catalog, sales, common, public_catalog.
+- Django POS/ERP v0.7.1 (untagged) after tagged v0.7.0; pins `django-lux[updater]==1.8.6`; images live in the dlux asset library; apps: finance, catalog, sales, common, public_catalog.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
