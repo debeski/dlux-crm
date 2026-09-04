@@ -1,7 +1,7 @@
 # Development override for compose.yml
 # Usage: docker compose -f compose.yml -f compose.dev.yml up
 
-name: sales-crm
+name: sales
 
 services:
   smtp-relay:

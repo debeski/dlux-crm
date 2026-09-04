@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "0.7.1",
-  "summary": "Pins django-lux 1.8.6 for the updater state-row and runtime-volume fixes, retires the forked detail modal, and refreshes the system-settings snapshot.",
+  "version": "0.7.2",
+  "summary": "Renames the published image to debeski/dlux-crm:sales \u2014 one repository per product, with the tag naming the edition.",
   "highlights": [
-    "django-lux 1.8.6: the update panel reports the installed version again and no longer offers a stale rollback target.",
-    "The forked dynamic_modal_detail.html is archived under .xpose/ now that dlux renders extra_detail_fields itself.",
-    "config.json refreshed from the live stack: public storefront and homepage builder settings, mono theme, tabbed options."
+    "compose.yml, CI and the release workflow publish and pull debeski/dlux-crm:sales-<ver> + :sales.",
+    "Matches the gov edition's debeski/dlux-crm:gov; set WEB_IMAGE on every deployment host.",
+    "Every service carries an org.dlux.restart label, matching the dlux scaffold contract."
   ],
-  "release_url": "https://github.com/debeski/Sales-CRM/releases/tag/v0.7.1"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.7.2"
 }

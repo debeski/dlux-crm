@@ -32,7 +32,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # older than the deployment's active runtime version. Passed at build time
 # (CI derives it from the pinned requirement); empty locally = gate skipped.
 ARG DLUX_BAKED_VERSION=""
-LABEL org.switchlibya.dlux_baked_version="${DLUX_BAKED_VERSION}"
+LABEL org.dlux_crm.dlux_baked_version="${DLUX_BAKED_VERSION}"
 
 # Optional schema-1 project release metadata consumed by Composer and surfaced
 # in DjangoLux's application-image update review.

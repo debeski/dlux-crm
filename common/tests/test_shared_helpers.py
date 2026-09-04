@@ -245,36 +245,6 @@ class ModalRowActionsTests(TestCase):
         self.assertEqual(table.get_dlux_row_actions(self.customer, base), base)
 
 
-class DetailModalOverrideTests(TestCase):
-    """The project's detail partial must stay in step with dlux's own."""
-
-    def _override(self):
-        from django.conf import settings
-        from pathlib import Path
-
-        for directory in settings.TEMPLATES[0]["DIRS"]:
-            candidate = Path(directory) / "dlux/helpers/dynamic_modal_detail.html"
-            if candidate.exists():
-                return candidate.read_text()
-        self.fail("project override of dynamic_modal_detail.html not found")
-
-    def test_it_renders_the_audit_trail(self):
-        # The pre-1.8 copy predated `{% dlux_audit_trail %}` and silently
-        # dropped it from every detail modal in the project.
-        self.assertIn("{% dlux_audit_trail object %}", self._override())
-
-    def test_it_keeps_the_projects_own_extra_fields(self):
-        self.assertIn("extra_detail_fields", self._override())
-
-    def test_the_back_control_matches_upstream(self):
-        override = self._override()
-        # Points left and mirrors under RTL via `dlux-back-link`, and stays out
-        # of a ribboned surface, which supplies its own Back.
-        self.assertIn("dlux-back-link", override)
-        self.assertIn("bi-arrow-left", override)
-        self.assertIn("request.GET.action == 'view' and not ribbon", override)
-
-
 class DocumentEditorAuditTests(TestCase):
     """A new document logs CREATE, an edited one logs UPDATE.
 

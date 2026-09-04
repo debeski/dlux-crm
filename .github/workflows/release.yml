@@ -5,19 +5,22 @@ name: Release
 #
 # Pipeline:
 #   build-push     -> verify tag == VERSION == release manifest, smoke-test, then multi-arch
-#                     (amd64+arm64) build & push debeski/sales:<ver> + :latest
+#                     (amd64+arm64) build & push debeski/dlux-crm:sales-<ver> + :sales
 #   github-release -> create the GitHub Release from the matching CHANGELOG section
 #
 # One-time setup (see docs/RELEASING.md): add repo secrets
 #   DOCKERHUB_USERNAME  - Docker Hub account/namespace (debeski)
-#   DOCKERHUB_TOKEN     - Docker Hub access token with read/write to debeski/sales
+#   DOCKERHUB_TOKEN     - Docker Hub access token with read/write to debeski/dlux-crm
 
 on:
   push:
     tags: ["v*"]
 
 env:
-  IMAGE: debeski/sales
+  # One repository per product; the tag names the edition. The gov edition
+  # publishes debeski/dlux-crm:gov-<ver> from its own repository.
+  IMAGE: debeski/dlux-crm
+  EDITION: sales
 
 permissions:
   contents: read
@@ -80,8 +83,8 @@ jobs:
             DLUX_BAKED_VERSION=${{ steps.dlux.outputs.version }}
             DLUX_PROJECT_RELEASE_MANIFEST=${{ steps.project_manifest.outputs.json }}
           tags: |
-            ${{ env.IMAGE }}:${{ github.ref_name }}
-            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.EDITION }}-${{ github.ref_name }}
+            ${{ env.IMAGE }}:${{ env.EDITION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

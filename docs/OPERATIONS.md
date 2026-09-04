@@ -223,8 +223,8 @@ deployment onto a newer published image without any host shell access:
 
 **Version gate**: the image is built with `--build-arg DLUX_BAKED_VERSION=<ver>`
 (CI reads the pinned `django-lux[updater]==` from `requirements.txt`) which is
-stamped as `LABEL org.switchlibya.dlux_baked_version`. The updater
-(`COMPOSER_VERSION_LABEL=org.switchlibya.dlux_baked_version`) refuses to recreate
+stamped as `LABEL org.dlux_crm.dlux_baked_version`. The updater
+(`COMPOSER_VERSION_LABEL=org.dlux_crm.dlux_baked_version`) refuses to recreate
 onto an image whose baked version is older than the deployment's active runtime
 version (`/opt/dlux-runtime/state/active.json`).
 
@@ -251,12 +251,12 @@ Two workflows (tag-driven model — full details in [RELEASING.md](RELEASING.md)
   (`config.settings_dev_sqlite`) and a Docker build + runtime smoke test (no push).
 - **`.github/workflows/release.yml`** — on a `v*` tag: verifies the tag, `VERSION`,
   and project release manifest agree,
-  smoke-tests, pushes multi-arch `debeski/sales:<ver>` + `:latest`, and creates a
+  smoke-tests, pushes multi-arch `debeski/dlux-crm:sales-<ver>` + `:sales`, and creates a
   GitHub Release from the `CHANGELOG.md` section.
 
 Required repository **Secrets**: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (token must
 be a *Secret*, not a *Variable*). Deploy the published image with
-`WEB_IMAGE=debeski/sales:latest ./start.sh -d`.
+`WEB_IMAGE=debeski/dlux-crm:sales ./start.sh -d`.
 
 Set **System Settings → Home URL** to `/staff/workspace/` to make the
 project-wide Workspace dashboard the staff landing page. Keep

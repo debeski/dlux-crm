@@ -63,7 +63,7 @@ class ProjectScaffoldTests(SimpleTestCase):
         validated = validate_project_release_manifest(
             project_root,
             tag=f"v{project_version}",
-            repository="debeski/Sales-CRM",
+            repository="debeski/dlux-crm",
         )
 
         self.assertEqual(validated, manifest)
@@ -75,7 +75,7 @@ class ProjectScaffoldTests(SimpleTestCase):
         self.assertTrue(all(len(item) <= 160 for item in manifest["highlights"]))
         self.assertEqual(
             manifest["release_url"],
-            f"https://github.com/debeski/Sales-CRM/releases/tag/v{project_version}",
+            f"https://github.com/debeski/dlux-crm/releases/tag/v{project_version}",
         )
 
         dockerfile = (project_root / "Dockerfile").read_text(encoding="utf-8")
@@ -105,5 +105,5 @@ class ProjectScaffoldTests(SimpleTestCase):
             validate_project_release_manifest(
                 project_root,
                 tag="v0.0.0",
-                repository="debeski/Sales-CRM",
+                repository="debeski/dlux-crm",
             )

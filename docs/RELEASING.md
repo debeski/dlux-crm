@@ -1,6 +1,6 @@
 # Releasing Switch POS
 
-The app ships as the Docker image **`debeski/sales`**. Releases are **tag-driven**:
+The app ships as the Docker image **`debeski/dlux-crm` (edition tag `sales`)**. Releases are **tag-driven**:
 pushing a `v*` git tag runs `.github/workflows/release.yml`, which builds the
 multi-arch image, pushes it to Docker Hub, and creates a GitHub Release. The
 root `VERSION` and `release-manifest.json.version` are version-locked release
@@ -18,7 +18,7 @@ Add two repository **Secrets** (Settings → Secrets and variables → Actions �
 | Secret | Value |
 | :--- | :--- |
 | `DOCKERHUB_USERNAME` | Docker Hub namespace that owns the image (`debeski`). |
-| `DOCKERHUB_TOKEN` | Docker Hub **access token** with read/write on `debeski/sales` (Docker Hub → Account Settings → Personal access tokens). |
+| `DOCKERHUB_TOKEN` | Docker Hub **access token** with read/write on `debeski/dlux-crm` (Docker Hub → Account Settings → Personal access tokens). |
 
 > The token must be a **Secret**, not a *Variable* — Variables are printed in build logs.
 
@@ -29,7 +29,7 @@ Add two repository **Secrets** (Settings → Secrets and variables → Actions �
 2. Bump `VERSION` to the same `X.Y.Z` (no `v` prefix).
 3. Update `release-manifest.json` with the same version, release URL, summary,
    and up to eight highlights. Validate it locally with
-   `python tools/validate_project_release_manifest.py --tag vX.Y.Z --repository debeski/Sales-CRM`.
+   `python tools/validate_project_release_manifest.py --tag vX.Y.Z --repository debeski/dlux-crm`.
 4. Commit the changelog, version, and manifest on `main`.
 5. Tag and push:
 
@@ -43,23 +43,23 @@ The `Release` workflow then:
   summary/highlight limits and repository release URL,
 - resolves the baked DjangoLux version from the pinned `django-lux[updater]==` in
   `requirements.txt` and passes it as `--build-arg DLUX_BAKED_VERSION` (stamped as
-  `LABEL org.switchlibya.dlux_baked_version` — the composer-updater version gate),
+  `LABEL org.dlux_crm.dlux_baked_version` — the composer-updater version gate),
 - compacts the project manifest and passes it as
   `--build-arg DLUX_PROJECT_RELEASE_MANIFEST` to both image builds, stamping
   `LABEL org.dlux.project.release-manifest` for the DjangoLux update review,
 - runs `scripts/smoke-test.sh` against a freshly built image (boots the app and
   applies all migrations on SQLite — gates the push on a working image),
 - builds `linux/amd64` + `linux/arm64` with Buildx,
-- pushes `debeski/sales:X.Y.Z` and `debeski/sales:latest`,
+- pushes `debeski/dlux-crm:sales-vX.Y.Z` and `debeski/dlux-crm:sales`,
 - publishes the GitHub Release using the matching `CHANGELOG.md` section.
 
 ## Deploying the published image
 
-The production `compose.yml` reads `${WEB_IMAGE:-switch_pos:latest}`. To run the
+The production `compose.yml` reads `${WEB_IMAGE:-debeski/dlux-crm:sales}`. To run the
 released image instead of building locally:
 
 ```bash
-WEB_IMAGE=debeski/sales:latest ./start.sh -d        # or a pinned :X.Y.Z
+WEB_IMAGE=debeski/dlux-crm:sales ./start.sh -d        # or a pinned :sales-vX.Y.Z
 ```
 
 ## CI

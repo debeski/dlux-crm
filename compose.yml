@@ -3,8 +3,8 @@ name: sales
 x-environment:
   # Database settings
   &de
-  WEB_IMAGE: "${WEB_IMAGE:-debeski/sales:latest}"
-  POSTGRES_DB: "sales_db"
+  WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
+  POSTGRES_DB: "${POSTGRES_DB:-sales_db}"
   POSTGRES_PORT: "5432"
   POSTGRES_HOST: "db"
   # Redis / Celery
@@ -36,6 +36,8 @@ services:
   db:
     image: postgres:17
     restart: always
+    labels:
+      org.dlux.restart: "protected"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -53,6 +55,8 @@ services:
   redis:
     image: redis:7
     restart: always
+    labels:
+      org.dlux.restart: "protected"
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "500mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redis_data:/data
@@ -65,8 +69,10 @@ services:
       - internal
 
   smtp-relay:
-    image: ${WEB_IMAGE:-debeski/sales:latest}
+    image: ${WEB_IMAGE:-debeski/dlux-crm:sales}
     restart: always
+    labels:
+      org.dlux.restart: "safe"
     entrypoint: []
     command: ["python", "-m", "dlux.smtp_relay"]
     environment:
@@ -96,6 +102,8 @@ services:
   caddy:
     image: caddy:latest
     restart: always
+    labels:
+      org.dlux.restart: "safe"
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -133,8 +141,10 @@ services:
       - internal
 
   web:
-    image: ${WEB_IMAGE:-debeski/sales:latest}
+    image: ${WEB_IMAGE:-debeski/dlux-crm:sales}
     restart: always
+    labels:
+      org.dlux.restart: "safe"
     command: >
       python -m dlux.updater.supervisor -- bash -c ' if [ "$$DEBUG_STATUS" = "True" ]; then
           echo "Starting in DEBUG mode with Django development server..."
@@ -173,8 +183,10 @@ services:
       - internal
 
   celery:
-    image: ${WEB_IMAGE:-debeski/sales:latest}
+    image: ${WEB_IMAGE:-debeski/dlux-crm:sales}
     restart: always
+    labels:
+      org.dlux.restart: "safe"
     command: ["python", "-m", "dlux.updater.supervisor", "--", "python", "-m", "celery", "-A", "config", "worker", "-B", "--loglevel=info"]
     entrypoint: ["/app/entrypoint.sh"]
     pre_start:
@@ -217,6 +229,8 @@ services:
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     restart: always
+    labels:
+      org.dlux.restart: "protected"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -240,6 +254,8 @@ services:
   composer-executor:
     image: debeski/composer:latest
     restart: unless-stopped
+    labels:
+      org.dlux.restart: "protected"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -260,9 +276,9 @@ services:
       - --interval
       - "2"
     environment:
-      WEB_IMAGE: "${WEB_IMAGE:-debeski/sales:latest}"
+      WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
       COMPOSER_EXECUTOR_SOCKET: "/run/composer-exec/composer-exec.sock"
-      COMPOSER_VERSION_LABEL: "org.switchlibya.dlux_baked_version"
+      COMPOSER_VERSION_LABEL: "org.dlux_crm.dlux_baked_version"
       COMPOSER_RELEASE_MANIFEST_LABEL: "org.dlux.project.release-manifest"
       COMPOSER_ACTIVE_VERSION_FILE: "/opt/dlux-runtime/state/active.json"
       COMPOSER_ACTIVE_VERSION_KEY: "version"
@@ -281,6 +297,8 @@ services:
   composer-agent:
     image: debeski/composer:latest
     restart: unless-stopped
+    labels:
+      org.dlux.restart: "protected"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -297,19 +315,19 @@ services:
       - --interval
       - "2"
       - --check-image
-      - ${WEB_IMAGE:-debeski/sales:latest}
+      - ${WEB_IMAGE:-debeski/dlux-crm:sales}
       - --availability-file
       - /opt/dlux-runtime/state/image-available.json
       - --check-interval
       - "3600"
     environment:
       DOCKER_HOST: "tcp://docker-socket-proxy:2375"
-      WEB_IMAGE: "${WEB_IMAGE:-debeski/sales:latest}"
+      WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
       COMPOSER_CONTROL_URL: "${COMPOSER_CONTROL_URL:-}"
       COMPOSER_ENROLLMENT_TOKEN: "${COMPOSER_ENROLLMENT_TOKEN:-}"
       COMPOSER_AGENT_STATE_DIR: "/var/lib/composer-agent"
       COMPOSER_EXECUTOR_SOCKET: "/run/composer-exec/composer-exec.sock"
-      COMPOSER_VERSION_LABEL: "org.switchlibya.dlux_baked_version"
+      COMPOSER_VERSION_LABEL: "org.dlux_crm.dlux_baked_version"
       COMPOSER_RELEASE_MANIFEST_LABEL: "org.dlux.project.release-manifest"
       COMPOSER_ACTIVE_VERSION_FILE: "/opt/dlux-runtime/state/active.json"
       COMPOSER_ACTIVE_VERSION_KEY: "version"
