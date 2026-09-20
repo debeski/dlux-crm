@@ -43,6 +43,7 @@
   - [ ] Purchase-invoice/stock-take/opening-stock editors do NOT fit `DocumentEditorView` — intake lines are plain Forms that create Products, not an inline formset. Left alone deliberately; revisit only if they gain a header+lines shape.
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
 - **Completed Recently:**
+  - [x] Generated app READMEs now recommend the Dlux Ribbon instead of the deprecated `advanced_filter_helper`; active code has no helper or `AUDIT_FIELD_NAMES` dependency (merged 2026-09-26).
   - [x] v0.8.1 version/manifest/changelog aligned and DjangoLux pinned exactly to 1.9.2 for patch-release validation (2026-09-23).
   - [x] DjangoLux runtime pin advanced exactly from 1.8.13 to 1.9.1 for the v0.8.0 release candidate (2026-09-23).
   - [x] Bundled `config.json` made retailer-neutral: removed Switch/SwitchLibya assets, copy, contacts and public-site app payloads; retained a valid generic settings snapshot (2026-09-23).
@@ -67,6 +68,7 @@
 - 2026-09-23: Rebuilt live Docker stack 9/9 healthy; `/health/` 200 and installed django-lux 1.9.2 confirmed.
 - 2026-09-11: v0.7.3 — 237 OK on dlux 1.8.13 in a scratch py3.13 venv (`finance catalog sales common public_catalog tests`, sqlite); 231 OK in `sales-web-1` on mounted 1.8.14b3 before the valuation render test; manifest gate OK for v0.7.3.
 ### One-line info about last time edited Docs: [Max 2 lines]
+- 2026-09-26: finance/catalog/sales app READMEs now direct new list pages to `RibbonMixin` and `{% dlux_ribbon %}`.
 - 2026-09-24: Architecture/Operations/Release docs describe 1.9.3, the official hash-pinned wheel, and Composer 1.5.2 maintenance requirements; changelog/manifest/version aligned at 0.8.2.
 - 2026-09-11: `docs/BUSINESS_RULES.md` Inventory valuation covers sale value, expected profit and margin.
 - 2026-09-04: `docs/RELEASING.md` + `docs/OPERATIONS.md` name `debeski/dlux-crm` and the `:sales-<ver>` / `:sales` tags.
