@@ -121,3 +121,33 @@ class StockTakeViewTests(TestCase):
         self.assertEqual(ctx["total_usd"], Decimal("25.00"))
         self.assertEqual(ctx["total_lyd"], Decimal("125.00"))
         self.assertEqual(ctx["item_count"], 2)
+
+    def test_valuation_expected_profit(self):
+        ExchangeRate.objects.create(rate=Decimal("5.00"))
+        Product.objects.filter(pk=self.a.pk).update(price_lyd_override=Decimal("15.00"))
+        Product.objects.filter(pk=self.b.pk).update(price_usd=Decimal("1.60"))
+        req = rf.get("/catalog/valuation/")
+        req.user = self.mgr
+        view = InventoryValuationView()
+        view.request, view.args, view.kwargs = req, (), {}
+        ctx = view.get_context_data()
+        a, b = ctx["rows"]
+        # A: 10 × 15 LYD override = 150 − 100 cost = 50; B: 5 × (1.60 USD × 5) = 40 − 25 cost = 15
+        self.assertEqual((a["sale_lyd"], a["profit_lyd"]), (Decimal("150.00"), Decimal("50.00")))
+        self.assertEqual((b["sale_lyd"], b["profit_lyd"]), (Decimal("40.00"), Decimal("15.00")))
+        self.assertEqual(ctx["total_sale_lyd"], Decimal("190.00"))
+        self.assertEqual(ctx["total_profit_lyd"], Decimal("65.00"))
+        self.assertEqual(ctx["margin_percent"], Decimal("34.21"))
+
+    def test_valuation_page_renders_profit_figures(self):
+        ExchangeRate.objects.create(rate=Decimal("5.00"))
+        Product.objects.filter(pk=self.a.pk).update(price_lyd_override=Decimal("15.00"))
+        req = rf.get("/catalog/valuation/")
+        req.user = self.mgr
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        resp = InventoryValuationView.as_view()(req)
+        content = resp.render().content.decode()
+        # Sale 150 + 25 = 175 LYD against 125 cost → 50 profit, 28.57% margin.
+        self.assertRegex(content, r"175[.,٫]00")
+        self.assertRegex(content, r"28[.,٫]57%")

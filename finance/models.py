@@ -20,13 +20,18 @@ from django.urls import reverse
 
 from dlux.models import ScopedModel
 
-# Cache key for the live USD->LYD rate. Invalidated whenever a new rate is saved.
+# Cache key retained for the live USD->LYD rate; EUR uses its own keyed value.
 CURRENT_RATE_CACHE_KEY = "finance:current_usd_lyd_rate"
 CURRENT_RATE_CACHE_TTL = 60 * 60  # 1h; bounded by explicit invalidation on save.
 
 
+def current_rate_cache_key(currency):
+    currency = str(currency).upper()
+    return CURRENT_RATE_CACHE_KEY if currency == "USD" else f"finance:current_{currency.lower()}_lyd_rate"
+
+
 class ExchangeRate(ScopedModel):
-    """Append-only history of the USD -> LYD conversion rate.
+    """Append-only history of USD/EUR -> LYD conversion rates.
 
     The newest row is the *live* rate used everywhere prices are computed. Past
     rows are never edited, so the system keeps a full audit trail of how the
@@ -44,12 +49,27 @@ class ExchangeRate(ScopedModel):
         (SOURCE_CUSTOM, "Custom"),
     )
 
+    CURRENCY_USD = "USD"
+    CURRENCY_EUR = "EUR"
+    CURRENCY_CHOICES = (
+        (CURRENCY_USD, "US Dollar (USD)"),
+        (CURRENCY_EUR, "Euro (EUR)"),
+    )
+
+    currency = models.CharField(
+        max_length=3,
+        choices=CURRENCY_CHOICES,
+        default=CURRENCY_USD,
+        db_index=True,
+        verbose_name="Currency",
+    )
+
     rate = models.DecimalField(
         max_digits=12,
         decimal_places=4,
         validators=[MinValueValidator(Decimal("0.0001"))],
-        verbose_name="LYD per 1 USD",
-        help_text="How many Libyan Dinars equal one US Dollar.",
+        verbose_name="LYD per 1 unit",
+        help_text="How many Libyan Dinars equal one unit of the selected currency.",
     )
     source = models.CharField(
         max_length=20,
@@ -66,13 +86,13 @@ class ExchangeRate(ScopedModel):
         permissions = [("manage_exchangerate", "Can set the global exchange rate")]
 
     def __str__(self):
-        return f"1 USD = {self.rate} LYD"
+        return f"1 {self.currency} = {self.rate} LYD"
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         # The newest row is authoritative; refresh the cached live rate.
         if not self.deleted_at:
-            cache.set(CURRENT_RATE_CACHE_KEY, self.rate, CURRENT_RATE_CACHE_TTL)
+            cache.set(current_rate_cache_key(self.currency), self.rate, CURRENT_RATE_CACHE_TTL)
 
 
 class CashDeposit(ScopedModel):

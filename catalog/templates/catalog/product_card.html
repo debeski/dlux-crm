@@ -1,0 +1,112 @@
+<div class="product-card">
+    <div class="d-flex flex-wrap align-items-start gap-3 mb-4">
+        <div class="product-card-image flex-shrink-0">
+            {% if product.image_url %}
+            <img src="{{ product.image_url }}" alt="{{ product.name }}">
+            {% else %}
+            <i class="bi bi-box-seam"></i>
+            {% endif %}
+        </div>
+        <div class="flex-grow-1" style="min-width:0">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div>
+                    <h5 class="mb-1">{{ product.name }}</h5>
+                    <div class="text-muted small">
+                        {{ product.category|default:"—" }}
+                        {% if product.sku %}<span class="mx-1">·</span><span class="font-monospace">{{ product.sku }}</span>{% endif %}
+                    </div>
+                    {% if product.barcode %}<div class="text-muted small font-monospace mt-1">{{ product.barcode }}</div>{% endif %}
+                </div>
+                <span class="badge rounded-pill {% if product.is_active %}text-bg-success{% else %}text-bg-secondary{% endif %}">
+                    {% if product.is_active %}{{ DLUX_STRINGS.ui_active|default:"Active" }}{% else %}{{ DLUX_STRINGS.ui_inactive|default:"Inactive" }}{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-2 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="product-card-stat">
+                <span>{{ DLUX_STRINGS.label_product_stock_qty|default:"On hand" }}</span>
+                <strong class="{% if product.is_low_stock %}text-danger{% endif %}">{{ product.stock_qty|floatformat:"-2" }} {{ product.get_unit_display }}</strong>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="product-card-stat">
+                <span>{{ DLUX_STRINGS.label_product_selling_price_lyd|default:"Selling price" }}</span>
+                <strong>{{ price_lyd|floatformat:2 }} LYD</strong>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="product-card-stat">
+                <span>{{ DLUX_STRINGS.label_product_price_usd|default:"Price (USD)" }}</span>
+                <strong>{{ product.price_usd|floatformat:2 }} USD</strong>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="product-card-stat">
+                <span>{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</span>
+                <strong>{{ product.cost_usd|floatformat:2 }} USD</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-lg-5">
+            <div class="product-card-panel mb-3">
+                <div class="product-card-heading"><i class="bi bi-info-circle me-1"></i>{{ DLUX_STRINGS.ui_item_details|default:"Item details" }}</div>
+                <dl class="row small mb-0">
+                    <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_unit|default:"Unit" }}</dt><dd class="col-7">{{ product.get_unit_display }}</dd>
+                    <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup" }}</dt><dd class="col-7">{{ product.markup_percent|floatformat:2 }}%</dd>
+                    <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_reorder_level|default:"Reorder level" }}</dt><dd class="col-7">{{ product.reorder_level|floatformat:"-2" }}</dd>
+                    <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_price_lyd_override|default:"Manual LYD" }}</dt><dd class="col-7">{% if product.price_lyd_override != None %}{{ product.price_lyd_override|floatformat:2 }} LYD{% else %}—{% endif %}</dd>
+                </dl>
+                {% if product.description %}<p class="small text-muted border-top pt-2 mb-0">{{ product.description|linebreaksbr }}</p>{% endif %}
+            </div>
+
+            <div class="product-card-panel">
+                <div class="product-card-heading"><i class="bi bi-palette me-1"></i>{{ DLUX_STRINGS.label_product_available_variants|default:"Variants" }} <span class="badge rounded-pill text-bg-secondary">{{ variants|length }}</span></div>
+                {% if variants %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>{{ DLUX_STRINGS.label_product_color|default:"Color" }}</th><th>{{ DLUX_STRINGS.label_product_size|default:"Size / Spec" }}</th><th class="text-end">{{ DLUX_STRINGS.label_product_stock_qty|default:"Stock" }}</th></tr></thead>
+                        <tbody>
+                            {% for variant in variants %}
+                            <tr><td>{{ variant.color_label|default:"—" }}</td><td>{{ variant.size|default:"—" }}</td><td class="text-end fw-semibold">{{ variant.stock_qty|floatformat:"-2" }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">{{ DLUX_STRINGS.ui_no_variants|default:"No color or size variants." }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-7">
+            <div class="product-card-panel product-card-history">
+                <div class="product-card-heading"><i class="bi bi-clock-history me-1"></i>{{ DLUX_STRINGS.page_stock_movements|default:"Recent stock movements" }} <span class="badge rounded-pill text-bg-secondary">{{ movements|length }}</span></div>
+                {% if movements %}
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>{{ DLUX_STRINGS.label_stockmovement_created_at|default:"Date" }}</th><th>{{ DLUX_STRINGS.label_stockmovement_movement_type|default:"Type" }}</th><th>{{ DLUX_STRINGS.label_stockmovement_variant|default:"Variant" }}</th><th class="text-end">{{ DLUX_STRINGS.label_stockmovement_quantity|default:"Qty" }}</th><th>{{ DLUX_STRINGS.label_stockmovement_reference|default:"Reference" }}</th></tr></thead>
+                        <tbody>
+                            {% for movement in movements %}
+                            <tr>
+                                <td class="text-nowrap">{{ movement.created_at|date:"Y-m-d H:i" }}</td>
+                                <td><span class="badge rounded-pill {% if movement.movement_type == 'in' %}text-bg-success{% elif movement.movement_type == 'out' %}text-bg-danger{% else %}text-bg-warning{% endif %}">{{ movement.get_movement_type_display }}</span></td>
+                                <td>{{ movement.variant.display_label|default:"—" }}</td>
+                                <td class="text-end fw-semibold {% if movement.signed_quantity < 0 %}text-danger{% else %}text-success{% endif %}">{{ movement.signed_quantity|floatformat:"-2" }}</td>
+                                <td><div>{{ movement.reference|default:"—" }}</div>{% if movement.reason %}<div class="text-muted small">{{ movement.reason }}</div>{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-0">{{ DLUX_STRINGS.ui_no_movements|default:"No stock movements recorded." }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

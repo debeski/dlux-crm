@@ -11,11 +11,14 @@ from .models import CashDeposit, ExchangeRate, Expense, ExpenseCategory, StaffAc
 class ExchangeRateTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):
         model = ExchangeRate
-        fields = ("rate", "source", "note", "created_by", "created_at")
+        fields = ("currency", "rate", "source", "note", "created_by", "created_at")
         dlux_actions = True
 
     def render_source(self, record):
         return t(f"source_{record.source}", record.get_source_display())
+
+    def render_currency(self, record):
+        return t(f"currency_{record.currency.lower()}", record.get_currency_display())
 
 
 class CashDepositTable(ModalRowActionsMixin, DluxTable):

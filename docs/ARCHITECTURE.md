@@ -205,8 +205,11 @@ registrations import defensively so an older runtime still gets the per-user car
 
 `finance/services.py` is the **single source of conversion math**:
 
-- `get_current_rate()` — the live USD→LYD rate (newest `ExchangeRate` row, cached).
-- `usd_to_lyd()` / `lyd_to_usd()` / `quantize_lyd()` — consistent 2-dp rounding.
+- `get_current_rate(currency="USD")` — the live currency→LYD rate (newest
+  matching `ExchangeRate` row, cached independently for USD and EUR).
+- `usd_to_lyd()` / `lyd_to_usd()` / `eur_to_lyd()` / `quantize_lyd()` —
+  explicit conversions with consistent 2-dp rounding. Catalog and invoice calls
+  omit the currency intentionally and therefore keep the USD default.
 
 Reuse these everywhere instead of multiplying by a rate inline.
 

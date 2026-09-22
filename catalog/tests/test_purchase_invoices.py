@@ -2,6 +2,7 @@ import json
 import re
 import tempfile
 from decimal import Decimal
+from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -10,15 +11,20 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import translation
 
+from catalog.forms import PurchaseInvoiceLineForm, StockMovementForm
 from catalog.models import Product, ProductVariant, PurchaseInvoice, StockMovement, Supplier
 from catalog.views import (
     OpeningStockDetailView,
     OpeningStockEditorView,
+    OpeningStockImportFinalizeView,
+    OpeningStockImportPreviewView,
     PurchaseInvoiceCreateView,
     StockMovementListView,
 )
 from finance.models import ExchangeRate
+from sales.forms import InvoiceItemForm
 
 User = get_user_model()
 rf = RequestFactory()
@@ -86,6 +92,16 @@ class PurchaseInvoiceTests(TestCase):
             self.user,
         )
         return PurchaseInvoiceCreateView.as_view()(req)
+
+    def test_create_page_gives_the_line_totals_an_unlocalized_rate(self):
+        # Arabic renders 6.50 as "6,50", which parseFloat reads as 6.
+        with translation.override("ar"):
+            content = self._get_create().content.decode()
+        self.assertRegex(content, r'parseFloat\("6\.50*"\)')
+
+    def test_quantity_inputs_step_by_one_and_accept_fractions(self):
+        for form in (PurchaseInvoiceLineForm(), StockMovementForm(), InvoiceItemForm()):
+            self.assertEqual(form.fields["quantity"].widget.attrs["step"], "any", type(form).__name__)
 
     def test_purchase_invoice_creates_supplier_product_line_and_stock_movement(self):
         data = self._post_data([
@@ -289,3 +305,108 @@ class OpeningStockOneTimeTests(TestCase):
         html = resp.content.decode()
         self.assertIn(reverse("catalog:opening_stock_detail"), html)
         self.assertIn(reverse("catalog:purchase_invoice_create"), html)
+
+
+class OpeningStockExcelImportTests(TestCase):
+    HEADERS = [
+        "Name", "Category", "Unit", "Barcode", "Color", "Size / Spec",
+        "Cost (USD)", "Markup %", "Price (USD)", "Manual LYD Price",
+        "Quantity in Storage",
+    ]
+
+    def setUp(self):
+        self.user = User.objects.create_superuser("exceladmin", "excel@example.com", "x")
+
+    def workbook(self, rows):
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(self.HEADERS)
+        for row in rows:
+            sheet.append(row)
+        output = BytesIO()
+        workbook.save(output)
+        return SimpleUploadedFile(
+            "opening-stock.xlsx",
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def preview(self, rows):
+        request = _attach_request_state(
+            rf.post(
+                reverse("catalog:opening_stock_import_preview"),
+                {"file": self.workbook(rows)},
+            ),
+            self.user,
+        )
+        response = OpeningStockImportPreviewView.as_view()(request)
+        return response, json.loads(response.content)
+
+    def test_editor_exposes_the_excel_modal_and_required_headers(self):
+        request = _attach_request_state(
+            rf.get(reverse("catalog:opening_stock")), self.user
+        )
+        response = OpeningStockEditorView.as_view()(request)
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("opening-stock-import-modal", html)
+        self.assertIn("Quantity in Storage", html)
+        self.assertIn(reverse("catalog:opening_stock_import_preview"), html)
+
+    def test_preview_then_finalize_creates_products_variants_and_stock(self):
+        response, payload = self.preview([[
+            "Brake Pad", "", "pair", "BP-001", "black", "Front",
+            12, 25, 15, "", 6,
+        ]])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["can_finalize"])
+        self.assertEqual(payload["summary"], {"total": 1, "create": 1, "update": 0, "conflicts": 0})
+        self.assertEqual(Product.objects.count(), 0)
+
+        request = _attach_request_state(
+            rf.post(
+                reverse("catalog:opening_stock_import_finalize"),
+                {"token": payload["token"]},
+            ),
+            self.user,
+        )
+        finalized = OpeningStockImportFinalizeView.as_view()(request)
+
+        self.assertEqual(finalized.status_code, 200)
+        product = Product.objects.get(name="Brake Pad")
+        self.assertEqual(product.stock_qty, Decimal("6.00"))
+        self.assertEqual(product.cost_usd, Decimal("12.00"))
+        variant = ProductVariant.objects.get(product=product)
+        self.assertEqual((variant.color, variant.size, variant.stock_qty), ("black", "Front", Decimal("6.00")))
+        self.assertTrue(StockMovement.objects.filter(product=product, reference="OPENING").exists())
+
+    def test_unknown_category_is_a_blocking_conflict(self):
+        response, payload = self.preview([[
+            "Brake Pad", "Unknown Category", "pair", "BP-001", "", "Front",
+            12, 25, 15, "", 6,
+        ]])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(payload["can_finalize"])
+        self.assertEqual(payload["summary"]["conflicts"], 1)
+        self.assertIn("does not exist", payload["rows"][0]["errors"][0])
+
+    def test_existing_product_preview_reports_an_update_without_writing(self):
+        product = Product.objects.create(
+            name="Brake Pad", barcode="BP-001", unit=Product.UNIT_PAIR,
+            cost_usd=Decimal("10.00"), price_usd=Decimal("13.00"),
+        )
+        response, payload = self.preview([[
+            "Brake Pad", "", "pair", "BP-001", "", "Front",
+            12, 25, 15, "", 2,
+        ]])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["summary"]["update"], 1)
+        self.assertIn("Cost (USD)", payload["rows"][0]["changes"])
+        product.refresh_from_db()
+        self.assertEqual(product.cost_usd, Decimal("10.00"))

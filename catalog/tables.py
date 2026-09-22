@@ -5,7 +5,7 @@ from django.utils.safestring import mark_safe
 from dlux.tables import DluxTable
 
 from common.i18n import t
-from common.tables import ModalRowActionsMixin
+from common.tables import ModalRowActionsMixin, modal_action, modal_url
 
 from django.urls import reverse
 
@@ -55,7 +55,25 @@ class SupplierTable(ModalRowActionsMixin, DluxTable):
         dlux_actions = True
 
 
-class ProductTable(ModalRowActionsMixin, DluxTable):
+class ProductCardActionsMixin:
+    def get_dlux_row_actions(self, record, base_actions):
+        actions = super().get_dlux_row_actions(record, base_actions)
+        generic_view = modal_url(Product, record.pk, view=True)
+        actions = [
+            action for action in actions
+            if (action.get("data") or {}).get("url") != generic_view
+        ]
+        actions.insert(0, modal_action(
+            t("ui_view_item_card", "Item card"),
+            "bi bi-card-list",
+            reverse("catalog:product_card", args=[record.pk]),
+            record.name,
+            dblclick=True,
+        ))
+        return actions
+
+
+class ProductTable(ProductCardActionsMixin, ModalRowActionsMixin, DluxTable):
     image = tables.Column(verbose_name="", orderable=False)
     price_lyd = tables.Column(
         empty_values=(), verbose_name="Price (LYD)", orderable=False
@@ -104,7 +122,7 @@ class ProductTable(ModalRowActionsMixin, DluxTable):
         return f"{record.stock_qty:g}"
 
 
-class ProductLightTable(ModalRowActionsMixin, DluxTable):
+class ProductLightTable(ProductCardActionsMixin, ModalRowActionsMixin, DluxTable):
     """Minimal Products table for the "light" layout — name, price, stock and
     active only. Everything else (image, sku, barcode, category, unit, variants)
     stays in the record's detail modal (`Product.get_modal_context`), for a

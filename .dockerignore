@@ -54,4 +54,5 @@ tracker.md
 .agents
 .claude
 .codex
+/CLAUDE.md
 db.sqlite3

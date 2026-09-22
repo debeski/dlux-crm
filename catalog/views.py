@@ -1,10 +1,13 @@
 import json
+import secrets
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.html import format_html
 from django.utils.translation import gettext as _
@@ -17,8 +20,8 @@ from dlux.translations import get_current_language_code, get_strings
 from dlux.utils import log_user_action
 
 from common.editors import sync_party
-from common.views import RibbonPageMixin, ScopedListView
-from finance.services import get_current_rate, usd_to_lyd
+from common.views import RibbonPageMixin, ScopedListView, scope_filtered_queryset
+from finance.services import get_current_rate, quantize_lyd, usd_to_lyd
 
 from .filters import (
     CategoryFilter, ProductFilter, PurchaseInvoiceFilter, ServiceFilter, StockMovementFilter,
@@ -29,6 +32,9 @@ from .models import (
     Category, Product, ProductVariant, PurchaseInvoice, PurchaseInvoiceLine, Service, StockMovement,
     StockTake, StockTakeLine, Supplier,
     product_color_hex,
+)
+from .opening_stock_import import (
+    IMPORT_COLUMNS, OpeningStockImportError, restore_rows, validate_workbook,
 )
 from .product_layouts import (
     PRODUCTS_LAYOUT_GRID, PRODUCTS_LAYOUT_LIGHT, PRODUCTS_LAYOUT_NS, PRODUCTS_LAYOUTS,
@@ -139,6 +145,7 @@ class ProductListView(ScopedListView):
     # Live sync of the cost/markup/USD/LYD price fields in the create-edit modal,
     # plus the per-user layout switcher (table / grid / light).
     extra_scripts = ("catalog/js/price_sync.js", "catalog/js/products_layout.js")
+    extra_styles = ("catalog/css/product_card.css",)
 
     def get_layout(self):
         return get_products_layout(self.request)
@@ -183,6 +190,39 @@ class ProductListView(ScopedListView):
         ctx["products_layout_ns"] = PRODUCTS_LAYOUT_NS
         ctx["products_layouts"] = PRODUCTS_LAYOUTS
         return ctx
+
+
+class ProductCardView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    """A product's useful operational summary in a dlux dynamic modal."""
+
+    model = Product
+    permission_required = "catalog.view_product"
+    raise_exception = True
+    template_name = "catalog/product_card.html"
+    context_object_name = "product"
+
+    def get_queryset(self):
+        return scope_filtered_queryset(
+            super().get_queryset().select_related("category").prefetch_related("variants"),
+            self.request.user,
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["variants"] = self.object.variants.all().order_by("color", "size", "pk")
+        ctx["movements"] = list(
+            self.object.movements.select_related("variant", "purchase_invoice", "created_by")
+            .order_by("-created_at", "-pk")[:30]
+        )
+        ctx["price_lyd"] = self.object.selling_price_lyd()
+        return ctx
+
+    def render_to_response(self, context, **response_kwargs):
+        from django.template.loader import render_to_string
+
+        return JsonResponse({
+            "html": render_to_string(self.template_name, context, request=self.request),
+        })
 
 
 class ServiceListView(ScopedListView):
@@ -432,19 +472,36 @@ class InventoryValuationView(RibbonPageMixin, LoginRequiredMixin, PermissionRequ
         rate = self.get_rate()
         rows = []
         total_usd = Decimal("0.00")
+        total_sale_lyd = Decimal("0.00")
         for p in Product.objects.filter(is_active=True, track_stock=True).order_by("name"):
-            value_usd = (p.stock_qty or Decimal("0")) * (p.cost_usd or Decimal("0"))
+            qty = p.stock_qty or Decimal("0")
+            value_usd = qty * (p.cost_usd or Decimal("0"))
+            value_lyd = usd_to_lyd(value_usd, rate)
+            # Today's shelf price: a manual LYD override wins, else price_usd at the live rate.
+            price_lyd = p.selling_price_lyd(rate)
+            sale_lyd = quantize_lyd(qty * price_lyd)
             total_usd += value_usd
+            total_sale_lyd += sale_lyd
             rows.append({
                 "product": p,
                 "stock_qty": p.stock_qty,
                 "cost_usd": p.cost_usd,
                 "value_usd": value_usd,
-                "value_lyd": usd_to_lyd(value_usd, rate),
+                "value_lyd": value_lyd,
+                "price_lyd": price_lyd,
+                "sale_lyd": sale_lyd,
+                "profit_lyd": sale_lyd - value_lyd,
             })
+        total_lyd = usd_to_lyd(total_usd, rate)
+        total_profit_lyd = total_sale_lyd - total_lyd
         ctx["rows"] = rows
         ctx["total_usd"] = total_usd
-        ctx["total_lyd"] = usd_to_lyd(total_usd, rate)
+        ctx["total_lyd"] = total_lyd
+        ctx["total_sale_lyd"] = total_sale_lyd
+        ctx["total_profit_lyd"] = total_profit_lyd
+        ctx["margin_percent"] = (
+            (total_profit_lyd / total_sale_lyd * 100).quantize(Decimal("0.01")) if total_sale_lyd else None
+        )
         ctx["rate"] = rate
         ctx["item_count"] = len(rows)
         return ctx
@@ -474,6 +531,7 @@ class OpeningStockEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
             "current_rate": get_current_rate(),
             "product_map_json": self._product_map(),
             "products": Product.objects.order_by("name"),
+            "import_columns": IMPORT_COLUMNS,
         }
 
     @staticmethod
@@ -530,6 +588,75 @@ class OpeningStockEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 messages.warning(request, _("No items were entered."))
             return redirect("catalog:stock_movement_list")
         return render(request, self.template_name, self._context(formset))
+
+
+class OpeningStockImportPreviewView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Validate an XLSX upload and stage its rows without touching stock."""
+
+    permission_required = OpeningStockEditorView.permission_required
+    raise_exception = True
+
+    def post(self, request):
+        if _opening_stock_used():
+            return JsonResponse({"error": _("Opening stock has already been applied.")}, status=409)
+        try:
+            result = validate_workbook(request.FILES.get("file"))
+        except OpeningStockImportError as exc:
+            return JsonResponse({"error": " ".join(exc.messages)}, status=400)
+
+        token = ""
+        if result["can_finalize"]:
+            token = secrets.token_urlsafe(24)
+            cache.set(
+                f"catalog:opening-stock-import:{token}",
+                {"user_id": request.user.pk, "rows": result.pop("valid_rows")},
+                30 * 60,
+            )
+        else:
+            result.pop("valid_rows", None)
+        result["token"] = token
+        return JsonResponse(result)
+
+
+class OpeningStockImportFinalizeView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Apply a previously previewed XLSX import through the manual intake path."""
+
+    permission_required = OpeningStockEditorView.permission_required
+    raise_exception = True
+
+    def post(self, request):
+        token = (request.POST.get("token") or "").strip()
+        cache_key = f"catalog:opening-stock-import:{token}"
+        staged = cache.get(cache_key) if token else None
+        if not staged or staged.get("user_id") != request.user.pk:
+            return JsonResponse({"error": _("This import preview expired. Select the file again.")}, status=400)
+        if _opening_stock_used():
+            return JsonResponse({"error": _("Opening stock has already been applied.")}, status=409)
+        lock_key = f"{cache_key}:finalizing"
+        if not cache.add(lock_key, request.user.pk, 60):
+            return JsonResponse({"error": _("This import is already being finalized.")}, status=409)
+        try:
+            cleaned_rows = restore_rows(staged["rows"])
+        except OpeningStockImportError as exc:
+            cache.delete(lock_key)
+            return JsonResponse({"error": " ".join(exc.messages)}, status=400)
+
+        try:
+            with transaction.atomic():
+                for cleaned in cleaned_rows:
+                    OpeningStockEditorView._apply_line(cleaned)
+                log_user_action(
+                    request, "CREATE", model_name="Opening Stock",
+                    details=f"Opening stock XLSX intake: {len(cleaned_rows)} item(s)",
+                )
+        finally:
+            cache.delete(lock_key)
+        cache.delete(cache_key)
+        messages.success(
+            request,
+            _("Opening stock applied — %(n)s item(s) loaded from Excel.") % {"n": len(cleaned_rows)},
+        )
+        return JsonResponse({"ok": True, "redirect": reverse("catalog:stock_movement_list")})
 
 
 class OpeningStockDetailView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):

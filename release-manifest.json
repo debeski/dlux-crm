@@ -1,11 +1,14 @@
 {
   "schema_version": 1,
-  "version": "0.7.2",
-  "summary": "Renames the published image to debeski/dlux-crm:sales \u2014 one repository per product, with the tag naming the edition.",
+  "version": "0.7.3",
+  "summary": "Opening Stock imports XLSX files safely, exchange rates cover USD and EUR, and Products gain an operational item card.",
   "highlights": [
-    "compose.yml, CI and the release workflow publish and pull debeski/dlux-crm:sales-<ver> + :sales.",
-    "Matches the gov edition's debeski/dlux-crm:gov; set WEB_IMAGE on every deployment host.",
-    "Every service carries an org.dlux.restart label, matching the dlux scaffold contract."
+    "Opening Stock validates and previews XLSX creates, updates and conflicts before finalizing stock.",
+    "Manual, official and black-market exchange-rate views now cover both USD and EUR.",
+    "Product View shows variants, prices, stock and recent ledger movements in a dedicated card.",
+    "Inventory Valuation adds stock value at selling price, expected profit and margin.",
+    "New purchase invoices no longer truncate the exchange rate to a whole number in Arabic.",
+    "Quantity fields step by 1, and the mouse wheel no longer changes any number field."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.7.2"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.7.3"
 }

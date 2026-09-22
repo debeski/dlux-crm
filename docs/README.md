@@ -6,6 +6,7 @@ Project documentation for the Switch sales system (منظومة مبيعات):
 - [BUSINESS_RULES.md](BUSINESS_RULES.md) — currency, hybrid pricing, frozen-rate rule, invoice lifecycle, inventory
 - [PERMISSIONS.md](PERMISSIONS.md) — roles (Admin vs Sales Staff), `seed_roles`, custom permissions
 - [OPERATIONS.md](OPERATIONS.md) — setup, first-run checklist, key URLs, local dev, migrations
+- [AUTOMOTIVE_FITMENT_PLAN.md](AUTOMOTIVE_FITMENT_PLAN.md) — phased optional vehicle-compatibility module and retailer rollout
 
 See also the root `CHANGELOG.md` and `VERSION`.
 

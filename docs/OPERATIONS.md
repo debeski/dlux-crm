@@ -171,14 +171,15 @@ jobs are declared in `config/celery.py` under `app.conf.beat_schedule`:
 
 | Task | Schedule | Purpose |
 |------|----------|---------|
-| `finance.tasks.refresh_market_rates` | every 3h | Scrapes two USD→LYD reference rates and caches them (**no expiry** — replaced only by a later successful scrape): the **official** rate from [cbl.gov.ly](https://cbl.gov.ly/currency-exchange-rates/) (`finance:cbl_official_usd_rate`) and the **black-market** rate + trend from [eanlibya.com](https://www.eanlibya.com/exchangerate/) (`finance:ean_black_market_usd_rate`). |
+| `finance.tasks.refresh_market_rates` | every 3h | Scrapes USD→LYD and EUR→LYD reference rates and caches them (**no expiry** — replaced only by a later successful scrape): official rates from [cbl.gov.ly](https://cbl.gov.ly/currency-exchange-rates/) (`finance:cbl_official_{usd,eur}_rate`) and black-market rates + trends from [eanlibya.com](https://www.eanlibya.com/exchangerate/) (`finance:ean_black_market_{usd,eur}_rate`). |
 
-The **Workspace dashboard** shows both reference rates next to the in-house
-*custom* rate when the viewer has a rate, sales, or catalog permission.
+The **Workspace dashboard** shows both sources for USD and EUR next to any
+in-house manual rate when the viewer has a rate, sales, or catalog permission.
 Each scrape is server-side (the CSP `connect-src` blocks a browser cross-origin
 fetch) and independent — if one site is down its last cached value is kept while
 the other still updates. This is display-only — invoices always freeze the custom
-`ExchangeRate`, never a scraped rate.
+USD `ExchangeRate`, never a scraped rate. Adding EUR history does not change the
+USD base used by products or invoices.
 
 **Networking**: `web` and the rest of the stack sit on the isolated
 `internal` network (`internal: true`, no egress). The scrape therefore

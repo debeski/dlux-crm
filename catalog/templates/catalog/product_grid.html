@@ -44,7 +44,7 @@
 
             <div class="mt-auto pt-3">
                 <button type="button" class="btn btn-sm btn-outline-secondary w-100 rounded-pill"
-                        data-dynamic-modal="{% url 'scoped_modal_manager' 'catalog' 'Product' p.pk %}?action=view"
+                        data-dynamic-modal="{% url 'catalog:product_card' p.pk %}"
                         data-modal-title="{{ p.name }}">
                     <i class="bi bi-arrows-angle-expand me-1"></i>{{ DLUX_STRINGS.ui_view_details|default:"Details" }}
                 </button>

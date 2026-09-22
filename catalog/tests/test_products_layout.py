@@ -150,7 +150,7 @@ class ProductListViewLayoutTests(TestCase):
         html = resp.content.decode()
         self.assertIn("data-products-grid", html)
         self.assertIn("dlux-table-shell", html)          # reuses dlux surface
-        self.assertIn("?action=view", html)              # expand → detail modal
+        self.assertIn("/products/1/card/", html)         # expand → operational item card
         self.assertIn("data-products-layout-switch", html)  # toggle still present
 
 

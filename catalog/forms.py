@@ -9,7 +9,7 @@ from dlux.translations import get_strings
 from dlux.utils import set_field_attrs
 
 from common.forms import (
-    apply_dlux_file_widgets, build_grid_helper, translate_choice_fields,
+    QUANTITY_INPUT_ATTRS, apply_dlux_file_widgets, build_grid_helper, translate_choice_fields,
     translate_help_text,
 )
 from finance.services import get_current_rate
@@ -237,6 +237,7 @@ class StockMovementForm(forms.ModelForm):
             str(pk): pid for pk, pid in variant_field.queryset.values_list("pk", "product_id")
         }
         set_field_attrs(self)
+        self.fields["quantity"].widget.attrs.update(QUANTITY_INPUT_ATTRS)
         translate_choice_fields(self)
         translate_help_text(self)
         build_grid_helper(self, [("product", "variant"), ("movement_type", "quantity"), ("reference",), ("reason",)])
@@ -348,6 +349,7 @@ class OpeningStockLineForm(forms.Form):
                 w.attrs.setdefault("class", "form-control form-control-sm")
                 if field.label:
                     w.attrs.setdefault("placeholder", field.label)
+        self.fields["quantity"].widget.attrs.update(QUANTITY_INPUT_ATTRS)
 
 
 class PurchaseInvoiceLineForm(OpeningStockLineForm):

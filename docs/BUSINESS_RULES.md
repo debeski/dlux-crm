@@ -5,9 +5,14 @@
 - Switch imports from China and thinks in **USD**; it sells locally in **LYD**.
 - LYD prices follow the **black-market** USD rate (higher than the official rate),
   which the admin sets globally.
-- The rate is a global setting reused by every price and conversion. It lives in
-  `finance.ExchangeRate` as an **append-only history**; the newest row is the live
-  rate. Past rows are never edited, giving a full audit trail of rate movements.
+- Manual USD and EUR rates live in `finance.ExchangeRate` as separate
+  **append-only histories**; the newest row for each currency is its live rate.
+  Existing catalog cost, pricing and invoice conversion remain USD-based. EUR is
+  available as a reference/manual conversion currency and does not silently
+  reinterpret any stored USD amount.
+- The dashboard also shows cached official and black-market USD and EUR rates
+  scraped from CBL and EANLibya. Scraped rates are references only; invoices
+  freeze the manually maintained USD rate.
 
 ## Pricing model — hybrid (USD base + optional LYD override)
 
@@ -189,7 +194,13 @@ at once, one per row:
    row without changing any neighbouring row. Selecting an existing product
    overwrites untouched row defaults (`0.00`, default unit) with that product's
    current values, but preserves fields the user already edited by hand.
-2. **Submitting** (behind a confirm describing what will happen) runs one
+2. **Import Excel** accepts an `.xlsx` workbook with `Name` and `Quantity in
+   Storage` required, plus the same optional category, unit, barcode, variant
+   and price columns as the grid. File selection only validates and stages the
+   data: the modal shows creates versus existing-product updates, changed
+   fields, duplicates, unknown categories and identity conflicts. No stock is
+   written until the user reviews the diff and presses **Finalize import**.
+3. **Submitting** manually or finalizing a verified workbook runs one
    transaction: each row create-or-reuses its `Product`, corrects its pricing
    when the admin edited those cells, and posts one **Stock In** `StockMovement`
    for the stored quantity (`reason="Opening balance"`, `reference="OPENING"`).
@@ -197,7 +208,7 @@ at once, one per row:
    movement points at that variant. Stock still flows only through the ledger. A
    zero-quantity row reprices its product without posting a movement; blank rows
    are dropped.
-3. It can only be applied once. After `reference="OPENING"` movements exist, the
+4. It can only be applied once. After `reference="OPENING"` movements exist, the
    Stock Movements page switches the action to a read-only Opening Stock record
    at `/staff/catalog/stock-movements/opening-stock/view/`; the posted movements remain
    the authoritative audit trail.
@@ -230,6 +241,18 @@ inbound-stock document that Opening Stock was never meant to be:
 4. Purchase invoices may carry the scan/photo/PDF attachment of the supplier's
    paper invoice (`PurchaseInvoice.attachment`, upload path
    `purchase_invoices/`). This is record-only and never affects totals or stock.
+
+The product create/reuse operation in step 3 is the same intake helper used by
+Opening Stock. Typing a new item name on a purchase invoice therefore creates
+the missing Product and its selected color/size variant before the purchase line
+and Stock In movement are posted.
+
+## Product item card
+
+Product View and row double-click open an operational item card instead of the
+generic field dump. It shows identity/image, on-hand quantity, cost and selling
+prices, reorder level, every color/size balance, and the 30 newest stock-ledger
+movements. Editing still uses the standard scoped modal.
 
 ## Sales invoice variant selection
 
@@ -266,6 +289,13 @@ A read-only report of **what the stock on hand is worth right now** —
 Σ(`stock_qty` × `cost_usd`), shown in USD and converted to LYD at the live rate.
 This is the closing-stock figure the fiscal-year financial report uses. Gated
 by `view_inventory_valuation`.
+
+The same page answers **what the stock would bring in if it all sold**: each
+item's sale value is `stock_qty` × `Product.selling_price_lyd` (the manual LYD
+override when set, else the USD price at the live rate), and its expected
+profit is sale value − cost value in LYD. The totals add a margin, profit as a
+percentage of sale value. These are today's shelf prices, not a forecast:
+invoice discounts and future rate moves are not applied.
 
 ## Fiscal year & the financial report
 

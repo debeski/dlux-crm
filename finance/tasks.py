@@ -1,6 +1,7 @@
 """Celery tasks for the finance app."""
 from celery import shared_task
 
+from .models import ExchangeRate
 from .services import refresh_cbl_rate_cache, refresh_ean_rate_cache
 
 
@@ -16,6 +17,12 @@ def refresh_market_rates():
     * black market (EAN)     — eanlibya.com
     """
     return {
-        "cbl": refresh_cbl_rate_cache(),
-        "ean": refresh_ean_rate_cache(),
+        "cbl": {
+            currency: refresh_cbl_rate_cache(currency)
+            for currency in (ExchangeRate.CURRENCY_USD, ExchangeRate.CURRENCY_EUR)
+        },
+        "ean": {
+            currency: refresh_ean_rate_cache(currency)
+            for currency in (ExchangeRate.CURRENCY_USD, ExchangeRate.CURRENCY_EUR)
+        },
     }

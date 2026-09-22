@@ -49,7 +49,7 @@ services:
     build: .
     image: !reset null
     volumes: !override
-      - /Users/debeski/Desktop/depy/pkg-django-lux/dlux:/app/dlux:ro
+      - /Users/debeski/Desktop/depy/pkg-django-lux/dlux:/app/dlux:rw
       - ./catalog:/app/catalog:rw
       - ./common:/app/common:rw
       - ./config:/app/config:rw

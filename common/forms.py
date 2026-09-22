@@ -11,6 +11,10 @@ from dlux.utils import translate_choices
 # Bootstrap column class per number of fields sharing a row.
 _GRID_COL = {1: "col-12", 2: "col-md-6", 3: "col-md-4", 4: "col-md-3"}
 
+# Quantities are 2-dp decimals (kg, meters), so Django renders step="0.01" and
+# the spinner crawls. "any" steps by 1 yet still accepts 2.5.
+QUANTITY_INPUT_ATTRS = {"step": "any", "inputmode": "decimal"}
+
 
 def build_grid_helper(form, rows):
     """Give a modal ModelForm a multi-column crispy layout so short fields share

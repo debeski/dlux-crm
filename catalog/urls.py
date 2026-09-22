@@ -5,6 +5,9 @@ from .views import (
     InventoryValuationView,
     OpeningStockDetailView,
     OpeningStockEditorView,  # one-time bulk intake (posts Stock In movements)
+    OpeningStockImportFinalizeView,
+    OpeningStockImportPreviewView,
+    ProductCardView,
     ProductListView,
     PurchaseInvoiceCreateView,
     PurchaseInvoiceDetailView,
@@ -36,6 +39,10 @@ _opening_stock = OpeningStockEditorView.as_view()
 _opening_stock.sidebar_exclude = True
 _opening_stock_detail = OpeningStockDetailView.as_view()
 _opening_stock_detail.sidebar_exclude = True
+_opening_stock_import_preview = OpeningStockImportPreviewView.as_view()
+_opening_stock_import_preview.sidebar_exclude = True
+_opening_stock_import_finalize = OpeningStockImportFinalizeView.as_view()
+_opening_stock_import_finalize.sidebar_exclude = True
 
 _purchase_invoice_create = PurchaseInvoiceCreateView.as_view()
 _purchase_invoice_create.sidebar_exclude = True
@@ -44,8 +51,12 @@ _purchase_invoice_detail.sidebar_exclude = True
 _purchase_invoice_print = PurchaseInvoicePrintView.as_view()
 _purchase_invoice_print.sidebar_exclude = True
 
+_product_card = ProductCardView.as_view()
+_product_card.sidebar_exclude = True
+
 urlpatterns = [
     path("", ProductListView.as_view(), name="product_list"),
+    path("products/<int:pk>/card/", _product_card, name="product_card"),
     path("categories/", CategoryListView.as_view(), name="category_list"),
     path("suppliers/", SupplierListView.as_view(), name="supplier_list"),
     path("services/", ServiceListView.as_view(), name="service_list"),
@@ -55,6 +66,16 @@ urlpatterns = [
     path("purchase-invoices/<int:pk>/print/", _purchase_invoice_print, name="purchase_invoice_print"),
     path("stock-movements/", StockMovementListView.as_view(), name="stock_movement_list"),
     path("stock-movements/opening-stock/", _opening_stock, name="opening_stock"),
+    path(
+        "stock-movements/opening-stock/import/preview/",
+        _opening_stock_import_preview,
+        name="opening_stock_import_preview",
+    ),
+    path(
+        "stock-movements/opening-stock/import/finalize/",
+        _opening_stock_import_finalize,
+        name="opening_stock_import_finalize",
+    ),
     path("stock-movements/opening-stock/view/", _opening_stock_detail, name="opening_stock_detail"),
     path("stock-takes/", StockTakeListView.as_view(), name="stock_take_list"),
     path("stock-takes/new/", _stock_take_create, name="stock_take_create"),

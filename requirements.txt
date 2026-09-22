@@ -1,4 +1,4 @@
-django-lux[updater]==1.8.6
+django-lux[updater]==1.8.13
 django-cors-headers
 django-csp
 gunicorn
@@ -8,3 +8,4 @@ django-redis
 celery
 django-celery-beat
 django-health-check==3.20.0
+openpyxl==3.1.5

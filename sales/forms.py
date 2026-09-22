@@ -5,7 +5,7 @@ from django.forms import inlineformset_factory
 from dlux.translations import get_strings
 from dlux.utils import set_field_attrs
 
-from common.forms import build_grid_helper, translate_choice_fields, translate_help_text
+from common.forms import QUANTITY_INPUT_ATTRS, build_grid_helper, translate_choice_fields, translate_help_text
 
 from .models import Customer, Delivery, Invoice, InvoiceItem, Payment
 
@@ -114,8 +114,8 @@ class InvoiceItemForm(forms.ModelForm):
             "inputmode": "decimal",
         })
         self.fields["quantity"].widget = forms.NumberInput(attrs={
-            "class": "form-control form-control-sm text-end cart-qty", "step": "0.01", "min": "0.01",
-            "inputmode": "decimal",
+            "class": "form-control form-control-sm text-end cart-qty", "min": "0.01",
+            **QUANTITY_INPUT_ATTRS,
         })
         translate_help_text(self)
 

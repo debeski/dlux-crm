@@ -1,5 +1,6 @@
 {% extends "dlux/form_base.html" %}
 {% load static %}
+{% load l10n %}
 {% load crispy_forms_tags %}
 
 {% block title %}{{ DLUX_STRINGS.ui_new_purchase_invoice|default:"New Purchase Invoice" }}{% endblock %}
@@ -167,7 +168,7 @@
     const prefix = "{{ formset.prefix }}";
     const totalForms = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
     const body = document.getElementById('items-body');
-    const rate = parseFloat("{{ current_rate }}") || 0;
+    const rate = parseFloat("{{ current_rate|unlocalize }}") || 0;
     const fmt = (n) => (isNaN(n) ? 0 : n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     function q(row, suffix) { return row.querySelector('[name$="-' + suffix + '"]'); }

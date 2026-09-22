@@ -4,13 +4,14 @@ from decimal import Decimal
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase
 
 from common.forms import translate_choice_fields
 
 from ..urls import app_name
 from .. import services
-from ..models import StaffAccount, StaffLedgerEntry
+from ..models import ExchangeRate, StaffAccount, StaffLedgerEntry
 from ..translations import DLUX_STRINGS as FINANCE_STRINGS
 
 User = get_user_model()
@@ -43,6 +44,29 @@ class FinanceConfigScaffoldTests(SimpleTestCase):
 
     def test_finance_translations_keep_english_arabic_key_parity(self):
         self.assertEqual(set(FINANCE_STRINGS["en"]), set(FINANCE_STRINGS["ar"]))
+
+
+class ExchangeRateCurrencyTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_manual_usd_and_eur_rates_are_independent(self):
+        ExchangeRate.objects.create(currency=ExchangeRate.CURRENCY_USD, rate=Decimal("8.50"))
+        ExchangeRate.objects.create(currency=ExchangeRate.CURRENCY_EUR, rate=Decimal("9.71"))
+
+        self.assertEqual(services.get_current_rate(), Decimal("8.50"))
+        self.assertEqual(
+            services.get_current_rate(ExchangeRate.CURRENCY_EUR), Decimal("9.71")
+        )
+        self.assertEqual(services.eur_to_lyd(Decimal("2")), Decimal("19.42"))
+
+    def test_exchange_rate_form_exposes_the_currency(self):
+        from ..forms import ExchangeRateForm
+
+        self.assertEqual(
+            list(ExchangeRateForm().fields)[:4],
+            ["currency", "rate", "source", "note"],
+        )
 
 
 class StaffLedgerTests(TestCase):
@@ -176,6 +200,13 @@ _CBL_SAMPLE = """
   <td><span>العملة: </span>الدولار الكندي</td>
   <td><span>المتوسط: </span>4.5118&nbspد.ل</td>
 </tr>
+<tr>
+  <td><span class="uk-text-bold">التاريخ: </span>2026-07-02</td>
+  <td><span class="uk-text-bold">العملة: </span>اليورو</td>
+  <td><span class="uk-text-bold">المتوسط: </span>7.1200&nbspد.ل</td>
+  <td><span class="uk-text-bold">بيع: </span>7.1400&nbspد.ل</td>
+  <td><span class="uk-text-bold">شراء: </span>7.1000&nbspد.ل</td>
+</tr>
 </table>
 """
 
@@ -198,6 +229,16 @@ class CblRateScraperTests(SimpleTestCase):
     def test_returns_none_on_network_error(self):
         with mock.patch("urllib.request.urlopen", side_effect=OSError("boom")):
             self.assertIsNone(services.fetch_cbl_usd_rate())
+
+    def test_parses_euro_row_from_the_same_page(self):
+        fake = mock.Mock()
+        fake.read.return_value = _CBL_SAMPLE.encode("utf-8")
+        fake.__enter__ = lambda s: s
+        fake.__exit__ = lambda *a: False
+        with mock.patch("urllib.request.urlopen", return_value=fake):
+            data = services.fetch_cbl_eur_rate()
+        self.assertEqual(data["average"], "7.1200")
+        self.assertEqual(data["sell"], "7.1400")
 
 
 # A trimmed sample of the eanlibya table: the dollar row (with a "down" trend
@@ -234,3 +275,13 @@ class EanRateScraperTests(SimpleTestCase):
     def test_returns_none_on_network_error(self):
         with mock.patch("urllib.request.urlopen", side_effect=OSError("boom")):
             self.assertIsNone(services.fetch_ean_usd_rate())
+
+    def test_parses_euro_row_from_the_same_page(self):
+        fake = mock.Mock()
+        fake.read.return_value = _EAN_SAMPLE.encode("utf-8")
+        fake.__enter__ = lambda s: s
+        fake.__exit__ = lambda *a: False
+        with mock.patch("urllib.request.urlopen", return_value=fake):
+            data = services.fetch_ean_eur_rate()
+        self.assertEqual(data["rate"], "9.71")
+        self.assertEqual(data["trend"], "up")

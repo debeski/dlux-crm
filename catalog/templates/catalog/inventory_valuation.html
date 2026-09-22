@@ -7,19 +7,29 @@
     {% dlux_ribbon %}
 
     <div class="row g-3 mb-4">
-        <div class="col-sm-4">
+        <div class="col-sm-6 col-xl-3">
             <div class="dlux-table-shell h-100 p-3">
-                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_total_value|default:"Total Stock Value" }} (LYD)</div>
-                <div class="h4 mb-0">{{ total_lyd|floatformat:2 }}</div>
+                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_valuation_cost_value|default:"Stock Value at Cost" }}</div>
+                <div class="h4 mb-0">{{ total_lyd|floatformat:2 }} <span class="fs-6 text-muted">LYD</span></div>
+                <div class="small text-muted">{{ total_usd|floatformat:2 }} USD</div>
             </div>
         </div>
-        <div class="col-sm-4">
+        <div class="col-sm-6 col-xl-3">
             <div class="dlux-table-shell h-100 p-3">
-                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_total_value|default:"Total Stock Value" }} (USD)</div>
-                <div class="h4 mb-0">{{ total_usd|floatformat:2 }}</div>
+                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_valuation_sale_value|default:"Stock Value at Selling Price" }}</div>
+                <div class="h4 mb-0">{{ total_sale_lyd|floatformat:2 }} <span class="fs-6 text-muted">LYD</span></div>
             </div>
         </div>
-        <div class="col-sm-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="dlux-table-shell h-100 p-3">
+                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_valuation_expected_profit|default:"Expected Profit" }}</div>
+                <div class="h4 mb-0 {% if total_profit_lyd < 0 %}text-danger{% else %}text-success{% endif %}">{{ total_profit_lyd|floatformat:2 }} <span class="fs-6 text-muted">LYD</span></div>
+                <div class="small text-muted">
+                    {{ DLUX_STRINGS.ui_valuation_profit_hint|default:"If all stock sells at today's prices" }}{% if margin_percent is not None %} · {{ DLUX_STRINGS.ui_valuation_margin|default:"Margin" }} {{ margin_percent|floatformat:2 }}%{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
             <div class="dlux-table-shell h-100 p-3">
                 <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_items_word|default:"Items" }}</div>
                 <div class="h4 mb-0">{{ item_count }}</div>
@@ -37,6 +47,9 @@
                         <th class="text-end">{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</th>
                         <th class="text-end">{{ DLUX_STRINGS.ui_value_usd|default:"Value (USD)" }}</th>
                         <th class="text-end">{{ DLUX_STRINGS.ui_value_lyd|default:"Value (LYD)" }}</th>
+                        <th class="text-end">{{ DLUX_STRINGS.label_product_selling_price_lyd|default:"Selling Price (LYD)" }}</th>
+                        <th class="text-end">{{ DLUX_STRINGS.ui_valuation_sale_value_lyd|default:"Sale Value (LYD)" }}</th>
+                        <th class="text-end">{{ DLUX_STRINGS.ui_valuation_profit_lyd|default:"Expected Profit (LYD)" }}</th>
                     </tr>
                 </thead>
                 <tbody class="dlux-table-body">
@@ -47,9 +60,12 @@
                         <td class="text-end text-muted">{{ r.cost_usd|floatformat:2 }}</td>
                         <td class="text-end">{{ r.value_usd|floatformat:2 }}</td>
                         <td class="text-end fw-semibold">{{ r.value_lyd|floatformat:2 }}</td>
+                        <td class="text-end text-muted">{{ r.price_lyd|floatformat:2 }}</td>
+                        <td class="text-end">{{ r.sale_lyd|floatformat:2 }}</td>
+                        <td class="text-end fw-semibold {% if r.profit_lyd < 0 %}text-danger{% else %}text-success{% endif %}">{{ r.profit_lyd|floatformat:2 }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5" class="text-center text-muted py-4">{{ DLUX_STRINGS.ui_no_tracked_products|default:"No stock-tracked products." }}</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-4">{{ DLUX_STRINGS.ui_no_tracked_products|default:"No stock-tracked products." }}</td></tr>
                     {% endfor %}
                 </tbody>
                 {% if rows %}
@@ -59,6 +75,9 @@
                         <td></td><td></td>
                         <td class="text-end">{{ total_usd|floatformat:2 }}</td>
                         <td class="text-end">{{ total_lyd|floatformat:2 }}</td>
+                        <td></td>
+                        <td class="text-end">{{ total_sale_lyd|floatformat:2 }}</td>
+                        <td class="text-end {% if total_profit_lyd < 0 %}text-danger{% else %}text-success{% endif %}">{{ total_profit_lyd|floatformat:2 }}</td>
                     </tr>
                 </tfoot>
                 {% endif %}

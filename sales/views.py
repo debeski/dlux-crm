@@ -532,7 +532,12 @@ class DashboardView(RibbonPageMixin, LoginRequiredMixin, TemplateView):
 
         ctx["current_rate"] = get_current_rate()
         ctx["has_rate"] = has_configured_rate()
-        ctx["latest_rate_row"] = ExchangeRate.objects.order_by("-created_at").first()
+        ctx["latest_rate_row"] = ExchangeRate.objects.filter(
+            currency=ExchangeRate.CURRENCY_USD
+        ).order_by("-created_at").first()
+        ctx["has_eur_rate"] = has_configured_rate(ExchangeRate.CURRENCY_EUR)
+        if ctx["has_eur_rate"]:
+            ctx["current_eur_rate"] = get_current_rate(ExchangeRate.CURRENCY_EUR)
         # External reference rates (scraped, cached) shown next to our custom rate:
         # the official CBL rate and the eanlibya black-market rate. Read cache-only
         # here — the web tier is network-isolated; the celery worker (which has
@@ -552,6 +557,19 @@ class DashboardView(RibbonPageMixin, LoginRequiredMixin, TemplateView):
             ctx["rate_gap"] = ctx["current_rate"] - market
         elif ctx.get("cbl_official_rate"):
             ctx["rate_gap"] = ctx["current_rate"] - ctx["cbl_official_rate"]
+
+        cbl_eur = get_cbl_official_rate(
+            refresh_if_missing=False, currency=ExchangeRate.CURRENCY_EUR
+        )
+        ctx["cbl_eur"] = cbl_eur
+        if cbl_eur and cbl_eur.get("average"):
+            ctx["cbl_eur_rate"] = Decimal(str(cbl_eur["average"]))
+        ean_eur = get_ean_black_market_rate(
+            refresh_if_missing=False, currency=ExchangeRate.CURRENCY_EUR
+        )
+        ctx["ean_eur"] = ean_eur
+        if ean_eur and ean_eur.get("rate"):
+            ctx["ean_eur_rate"] = Decimal(str(ean_eur["rate"]))
         ctx["sales_today"] = today_qs.aggregate(t=Sum("total_lyd"))["t"] or Decimal("0")
         ctx["count_today"] = today_qs.count()
         ctx["sales_month"] = month_qs.aggregate(t=Sum("total_lyd"))["t"] or Decimal("0")

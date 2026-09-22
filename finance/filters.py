@@ -11,13 +11,13 @@ class ExchangeRateFilter(django_filters.FilterSet):
 
     advanced_config = {
         "fields": [{"name": "keyword", "placeholder_key": "search_placeholder"}],
-        "advanced_fields": [["source"]],
+        "advanced_fields": [["currency", "source"]],
         "clear_preserve_keys": ["sort", "page"],
     }
 
     class Meta:
         model = ExchangeRate
-        fields = ["keyword", "source"]
+        fields = ["keyword", "currency", "source"]
 
     def filter_keyword(self, queryset, name, value):
         if not value:

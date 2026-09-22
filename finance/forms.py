@@ -20,14 +20,14 @@ class ExchangeRateForm(forms.ModelForm):
 
     class Meta:
         model = ExchangeRate
-        fields = ["rate", "source", "note"]
+        fields = ["currency", "rate", "source", "note"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         set_field_attrs(self)
         translate_choice_fields(self)
         translate_help_text(self)
-        build_grid_helper(self, [("rate", "source"), ("note",)])
+        build_grid_helper(self, [("currency", "rate"), ("source", "note")])
 
 
 class CashDepositForm(forms.ModelForm):

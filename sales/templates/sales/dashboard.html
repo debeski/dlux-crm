@@ -76,6 +76,25 @@
                     {% if cbl_official %}CBL{% if cbl_official.date %} {{ cbl_official.date }}{% endif %}{% endif %}{% if ean_market %} · EANLibya{% endif %}{% if rate_gap != None %} · {{ DLUX_STRINGS.ui_rate_gap }}: {{ rate_gap|floatformat:2 }}{% endif %}
                     {% if not cbl_official and not ean_market %}{% if latest_rate_row %}{{ latest_rate_row.created_at|date:"Y-m-d" }}{% else %}—{% endif %}{% endif %}
                 </div>
+                <hr class="my-2">
+                <div class="text-muted small text-uppercase">EUR <span class="text-muted">(LYD/EUR)</span></div>
+                <div class="d-flex justify-content-between align-items-baseline mt-1">
+                    <span class="small text-muted">{{ DLUX_STRINGS.ui_custom_rate }}</span>
+                    {% if has_eur_rate %}<span class="h6 mb-0">{{ current_eur_rate|floatformat:4 }}</span>{% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}
+                </div>
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <span class="small text-muted"><i class="bi bi-bank me-1"></i>{{ DLUX_STRINGS.ui_official_rate }}</span>
+                    {% if cbl_eur_rate %}<span class="h6 mb-0">{{ cbl_eur_rate|floatformat:4 }}</span>{% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}
+                </div>
+                <div class="d-flex justify-content-between align-items-baseline">
+                    <span class="small text-muted"><i class="bi bi-graph-up-arrow me-1"></i>{{ DLUX_STRINGS.ui_black_market_rate }}</span>
+                    {% if ean_eur_rate %}
+                    <span class="h6 mb-0">
+                        {% if ean_eur.trend == "up" %}<i class="bi bi-caret-up-fill text-success small"></i>{% elif ean_eur.trend == "down" %}<i class="bi bi-caret-down-fill text-danger small"></i>{% endif %}
+                        {{ ean_eur_rate|floatformat:2 }}
+                    </span>
+                    {% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}
+                </div>
             </div>
         </div>
     </div>
