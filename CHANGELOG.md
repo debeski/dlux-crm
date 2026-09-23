@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.8.1
+- **django-lux 1.9.2 Patch Release**: Replaced the problematic DjangoLux 1.9.1 runtime with the exact `django-lux[updater]==1.9.2` pin and rebuilt the sales image without changing the v0.8.0 automotive feature set. The requirements file also supplies the official PyPI wheel as a SHA-256-verified direct candidate so builds remain deterministic while PyPI's Simple-project cache propagates the stable release.
+
 ## v0.8.0
 - **django-lux 1.9.1**: Pinned the application and release image to the exact DjangoLux 1.9.1 runtime and revalidated the full CRM, automotive extension, release manifest, and container smoke-test path against that wheel.
 - **Brand-Neutral Saved Configuration**: Scrubbed the bundled `config.json` of Switch/SwitchLibya identity, logo/favicon asset paths, footer/login copy, public metadata, smart-lock-specific shop text, contact phone/WhatsApp values, and the store-specific public catalog/homepage app payloads. Required identity fields now use neutral Sales CRM labels so importing the snapshot does not brand another retailer as the original store.

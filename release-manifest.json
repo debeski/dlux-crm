@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "version": "0.8.0",
-  "summary": "Adds off-by-default automotive compatibility configuration, fitment management, reverse lookup, and a guided vehicle browser.",
+  "version": "0.8.1",
+  "summary": "Patches the automotive compatibility release onto DjangoLux 1.9.2, replacing the problematic 1.9.1 runtime.",
   "highlights": [
     "Automotive Compatibility is off by default, so existing stores keep their current screens and queries.",
     "Admins can configure chassis, engine, fuel, trim, transmission and position criteria from one settings card.",
@@ -9,7 +9,8 @@
     "Managers can maintain vehicle reference data and save several validated compatibility ranges from a Product card.",
     "Product cards and keyword search expose enabled vehicle criteria while disabled features and criteria remain unreachable.",
     "A query-parameter vehicle browser provides distinct-SKU counts, broad-fitment matching, stock status, and direct Product search.",
-    "The permission-gated automotive hub can be added to the sidebar after the enhancement is saved as enabled."
+    "The permission-gated automotive hub can be added to the sidebar after the enhancement is saved as enabled.",
+    "The application and release image now pin DjangoLux 1.9.2 exactly instead of 1.9.1."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.0"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.1"
 }

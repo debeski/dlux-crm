@@ -2,11 +2,11 @@
 
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- Django POS/ERP v0.8.0 released after v0.7.3; pins `django-lux[updater]==1.9.1`; apps: finance, catalog, automotive, sales, common, public_catalog.
+- Django POS/ERP v0.8.1 released after v0.8.0; pins `django-lux[updater]==1.9.2`; apps: finance, catalog, automotive, sales, common, public_catalog.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
-- Current verified baseline 2026-09-23: v0.8.0 released; 285 tests pass on DjangoLux 1.9.1; amd64 image carries the exact pin/manifest and passes the runtime smoke gate.
+- Current baseline 2026-09-23: v0.8.1 replaces problematic DjangoLux 1.9.1 with 1.9.2; 285 tests and the amd64 production-image smoke suite pass.
 ### Current Project Adopted Standards: [Max 5 lines]
 - Scoped models via `dlux.ScopedModel`; lists are `common.ScopedListView` on the dlux Ribbon + `dlux/list_page.html` (non-list pages use `common.RibbonPageMixin`), CRUD through the modal manager.
 - Money is frozen per invoice (`exchange_rate`, `unit_price_lyd`); finance is dependency root. Decimals fed to JS go through `|unlocalize` (Arabic renders `9,85`).
@@ -43,6 +43,7 @@
   - [ ] Purchase-invoice/stock-take/opening-stock editors do NOT fit `DocumentEditorView` — intake lines are plain Forms that create Products, not an inline formset. Left alone deliberately; revisit only if they gain a header+lines shape.
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
 - **Completed Recently:**
+  - [x] v0.8.1 version/manifest/changelog aligned and DjangoLux pinned exactly to 1.9.2 for patch-release validation (2026-09-23).
   - [x] DjangoLux runtime pin advanced exactly from 1.8.13 to 1.9.1 for the v0.8.0 release candidate (2026-09-23).
   - [x] Bundled `config.json` made retailer-neutral: removed Switch/SwitchLibya assets, copy, contacts and public-site app payloads; retained a valid generic settings snapshot (2026-09-23).
   - [x] Automotive UX: removed settings notice, save-gated Manage action, enhancement-gated bilingual hub sidebar entry, and consistent hover/focus behavior across all seven hub cards (2026-09-23).
@@ -59,13 +60,13 @@
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
   - [x] Date filters: Invoice/Payment/Expense on `DatedFilterSet` (year + range); `date_from` -> `date_gte`, old bookmarks lose their filter — user's call (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-09-23: DjangoLux 1.9.1 clean Python 3.12 environment passes 285/285; amd64 v0.8.0 image label is 1.9.1 and release smoke gate passes checks, migration and Gunicorn.
+- 2026-09-23: Published DjangoLux 1.9.2 wheel passes 285/285 in clean Python 3.12; v0.8.1 amd64 image passes label/version, Django, migration and Gunicorn smoke gates.
 - 2026-09-23: Brand-neutral `config.json` parses, normalizes to 76 settings, contains no Switch/SwitchLibya/store-contact remnants, and scaffold tests pass 5/5.
 - 2026-09-23: 285/285 baseline; automotive 37/37 after gating sidebar discovery/rendering on the persisted enhancement state, with enabled/disabled and bilingual regressions.
-- 2026-09-23: Rebuilt live Docker stack 9/9 healthy; `/health/` 200, installed django-lux 1.9.1 confirmed, `automotive.0001_initial` applied.
+- 2026-09-23: Rebuilt live Docker stack 9/9 healthy; `/health/` 200 and installed django-lux 1.9.2 confirmed.
 - 2026-09-11: v0.7.3 — 237 OK on dlux 1.8.13 in a scratch py3.13 venv (`finance catalog sales common public_catalog tests`, sqlite); 231 OK in `sales-web-1` on mounted 1.8.14b3 before the valuation render test; manifest gate OK for v0.7.3.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-09-23: Architecture names DjangoLux 1.9.1; Operations documents brand-neutral config/port 84; automotive fitment docs cover Phase 3 and sidebar gating.
+- 2026-09-23: Architecture names DjangoLux 1.9.2; Operations documents the hash-verified official-wheel fallback while PyPI Simple propagation lags.
 - 2026-09-11: `docs/BUSINESS_RULES.md` Inventory valuation covers sale value, expected profit and margin.
 - 2026-09-04: `docs/RELEASING.md` + `docs/OPERATIONS.md` name `debeski/dlux-crm` and the `:sales-<ver>` / `:sales` tags.
 
@@ -76,6 +77,6 @@
 ### Global Rulesets:
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
-- v0.8.0 is released with automotive Phases 1–3 and DjangoLux 1.9.1. Retailer Phase 0 data decisions and Phase 4 import/pilot remain open.
+- v0.8.1 is released with DjangoLux 1.9.2. Retailer Phase 0 data decisions and Phase 4 import/pilot remain open.
 ### References and Links:
 - Dlux source: `../../pkg-django-lux`; release guide: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`.

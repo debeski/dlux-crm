@@ -1,4 +1,5 @@
-django-lux[updater]==1.9.1
+django-lux[updater] @ https://files.pythonhosted.org/packages/6a/d2/4e1645fde31b868938450b85ededab9eda70ac88a67c257bf1d3d971e383/django_lux-1.9.2-py3-none-any.whl#sha256=e492c7604dc2ca176c2869b63dd7958cc81e8affb02cc1417f8f07a1cb78c4ae
+django-lux[updater]==1.9.2
 django-cors-headers
 django-csp
 gunicorn

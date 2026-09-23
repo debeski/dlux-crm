@@ -1,6 +1,6 @@
 # Switch POS — Architecture
 
-A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.9.1)**.
+A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.9.2)**.
 It is a single Django/DLux project with a public catalog surface and an authenticated
 staff workflow. DjangoLux provides users, permissions, sidebar/titlebar/navbar UI,
 dynamic modals, audit trail, soft-delete, reports, backups and notifications — this
