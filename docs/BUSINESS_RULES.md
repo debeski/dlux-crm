@@ -254,6 +254,55 @@ generic field dump. It shows identity/image, on-hand quantity, cost and selling
 prices, reorder level, every color/size balance, and the 30 newest stock-ledger
 movements. Editing still uses the standard scoped modal.
 
+## Optional enhancements and automotive fitment
+
+Store-specific behavior must extend the generic product catalog rather than add
+industry fields to it. The first extension is Automotive Compatibility, configured
+by a superuser from the **Optional enhancements** System Settings card.
+
+- The master switch defaults off. Missing configuration is treated as off, so an
+  upgraded store sees no new navigation, forms, or query behavior.
+- Make/model/year is the automotive core. Chassis/generation, engine, fuel type,
+  trim, transmission and position are separately configurable criteria.
+- Fuel type depends on Engine. Configuration normalization always enables Engine
+  when Fuel Type is enabled.
+- Disabling the whole enhancement hides it without deleting fitment data.
+  Disabling one criterion is rejected while any fitment uses that constraint;
+  otherwise a hidden engine/chassis value could create unsafe false-positive matches.
+- `VehicleMake`, `VehicleModel`, `VehicleGeneration`, `VehicleEngine`,
+  `VehicleTrim` and `ProductFitment` are scoped extension records. A fitment links
+  one Product to one model and inclusive year range plus optional criteria.
+- Product, ProductVariant, stock balances, purchase lines and sales lines receive
+  no automotive columns. One compatible SKU always retains one stock balance and
+  one purchase/sales history regardless of how many vehicles it fits.
+- The vehicle-data hub manages makes, models and only the qualifier dimensions
+  enabled by the store. Reference values are deactivated rather than deleted.
+- The settings modal stages changes until Save. **Manage vehicle data** is
+  disabled when Automotive Compatibility is not yet persistently enabled, so
+  checking an unsaved switch cannot lead to a feature-gated 404.
+- The automotive hub is the single route exposed to the sidebar builder, and
+  only while the persisted enhancement switch is on. Turning the enhancement
+  off removes it from discovery and rendering even if it was previously saved
+  in the sidebar; the individual make/model/generation/engine/trim routes remain
+  internal hub destinations.
+- The Product Item card shows its compatible vehicles using enabled criteria
+  only. Managers edit several ranges in one save; exact duplicates are rejected
+  and matching overlapping ranges require explicit confirmation.
+- Product keyword search includes enabled make/model/chassis/engine/fuel/trim
+  text while automotive is on. It returns each Product once and does not alter
+  stock, purchasing or sales history.
+- The guided Vehicle Browser follows Make → Model → Year and then shows only
+  enabled qualifiers that can meaningfully narrow the current result. Blank
+  generation/engine/trim/transmission/position values mean broad/all and remain
+  compatible when a specific qualifier is selected. Counts and results are by
+  distinct Product/SKU, never by fitment-row count or stock units.
+- Browser results include active Products for active makes/models, mark low and
+  out-of-stock items, and open the existing Product Item card. Out-of-stock items
+  are currently shown by default; the retailer pilot must confirm whether that
+  should become a user-controlled or store-wide filter.
+- Direct browser search accepts Product name, SKU or barcode without requiring a
+  vehicle path. The XLSX fitment intake remains a later plan phase.
+
 ## Sales invoice variant selection
 
 When adding a product line on a sales invoice, the editor reads the selected

@@ -182,7 +182,22 @@ class ProductListView(ScopedListView):
             },
             request=self.request,
         )
-        return [{"html": toggle}] + list(super().get_ribbon_action_specs())
+        actions = [{"html": toggle}]
+        from automotive.settings import automotive_enabled
+
+        if (
+            automotive_enabled()
+            and self.request.user.has_perm("automotive.view_productfitment")
+        ):
+            actions.append({
+                "label": get_strings(get_current_language_code(self.request)).get(
+                    "ui_browse_by_vehicle", "Browse by vehicle",
+                ),
+                "icon": "bi bi-car-front",
+                "url": reverse("automotive:browse"),
+                "css_class": "btn btn-outline-primary rounded-pill",
+            })
+        return actions + list(super().get_ribbon_action_specs())
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -215,6 +230,35 @@ class ProductCardView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
             .order_by("-created_at", "-pk")[:30]
         )
         ctx["price_lyd"] = self.object.selling_price_lyd()
+        from automotive.services import fitment_label
+        from automotive.settings import get_automotive_config
+
+        automotive = get_automotive_config()
+        show_fitments = (
+            automotive["enabled"]
+            and self.request.user.has_perm("automotive.view_productfitment")
+        )
+        ctx["show_automotive_fitments"] = show_fitments
+        ctx["can_change_automotive_fitments"] = (
+            show_fitments
+            and self.request.user.has_perms((
+                "automotive.add_productfitment",
+                "automotive.change_productfitment",
+                "automotive.delete_productfitment",
+            ))
+        )
+        if show_fitments:
+            fitments = list(
+                self.object.automotive_fitments.select_related(
+                    "vehicle_model", "vehicle_model__make", "generation", "engine", "trim",
+                ).order_by(
+                    "vehicle_model__make__name", "vehicle_model__name", "year_from", "year_to",
+                )
+            )
+            ctx["automotive_fitments"] = [
+                {"object": fitment, "label": fitment_label(fitment, automotive["criteria"])}
+                for fitment in fitments
+            ]
         return ctx
 
     def render_to_response(self, context, **response_kwargs):

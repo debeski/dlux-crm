@@ -8,7 +8,10 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
 
-from dlux.views import DynamicModalDeleteView, DynamicModalManagerView
+from automotive.views import (
+    FeatureAwareDynamicModalDeleteView,
+    FeatureAwareDynamicModalManagerView,
+)
 
 
 def staff_entry(request):
@@ -27,12 +30,12 @@ staff_urlpatterns = [
     # are wired to these by common/static/common/js/scoped_crud.js.
     path(
         "app-modals/<str:app_label>/<str:model_name>/<str:pk>/delete/",
-        DynamicModalDeleteView.as_view(),
+        FeatureAwareDynamicModalDeleteView.as_view(),
         name="scoped_modal_delete",
     ),
     path(
         "app-modals/<str:app_label>/<str:model_name>/<str:pk>/",
-        DynamicModalManagerView.as_view(show_table=False),
+        FeatureAwareDynamicModalManagerView.as_view(show_table=False),
         name="scoped_modal_manager",
     ),
     path("", include(("common.urls", "common"), namespace="common")),
@@ -42,6 +45,7 @@ staff_urlpatterns = [
     path("finance/", include(("finance.urls", "finance"), namespace="finance")),
     path("catalog/", include(("catalog.urls", "catalog"), namespace="catalog")),
     path("sales/", include(("sales.urls", "sales"), namespace="sales")),
+    path("automotive/", include(("automotive.urls", "automotive"), namespace="automotive")),
     # DjangoLux generated routes end
 
     # Staff-side public catalog builder (curates the public /shop from live stock).

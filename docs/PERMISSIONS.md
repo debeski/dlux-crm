@@ -81,6 +81,9 @@ permission sets in [`sales/management/commands/seed_roles.py`](../sales/manageme
 | `catalog.view_purchaseinvoice` / `add_purchaseinvoice` / `change_purchaseinvoice` | PurchaseInvoice | View and post inbound stock invoices |
 | `catalog.apply_stocktake` | StockTake | Post the adjustments from a physical count |
 | `catalog.view_inventory_valuation` | StockTake | View the inventory valuation report |
+| `automotive.view_*` | Automotive lookups + ProductFitment | Browse vehicle compatibility; granted read-only to Sales Representatives |
+| `automotive.add_*` / `change_*` | Automotive lookups + ProductFitment | Maintain compatibility; granted to Sales Managers |
+| `automotive.delete_productfitment` | ProductFitment | Remove an incorrect Product/vehicle relationship in the multi-row editor; granted to Sales Managers |
 
 The one-time **Opening Stock** bulk intake has no permission of its own — it
 reuses `catalog.add_product` + `catalog.change_product` + `catalog.add_stockmovement`
@@ -92,6 +95,15 @@ Inventory features (suppliers, purchase invoices, stock movements, stock takes,
 opening stock, valuation) are **not row-scoped** —
 they're shared management data gated purely by these permissions; the Sales Manager
 group holds them, reps/couriers don't.
+
+Automotive records are also shared catalog data. The optional feature switch
+controls whether their UI/query experience is active; it never grants access.
+Sales Representatives receive view permissions for vehicle lookups and fitments,
+Sales Managers receive view/add/change permissions plus delete permission for
+ProductFitment, and Delivery Couriers receive none. Managers are intentionally
+not granted delete permissions for vehicle reference data: obsolete makes,
+models, generations, engines and trims are deactivated. Fitment removal is an
+explicit correction from the Product compatibility editor.
 
 Standard `view/add/change/delete` permissions exist for every model. Reports and
 the Workspace/Sales Overview sales figures are additionally row-scoped by the

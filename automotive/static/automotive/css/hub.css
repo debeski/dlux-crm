@@ -1,0 +1,19 @@
+.automotive-hub-card {
+    cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.automotive-hub-card:hover,
+.automotive-hub-card:focus-visible {
+    color: var(--bs-body-color);
+    border-color: var(--bs-primary) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 .65rem 1.5rem rgba(0, 0, 0, .1) !important;
+    outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .automotive-hub-card {
+        transition: none;
+    }
+}

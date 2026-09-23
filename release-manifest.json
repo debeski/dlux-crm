@@ -1,14 +1,15 @@
 {
   "schema_version": 1,
-  "version": "0.7.3",
-  "summary": "Opening Stock imports XLSX files safely, exchange rates cover USD and EUR, and Products gain an operational item card.",
+  "version": "0.8.0",
+  "summary": "Adds off-by-default automotive compatibility configuration, fitment management, reverse lookup, and a guided vehicle browser.",
   "highlights": [
-    "Opening Stock validates and previews XLSX creates, updates and conflicts before finalizing stock.",
-    "Manual, official and black-market exchange-rate views now cover both USD and EUR.",
-    "Product View shows variants, prices, stock and recent ledger movements in a dedicated card.",
-    "Inventory Valuation adds stock value at selling price, expected profit and margin.",
-    "New purchase invoices no longer truncate the exchange rate to a whole number in Arabic.",
-    "Quantity fields step by 1, and the mouse wheel no longer changes any number field."
+    "Automotive Compatibility is off by default, so existing stores keep their current screens and queries.",
+    "Admins can configure chassis, engine, fuel, trim, transmission and position criteria from one settings card.",
+    "Separate scoped fitment tables reference Product without adding automotive fields to the core catalog or stock schema.",
+    "Managers can maintain vehicle reference data and save several validated compatibility ranges from a Product card.",
+    "Product cards and keyword search expose enabled vehicle criteria while disabled features and criteria remain unreachable.",
+    "A query-parameter vehicle browser provides distinct-SKU counts, broad-fitment matching, stock status, and direct Product search.",
+    "The permission-gated automotive hub can be added to the sidebar after the enhancement is saved as enabled."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.7.3"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.0"
 }

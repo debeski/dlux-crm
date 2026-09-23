@@ -5,15 +5,24 @@
 The dlux scaffold ships Docker assets. Bring up the stack:
 
 ```bash
-./start.sh -d                                  # composer orchestrator (DEV mode → app on http://localhost:90)
+./start.sh -d                                  # normal DEV start → http://localhost:84
+./start.sh -d --build                          # rebuild after dependency/Dockerfile changes
 # or directly:
 docker compose --env-file .secrets/.env -f compose.yml -f compose.dev.yml up
 ```
 
 `./start.sh -d` runs the `debeski/composer` image, which decrypts `.secrets`,
-builds the `web`/`celery`/`smtp-relay` images from the `Dockerfile`, starts the
-stack (db, redis, caddy, web, celery, smtp-relay, pgadmin, db-backup) and runs the
-`migrator` post-start task. In DEV mode the app is served at **http://localhost:90**.
+starts the stack (db, Redis, Caddy, web, Celery, SMTP relay, socket proxy and the
+Composer agent/executor pair), waits for health, and runs the `migrator`
+post-start task. Use `--build` when `requirements.txt` changes so the image
+actually installs the new pin. In DEV mode the app is served at
+**http://localhost:84**. The development override bind-mounts each local app,
+including `automotive`, into web and Celery for live source changes.
+
+The repository uses Composer wrapper scaffold v3 and resident commands
+`agent run` / `executor run`. If `./start.sh check` reports scaffold drift, run
+`./start.sh check --fix -y`; the repair preserves replaced files under
+`.xclude/` and validates the resulting Compose configuration.
 
 ## Production deploy with a domain + automatic HTTPS
 
@@ -78,13 +87,30 @@ python manage.py createsuperuser
 On first visit the system runs the DjangoLux **setup wizard** (system name, logo,
 language, theme). Health endpoint: `/health/`.
 
+The repository's `config.json` is a reusable, brand-neutral settings snapshot.
+It intentionally carries no retailer logo/favicon, contact number, storefront
+copy, or public homepage/catalog app payload. Set those values for each store
+through the setup wizard and Options instead of committing a customer's brand.
+
 ## First-run checklist
 
 1. Complete the setup wizard (set the Arabic/English system name + logo — these
    brand the printed sales invoice, payment receipt, and purchase invoice).
-2. **Finance → Exchange Rates → Add**: enter the current black-market USD→LYD rate.
+2. For a car-parts store, open **System → Options → Optional enhancements** and
+   enable Automotive Compatibility plus the criteria that store uses. It is off
+   by default on every existing and new installation. Save the profile first;
+   **Manage vehicle data** stays disabled until that enabled state is persisted.
+   Then use it to create makes, models, and the enabled qualifiers. For regular
+   access, add **Automotive Compatibility** (`automotive:hub`) from the Sidebar
+   builder; only this hub is exposed, not its individual management lists.
+   Open a Product Item card and choose **Manage compatibility** to attach one or
+   more vehicle/year ranges. Use **Browse by vehicle** from Products, the vehicle
+   data hub, or a Product card to follow Make → Model → Year and the enabled
+   qualifiers; the URL preserves the selected path and direct search accepts a
+   Product name, SKU or barcode. Non-automotive stores leave the enhancement off.
+3. **Finance → Exchange Rates → Add**: enter the current black-market USD→LYD rate.
    The Workspace dashboard warns until this is done.
-3. **Catalog → Categories / Products / Services**: add what you sell. For products,
+4. **Catalog → Categories / Products / Services**: add what you sell. For products,
    enter `cost_usd` + `markup_percent` (or a direct `price_usd`). Product variants
    are stock-bearing `ProductVariant` buckets (`color` + free-form `size` / spec):
    set them during Opening Stock, Purchase Invoice intake, or variant-aware manual
@@ -103,7 +129,7 @@ language, theme). Health endpoint: `/health/`.
      creates/reuses products, can set product color and size/spec at intake,
      accepts the supplier invoice scan/photo/PDF, and posts Stock In movements
      per line.
-4. Build the storefront from **Shop Builder** (`/staff/shop-builder/`): flip the
+5. Build the storefront from **Shop Builder** (`/staff/shop-builder/`): flip the
    **Publish** switch on any live Product/Service to add it to the public shop,
    **Feature** the best (drives the landing hero/strip, drag the grip to reorder),
    and **Customize** each listing (customer-safe public title/summary/body,
@@ -150,6 +176,8 @@ language, theme). Health endpoint: `/health/`.
 | `/staff/sales/invoices/` | Invoices |
 | `/staff/sales/new/` | New invoice editor |
 | `/staff/catalog/` | Products & stock |
+| `/staff/automotive/` | Vehicle reference-data hub (when enabled) |
+| `/staff/automotive/browse/` | Guided vehicle compatibility browser (when enabled) |
 | `/staff/shop-builder/` | Public Catalog Builder (curate the public shop) |
 | `/staff/shop-builder/homepage/` | Public Homepage Builder (design the landing page, live preview) |
 | `/staff/catalog/services/` | Services |

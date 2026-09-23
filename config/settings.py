@@ -107,6 +107,7 @@ INSTALLED_APPS = [
     # DjangoLux generated apps start
     "finance",
     "catalog",
+    "automotive",
     "sales",
     "public_catalog",
     # DjangoLux generated apps end

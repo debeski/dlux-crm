@@ -1,0 +1,78 @@
+{% extends "dlux/base.html" %}
+{% load static dlux_tags %}
+
+{% block title %}{{ DLUX_STRINGS.ui_manage_fitments|default:"Manage compatibility" }} — {{ product.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" data-fitment-editor data-dependencies-url="{% url 'automotive:dependencies' %}">
+    {% dlux_ribbon %}
+    <div class="alert alert-light border small"><strong>{{ product.name }}</strong>{% if product.sku %} · <span class="font-monospace">{{ product.sku }}</span>{% endif %}</div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {{ formset.management_form }}
+        {% if formset.non_form_errors %}<div class="alert alert-danger">{{ formset.non_form_errors }}</div>{% endif %}
+        <div class="d-grid gap-3" data-fitment-rows>
+            {% for form in formset %}
+            <div class="card border-0 shadow-sm" data-fitment-row>
+                <div class="card-body">
+                    {{ form.id }}
+                    {% if form.non_field_errors %}<div class="alert alert-danger py-2">{{ form.non_field_errors }}</div>{% endif %}
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-5">{{ form.vehicle_model.label_tag }}{{ form.vehicle_model }}{{ form.vehicle_model.errors }}</div>
+                        <div class="col-6 col-lg-2">{{ form.year_from.label_tag }}{{ form.year_from }}{{ form.year_from.errors }}</div>
+                        <div class="col-6 col-lg-2">{{ form.year_to.label_tag }}{{ form.year_to }}{{ form.year_to.errors }}</div>
+                        {% if criteria.generation_chassis %}<div class="col-12 col-lg-3">{{ form.generation.label_tag }}{{ form.generation }}{{ form.generation.errors }}</div>{% endif %}
+                        {% if criteria.engine %}<div class="col-12 col-md-6 col-lg-4">{{ form.engine.label_tag }}{{ form.engine }}{{ form.engine.errors }}</div>{% endif %}
+                        {% if criteria.trim %}<div class="col-12 col-md-6 col-lg-4">{{ form.trim.label_tag }}{{ form.trim }}{{ form.trim.errors }}</div>{% endif %}
+                        {% if criteria.transmission %}<div class="col-12 col-md-6 col-lg-4">{{ form.transmission.label_tag }}{{ form.transmission }}{{ form.transmission.errors }}</div>{% endif %}
+                        {% if criteria.position %}<div class="col-12 col-md-6 col-lg-4">{{ form.position.label_tag }}{{ form.position }}{{ form.position.errors }}</div>{% endif %}
+                        <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent text-end">
+                    <span class="d-none">{{ form.DELETE }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" data-remove-fitment><i class="bi bi-trash me-1"></i>{{ DLUX_STRINGS.ui_remove|default:"Remove" }}</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <template data-empty-fitment>
+            <div class="card border-0 shadow-sm" data-fitment-row>
+                <div class="card-body">
+                    {{ formset.empty_form.id }}
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-5">{{ formset.empty_form.vehicle_model.label_tag }}{{ formset.empty_form.vehicle_model }}</div>
+                        <div class="col-6 col-lg-2">{{ formset.empty_form.year_from.label_tag }}{{ formset.empty_form.year_from }}</div>
+                        <div class="col-6 col-lg-2">{{ formset.empty_form.year_to.label_tag }}{{ formset.empty_form.year_to }}</div>
+                        {% if criteria.generation_chassis %}<div class="col-12 col-lg-3">{{ formset.empty_form.generation.label_tag }}{{ formset.empty_form.generation }}</div>{% endif %}
+                        {% if criteria.engine %}<div class="col-12 col-md-6 col-lg-4">{{ formset.empty_form.engine.label_tag }}{{ formset.empty_form.engine }}</div>{% endif %}
+                        {% if criteria.trim %}<div class="col-12 col-md-6 col-lg-4">{{ formset.empty_form.trim.label_tag }}{{ formset.empty_form.trim }}</div>{% endif %}
+                        {% if criteria.transmission %}<div class="col-12 col-md-6 col-lg-4">{{ formset.empty_form.transmission.label_tag }}{{ formset.empty_form.transmission }}</div>{% endif %}
+                        {% if criteria.position %}<div class="col-12 col-md-6 col-lg-4">{{ formset.empty_form.position.label_tag }}{{ formset.empty_form.position }}</div>{% endif %}
+                        <div class="col-12">{{ formset.empty_form.notes.label_tag }}{{ formset.empty_form.notes }}</div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent text-end">
+                    <span class="d-none">{{ formset.empty_form.DELETE }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" data-remove-fitment><i class="bi bi-trash me-1"></i>{{ DLUX_STRINGS.ui_remove|default:"Remove" }}</button>
+                </div>
+            </div>
+        </template>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4">
+            <button type="button" class="btn btn-outline-primary rounded-pill" data-add-fitment><i class="bi bi-plus-lg me-1"></i>{{ DLUX_STRINGS.ui_add_fitment|default:"Add compatibility row" }}</button>
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="confirm_overlaps" value="1" id="confirm-overlaps" {% if confirm_overlaps %}checked{% endif %}>
+                    <label class="form-check-label small" for="confirm-overlaps">{{ DLUX_STRINGS.ui_confirm_fitment_overlaps|default:"I reviewed and confirm intentional overlapping ranges" }}</label>
+                </div>
+                <button type="submit" class="btn btn-success rounded-pill px-4"><i class="bi bi-check2-circle me-1"></i>{{ DLUX_STRINGS.btn_save|default:"Save" }}</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}{{ block.super }}<script src="{% static 'automotive/js/dependent_selects.js' %}" nonce="{{ request.csp_nonce }}"></script>{% endblock %}

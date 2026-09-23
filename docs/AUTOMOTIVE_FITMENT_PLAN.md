@@ -1,5 +1,11 @@
 # Automotive Fitment Module — Phased Delivery Plan
 
+> Implementation status (2026-09-23): Phases 1–3 are implemented for v0.8.0.
+> The optional settings card, extension schema, role permissions, vehicle lookup
+> managers, multi-row Product fitment editor, Product-card reverse lookup and
+> compatibility keyword search, and guided vehicle browser are complete. Phase 0
+> retailer data collection and Phase 4 workbook import/pilot work remain open.
+
 ## Objective
 
 Add vehicle compatibility to Switch POS without turning the shared `Product`
@@ -365,6 +371,15 @@ with view permission can see the complete relationship from the Product card.
 
 ## Phase 3 — Vehicle Browser MVP
 
+> Implemented for v0.8.0. The browser is linked from the Products ribbon,
+> automotive hub and Product card only while the enhancement is enabled. The
+> hub is also available as one optional, permission-gated sidebar-builder entry;
+> its individual management lists stay behind the hub. Its
+> regression suite covers feature gating, distinct counts, broad/all matching,
+> selector skipping, direct search and query growth with 50 additional fitments.
+> Out-of-stock Products are shown with a status badge pending the retailer's
+> Phase 0/pilot decision.
+
 ### Goal
 
 Deliver the retailer's requested pyramid as a fast, guided search experience.
@@ -613,8 +628,8 @@ Every implementation phase must cover:
 ## Recommended Next Action
 
 Run Phase 0 with the retailer and obtain the sample workbook before writing the
-migration. Use it to finalize controlled values, broad/all semantics, and the
-retailer's initial criterion switches, then implement Phases 1–3 together. Use
-Phase 4 to load and validate the retailer's real catalog. Ship the Optional
-Enhancements namespace with Automotive Compatibility off by default, including
-for the smart-lock store and every already-running installation.
+migration. Use it to validate controlled values, broad/all semantics, the
+retailer's initial criterion switches and the implemented Phases 1–3 workflow.
+Then use Phase 4 to load and validate the retailer's real catalog. Ship the
+Optional Enhancements namespace with Automotive Compatibility off by default,
+including for the smart-lock store and every already-running installation.

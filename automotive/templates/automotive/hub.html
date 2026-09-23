@@ -1,0 +1,67 @@
+{% extends "dlux/base.html" %}
+{% load static dlux_tags %}
+
+{% block title %}{{ DLUX_STRINGS.page_automotive_data|default:"Automotive Compatibility" }}{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'automotive/css/hub.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 automotive-hub">
+    {% dlux_ribbon %}
+
+    <div class="alert alert-light border d-flex gap-3 align-items-start">
+        <i class="bi bi-diagram-3 fs-4 text-primary"></i>
+        <div>
+            <div class="fw-semibold">{{ DLUX_STRINGS.automotive_management_order|default:"Recommended setup order" }}</div>
+            <div class="small text-muted">{{ DLUX_STRINGS.automotive_management_order_help|default:"Create makes first, then models, followed by any enabled qualifiers. Add compatibility from a Product card when the vocabulary is ready." }}</div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-md-6 col-xl-4">
+            <a class="card h-100 border-primary shadow-sm text-decoration-none text-body automotive-hub-card" href="{% url 'automotive:browse' %}">
+                <div class="card-body"><i class="bi bi-search fs-3 text-primary"></i><h2 class="h5 mt-3">{{ DLUX_STRINGS.ui_browse_by_vehicle|default:"Browse by vehicle" }}</h2><p class="text-muted small mb-0">{{ DLUX_STRINGS.hub_browser_help|default:"Follow make, model, year, and enabled criteria to compatible products." }}</p></div>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-4">
+            <a class="card h-100 border-0 shadow-sm text-decoration-none text-body automotive-hub-card" href="{% url 'automotive:make_list' %}">
+                <div class="card-body"><i class="bi bi-buildings fs-3 text-primary"></i><h2 class="h5 mt-3">{{ DLUX_STRINGS.models_vehiclemake|default:"Vehicle Makes" }}</h2><p class="text-muted small mb-0">{{ DLUX_STRINGS.hub_makes_help|default:"Toyota, Nissan, BMW, and other manufacturers." }}</p></div>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-4">
+            <a class="card h-100 border-0 shadow-sm text-decoration-none text-body automotive-hub-card" href="{% url 'automotive:model_list' %}">
+                <div class="card-body"><i class="bi bi-car-front fs-3 text-primary"></i><h2 class="h5 mt-3">{{ DLUX_STRINGS.models_vehiclemodel|default:"Vehicle Models" }}</h2><p class="text-muted small mb-0">{{ DLUX_STRINGS.hub_models_help|default:"Corolla, Camry, Hilux, and the make each belongs to." }}</p></div>
+            </a>
+        </div>
+        {% if automotive_config.criteria.generation_chassis %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <a class="card h-100 border-0 shadow-sm text-decoration-none text-body automotive-hub-card" href="{% url 'automotive:generation_list' %}">
+                <div class="card-body"><i class="bi bi-layers fs-3 text-primary"></i><h2 class="h5 mt-3">{{ DLUX_STRINGS.models_vehiclegeneration|default:"Vehicle Generations" }}</h2><p class="text-muted small mb-0">{{ DLUX_STRINGS.hub_generations_help|default:"Year-bounded generations and chassis codes." }}</p></div>
+            </a>
+        </div>
+        {% endif %}
+        {% if automotive_config.criteria.engine %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <a class="card h-100 border-0 shadow-sm text-decoration-none text-body automotive-hub-card" href="{% url 'automotive:engine_list' %}">
+                <div class="card-body"><i class="bi bi-gear-wide-connected fs-3 text-primary"></i><h2 class="h5 mt-3">{{ DLUX_STRINGS.models_vehicleengine|default:"Vehicle Engines" }}</h2><p class="text-muted small mb-0">{{ DLUX_STRINGS.hub_engines_help|default:"Engine codes, display names, displacement, and fuel." }}</p></div>
+            </a>
+        </div>
+        {% endif %}
+        {% if automotive_config.criteria.trim %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <a class="card h-100 border-0 shadow-sm text-decoration-none text-body automotive-hub-card" href="{% url 'automotive:trim_list' %}">
+                <div class="card-body"><i class="bi bi-tags fs-3 text-primary"></i><h2 class="h5 mt-3">{{ DLUX_STRINGS.models_vehicletrim|default:"Vehicle Trims" }}</h2><p class="text-muted small mb-0">{{ DLUX_STRINGS.hub_trims_help|default:"Equipment levels used only when compatibility differs." }}</p></div>
+            </a>
+        </div>
+        {% endif %}
+        <div class="col-12 col-md-6 col-xl-4">
+            <a class="card h-100 border-0 shadow-sm text-decoration-none text-body automotive-hub-card" href="{% url 'catalog:product_list' %}">
+                <div class="card-body"><i class="bi bi-box-seam fs-3 text-primary"></i><h2 class="h5 mt-3">{{ DLUX_STRINGS.models_product|default:"Products" }}</h2><p class="text-muted small mb-0">{{ DLUX_STRINGS.hub_products_help|default:"Open an Item card to add or review its vehicle compatibility." }}</p></div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

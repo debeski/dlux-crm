@@ -63,10 +63,34 @@ class ProductFilter(django_filters.FilterSet):
     def filter_keyword(self, queryset, name, value):
         if not value:
             return queryset
-        return queryset.filter(
+        query = (
             Q(name__icontains=value) | Q(sku__icontains=value) | Q(barcode__icontains=value)
             | Q(size__icontains=value)
         )
+        from automotive.settings import get_automotive_config
+
+        automotive = get_automotive_config()
+        if automotive["enabled"]:
+            criteria = automotive["criteria"]
+            query |= (
+                Q(automotive_fitments__vehicle_model__make__name__icontains=value)
+                | Q(automotive_fitments__vehicle_model__name__icontains=value)
+            )
+            if criteria["generation_chassis"]:
+                query |= (
+                    Q(automotive_fitments__generation__name__icontains=value)
+                    | Q(automotive_fitments__generation__chassis_code__icontains=value)
+                )
+            if criteria["engine"]:
+                query |= (
+                    Q(automotive_fitments__engine__display_name__icontains=value)
+                    | Q(automotive_fitments__engine__engine_code__icontains=value)
+                )
+            if criteria["fuel_type"]:
+                query |= Q(automotive_fitments__engine__fuel_type__icontains=value)
+            if criteria["trim"]:
+                query |= Q(automotive_fitments__trim__name__icontains=value)
+        return queryset.filter(query).distinct()
 
 
 class ServiceFilter(django_filters.FilterSet):

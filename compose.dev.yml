@@ -29,6 +29,7 @@ services:
     image: !reset null
     volumes: !override
       - /Users/debeski/Desktop/depy/pkg-django-lux/dlux:/app/dlux:ro
+      - ./automotive:/app/automotive:rw
       - ./catalog:/app/catalog:rw
       - ./common:/app/common:rw
       - ./config:/app/config:rw
@@ -50,6 +51,7 @@ services:
     image: !reset null
     volumes: !override
       - /Users/debeski/Desktop/depy/pkg-django-lux/dlux:/app/dlux:rw
+      - ./automotive:/app/automotive:rw
       - ./catalog:/app/catalog:rw
       - ./common:/app/common:rw
       - ./config:/app/config:rw

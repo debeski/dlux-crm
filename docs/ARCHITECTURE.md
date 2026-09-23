@@ -1,6 +1,6 @@
 # Switch POS — Architecture
 
-A web-based sales system (منظومة مبيعات) for **Switch**, built on **DjangoLux (dlux 1.4.4)**.
+A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.9.1)**.
 It is a single Django/DLux project with a public catalog surface and an authenticated
 staff workflow. DjangoLux provides users, permissions, sidebar/titlebar/navbar UI,
 dynamic modals, audit trail, soft-delete, reports, backups and notifications — this
@@ -12,14 +12,36 @@ project adds the Switch sales/catalog/finance domain plus the public catalog pro
 finance   (money foundation: exchange rate, cash deposits, expenses, staff accounts)
    ▲
 catalog   (products, services, stock ledger) — uses finance for conversion
-   ▲
-sales     (customers, invoices, items, payments) — uses catalog + finance
+   ▲                         ▲
+sales     (customers,       automotive (optional vehicle compatibility;
+           invoices,        references Product, never changes stock identity)
+           payments)
 
 public_catalog (curated public listings linked to catalog Product/Service)
 ```
 
 Lower layers **never** import higher ones. The stock ledger references invoices by
 their string number (not a FK) so `catalog` stays independent of `sales`.
+
+`automotive/` is an optional extension above `catalog`. Its make/model,
+generation, engine, trim and fitment tables reference `catalog.Product`, but no
+automotive fields exist on Product, ProductVariant, stock, purchasing or sales
+tables. `SystemSettings.extra_config['app']['switch_pos.optional_enhancements']`
+is the single shop-wide configuration source; the Automotive master switch
+defaults off, and its criteria affect only extension UI/query behavior.
+When enabled, `/staff/automotive/` is the reference-data hub and the Product
+Item card is the reverse-lookup and fitment-maintenance entry point. Lookup
+lists reuse `ScopedListView` and DjangoLux modals; Product fitments use a custom
+inline formset because several vehicle ranges must be reviewed and saved as one
+unit. The generic `/staff/app-modals/...` routes also enforce the enhancement
+and criterion switches, so a hidden screen cannot be reached by guessing a URL.
+`automotive.browser.VehicleBrowser` serves the runtime-gated
+`/staff/automotive/browse/` path. It applies scope/soft-delete policy once,
+aggregates distinct Product counts, then progressively narrows an in-memory set
+of fitment rows so selecting a qualifier still includes blank broad/all rows.
+Only the final Product query carries live category, stock and price data; result
+size therefore does not create per-card compatibility queries. Query parameters
+are the browser state, making Back, refresh and shared vehicle paths deterministic.
 
 `common/` is a plain Python package (not a Django app, no models). It holds
 `ScopedListView`, `RibbonPageMixin` and the generic
@@ -36,7 +58,8 @@ Caddy proxies `switchlibya.ly`/`www.switchlibya.ly` to Django; the optional lega
   `/shop/items/<slug>/modal/`, and `/contact/modal/`.
 - Staff routes: `/staff/`, `/staff/accounts/...`, `/staff/sys/...`,
   `/staff/workspace/`, `/staff/catalog/`, `/staff/sales/`, `/staff/finance/`,
-  `/staff/shop-builder/`, `/staff/shop-builder/homepage/`, `/staff/app-modals/...`, and `/staff/admin/`.
+  `/staff/automotive/` (when enabled), `/staff/shop-builder/`,
+  `/staff/shop-builder/homepage/`, `/staff/app-modals/...`, and `/staff/admin/`.
 - `dlux.urls` is mounted below `/staff/`, so `reverse("login")` resolves to
   `/staff/accounts/login/`; staff-only views still use normal Django auth
   (`LoginRequiredMixin`, permissions, and `LOGIN_URL = "login"`).

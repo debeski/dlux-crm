@@ -51,6 +51,28 @@
         </div>
     </div>
 
+    {% if show_automotive_fitments %}
+    <div class="product-card-panel mb-3">
+        <div class="product-card-heading d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span><i class="bi bi-car-front me-1"></i>{{ DLUX_STRINGS.ui_fits_vehicles|default:"Fits vehicles" }} <span class="badge rounded-pill text-bg-secondary">{{ automotive_fitments|length }}</span></span>
+            <span class="d-flex gap-2">
+                <a href="{% url 'automotive:browse' %}" target="_top" class="btn btn-sm btn-outline-secondary rounded-pill"><i class="bi bi-search me-1"></i>{{ DLUX_STRINGS.ui_browse_by_vehicle|default:"Browse by vehicle" }}</a>
+                <a href="{% url 'automotive:hub' %}" target="_top" class="btn btn-sm btn-outline-secondary rounded-pill">{{ DLUX_STRINGS.ui_vehicle_data|default:"Vehicle data" }}</a>
+                {% if can_change_automotive_fitments %}<a href="{% url 'automotive:product_fitments' product.pk %}" target="_top" class="btn btn-sm btn-outline-primary rounded-pill"><i class="bi bi-pencil me-1"></i>{{ DLUX_STRINGS.ui_manage_fitments|default:"Manage" }}</a>{% endif %}
+            </span>
+        </div>
+        {% if automotive_fitments %}
+        <div class="d-flex flex-wrap gap-2">
+            {% for fitment in automotive_fitments %}
+            <span class="badge rounded-pill text-bg-light border text-body fw-normal px-3 py-2">{{ fitment.label }}</span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">{{ DLUX_STRINGS.ui_no_fitments|default:"No vehicle compatibility has been added. A manager can add it without creating another product or stock balance." }}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="row g-3">
         <div class="col-12 col-lg-5">
             <div class="product-card-panel mb-3">

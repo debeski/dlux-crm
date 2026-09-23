@@ -1,0 +1,113 @@
+{% extends "dlux/base.html" %}
+{% load static dlux_tags %}
+
+{% block title %}{{ DLUX_STRINGS.page_vehicle_browser|default:"Browse by Vehicle" }}{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'automotive/css/browser.css' %}">
+<link rel="stylesheet" href="{% static 'catalog/css/product_card.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 vehicle-browser">
+    {% dlux_ribbon %}
+
+    <div class="vehicle-browser-search card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="d-flex flex-column flex-md-row gap-2" role="search">
+                <div class="input-group flex-grow-1">
+                    <span class="input-group-text bg-transparent"><i class="bi bi-upc-scan"></i></span>
+                    <input class="form-control" type="search" name="q" value="{{ search_query }}" placeholder="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search SKU, barcode, or product name' }}" aria-label="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search SKU, barcode, or product name' }}">
+                </div>
+                <button class="btn btn-primary rounded-pill px-4" type="submit">{{ DLUX_STRINGS.ui_search_products|default:"Search products" }}</button>
+                {% if search_query %}<a class="btn btn-outline-secondary rounded-pill" href="{% url 'automotive:browse' %}">{{ DLUX_STRINGS.ui_browse_vehicle_instead|default:"Choose a vehicle" }}</a>{% endif %}
+            </form>
+        </div>
+    </div>
+
+    {% if breadcrumbs %}
+    <nav class="vehicle-path mb-4" aria-label="{{ DLUX_STRINGS.ui_selected_vehicle|default:'Selected vehicle' }}">
+        <a href="{% url 'automotive:browse' %}" class="vehicle-path-home"><i class="bi bi-car-front"></i><span>{{ DLUX_STRINGS.ui_change_vehicle|default:"Change vehicle" }}</span></a>
+        {% for crumb in breadcrumbs %}
+        <i class="bi bi-chevron-right vehicle-path-separator" aria-hidden="true"></i>
+        <a href="{{ crumb.url }}" class="vehicle-path-crumb">{{ crumb.label }}</a>
+        {% endfor %}
+    </nav>
+    {% endif %}
+
+    {% if next_step == "make" %}
+    <section class="vehicle-step" aria-labelledby="make-heading">
+        <div class="vehicle-step-heading"><span class="vehicle-step-number">1</span><div><h2 id="make-heading">{{ DLUX_STRINGS.vehicle_choose_make|default:"Choose a make" }}</h2><p>{{ DLUX_STRINGS.vehicle_choose_make_help|default:"Start with the vehicle manufacturer." }}</p></div></div>
+        <div class="vehicle-choice-grid">
+            {% for option in make_options %}<a class="vehicle-choice" href="{{ option.url }}"><span>{{ option.label }}</span><small>{{ option.count }} {{ DLUX_STRINGS.ui_products_count|default:"products" }}</small></a>
+            {% empty %}<div class="vehicle-empty">{{ DLUX_STRINGS.vehicle_no_fitment_data|default:"No active vehicle compatibility data is available yet." }}</div>{% endfor %}
+        </div>
+    </section>
+    {% elif next_step == "model" %}
+    <section class="vehicle-step" aria-labelledby="model-heading">
+        <div class="vehicle-step-heading"><span class="vehicle-step-number">2</span><div><h2 id="model-heading">{{ DLUX_STRINGS.vehicle_choose_model|default:"Choose a model" }}</h2><p>{{ DLUX_STRINGS.vehicle_choose_model_help|default:"Only models with compatible products are shown." }}</p></div></div>
+        <div class="vehicle-choice-grid">
+            {% for option in model_options %}<a class="vehicle-choice" href="{{ option.url }}"><span>{{ option.label }}</span><small>{{ option.count }} {{ DLUX_STRINGS.ui_products_count|default:"products" }}</small></a>{% endfor %}
+        </div>
+    </section>
+    {% elif next_step == "year" %}
+    <section class="vehicle-step" aria-labelledby="year-heading">
+        <div class="vehicle-step-heading"><span class="vehicle-step-number">3</span><div><h2 id="year-heading">{{ DLUX_STRINGS.vehicle_choose_year|default:"Choose a year" }}</h2><p>{{ DLUX_STRINGS.vehicle_choose_year_help|default:"Years come from the stored compatibility ranges." }}</p></div></div>
+        <div class="vehicle-choice-grid vehicle-year-grid">
+            {% for option in year_options %}<a class="vehicle-choice" href="{{ option.url }}"><span>{{ option.label }}</span><small>{{ option.count }} {{ DLUX_STRINGS.ui_products_count|default:"products" }}</small></a>{% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if generation_options %}
+    <section class="vehicle-refinement"><h2>{{ DLUX_STRINGS.optional_criterion_generation|default:"Chassis / generation" }}</h2><div class="vehicle-choice-row">{% for option in generation_options %}<a href="{{ option.url }}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}</div></section>
+    {% endif %}
+    {% if engine_options %}
+    <section class="vehicle-refinement"><h2>{{ DLUX_STRINGS.optional_criterion_engine|default:"Engine" }}</h2><div class="vehicle-choice-row">{% for option in engine_options %}<a href="{{ option.url }}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}</div></section>
+    {% endif %}
+    {% if trim_options %}
+    <section class="vehicle-refinement"><h2>{{ DLUX_STRINGS.optional_criterion_trim|default:"Trim" }}</h2><div class="vehicle-choice-row">{% for option in trim_options %}<a href="{{ option.url }}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}</div></section>
+    {% endif %}
+    {% if transmission_options %}
+    <section class="vehicle-refinement"><h2>{{ DLUX_STRINGS.optional_criterion_transmission|default:"Transmission" }}</h2><div class="vehicle-choice-row">{% for option in transmission_options %}<a href="{{ option.url }}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}</div></section>
+    {% endif %}
+    {% if category_options %}
+    <section class="vehicle-refinement"><h2>{{ DLUX_STRINGS.models_category|default:"Categories" }}</h2><div class="vehicle-choice-row">{% for option in category_options %}<a href="{{ option.url }}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}</div></section>
+    {% endif %}
+    {% if position_options %}
+    <section class="vehicle-refinement"><h2>{{ DLUX_STRINGS.optional_criterion_position|default:"Part position" }}</h2><div class="vehicle-choice-row">{% for option in position_options %}<a href="{{ option.url }}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}</div></section>
+    {% endif %}
+
+    {% if show_results %}
+    <section class="vehicle-results mt-4" aria-labelledby="results-heading">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div><h2 id="results-heading" class="h4 mb-1">{{ DLUX_STRINGS.vehicle_compatible_products|default:"Compatible products" }}</h2><p class="text-muted small mb-0">{{ product_count }} {{ DLUX_STRINGS.ui_products_count|default:"products" }}{% if result_limited %} · {{ DLUX_STRINGS.vehicle_first_100|default:"showing the first 100" }}{% endif %}</p></div>
+            {% if not search_query %}<a class="btn btn-outline-secondary rounded-pill" href="{{ change_vehicle_url }}"><i class="bi bi-arrow-repeat me-1"></i>{{ DLUX_STRINGS.ui_change_vehicle|default:"Change vehicle" }}</a>{% endif %}
+        </div>
+
+        <div class="vehicle-product-grid">
+            {% for product in products %}
+            <article class="vehicle-product-card">
+                <button type="button" class="vehicle-product-open" data-dynamic-modal="{% url 'catalog:product_card' product.pk %}" data-modal-title="{{ product.name }}">
+                    <span class="vehicle-product-image">
+                        {% if product.image_url %}<img src="{{ product.image_url }}" alt="">{% else %}<i class="bi bi-box-seam"></i>{% endif %}
+                    </span>
+                    <span class="vehicle-product-body">
+                        <span class="vehicle-product-name">{{ product.name }}</span>
+                        <span class="vehicle-product-meta">{{ product.category|default:"—" }}{% if product.sku %} · <span class="font-monospace">{{ product.sku }}</span>{% endif %}</span>
+                        <span class="vehicle-product-footer">
+                            <strong>{{ product.browser_price_lyd|floatformat:2 }} LYD</strong>
+                            {% if product.stock_qty <= 0 %}<span class="badge text-bg-danger">{{ DLUX_STRINGS.ui_out_of_stock|default:"Out of stock" }}</span>{% elif product.is_low_stock %}<span class="badge text-bg-warning">{{ DLUX_STRINGS.ui_low_stock|default:"Low stock" }}</span>{% else %}<span class="badge text-bg-success">{{ product.stock_qty|floatformat:"-2" }} {{ product.get_unit_display }}</span>{% endif %}
+                        </span>
+                    </span>
+                </button>
+            </article>
+            {% empty %}
+            <div class="vehicle-empty"><i class="bi bi-search fs-3"></i><strong>{{ DLUX_STRINGS.vehicle_no_products|default:"No compatible products found" }}</strong><span>{{ DLUX_STRINGS.vehicle_no_products_help|default:"Keep the selected vehicle and change a qualifier, or review its fitment data." }}</span></div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

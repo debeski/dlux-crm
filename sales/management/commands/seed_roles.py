@@ -36,6 +36,12 @@ REP_PERMS = [
     # Look up what to sell (read-only)
     "catalog.view_product",
     "catalog.view_service",
+    "automotive.view_vehiclemake",
+    "automotive.view_vehiclemodel",
+    "automotive.view_vehiclegeneration",
+    "automotive.view_vehicleengine",
+    "automotive.view_vehicletrim",
+    "automotive.view_productfitment",
     # Hand over the cash they collected (an admin/manager confirms it)
     "finance.view_cashdeposit",
     "finance.add_cashdeposit",
@@ -75,6 +81,14 @@ MANAGER_PERMS = [
     "catalog.view_service", "catalog.add_service", "catalog.change_service",
     "catalog.view_category", "catalog.add_category", "catalog.change_category",
     "catalog.view_supplier", "catalog.add_supplier", "catalog.change_supplier",
+    # Optional automotive extension — shared lookup and fitment management
+    "automotive.view_vehiclemake", "automotive.add_vehiclemake", "automotive.change_vehiclemake",
+    "automotive.view_vehiclemodel", "automotive.add_vehiclemodel", "automotive.change_vehiclemodel",
+    "automotive.view_vehiclegeneration", "automotive.add_vehiclegeneration", "automotive.change_vehiclegeneration",
+    "automotive.view_vehicleengine", "automotive.add_vehicleengine", "automotive.change_vehicleengine",
+    "automotive.view_vehicletrim", "automotive.add_vehicletrim", "automotive.change_vehicletrim",
+    "automotive.view_productfitment", "automotive.add_productfitment", "automotive.change_productfitment",
+    "automotive.delete_productfitment",
     # Inventory: purchase invoices, stock movements, physical counts + valuation
     "catalog.view_purchaseinvoice", "catalog.add_purchaseinvoice",
     "catalog.change_purchaseinvoice",
