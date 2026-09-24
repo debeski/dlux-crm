@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.8.2
+- **DjangoLux 1.9.3**: Pins `django-lux[updater]==1.9.3` (from 1.9.2), including the updated deployment/Composer maintenance controls and login feedback. No application schema changes.
+
 ## v0.8.1
 - **django-lux 1.9.2 Patch Release**: Replaced the problematic DjangoLux 1.9.1 runtime with the exact `django-lux[updater]==1.9.2` pin and rebuilt the sales image without changing the v0.8.0 automotive feature set. The requirements file also supplies the official PyPI wheel as a SHA-256-verified direct candidate so builds remain deterministic while PyPI's Simple-project cache propagates the stable release.
 

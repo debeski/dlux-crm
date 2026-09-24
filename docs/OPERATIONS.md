@@ -257,7 +257,7 @@ stamped as `LABEL org.dlux_crm.dlux_baked_version`. The updater
 onto an image whose baked version is older than the deployment's active runtime
 version (`/opt/dlux-runtime/state/active.json`).
 
-The v0.8.1 requirements retain the exact DjangoLux 1.9.2 pin and expose its
+The v0.8.2 requirements retain the exact DjangoLux 1.9.3 pin and expose its
 official `files.pythonhosted.org` wheel as a SHA-256-verified direct candidate.
 This avoids a transient stale PyPI Simple-project cache without changing the
 package source or allowing a different framework version.
