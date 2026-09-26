@@ -11,10 +11,11 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
-## v0.8.2 dependency baseline
+## v0.8.3 dependency baseline
 
-This release pins `django-lux[updater]==1.9.3`. The maintenance operations
-introduced by DjangoLux 1.9.3 require Composer 1.5.2 or later. Validate the
+This release pins `django-lux[updater]==1.9.4`. The maintenance operations
+introduced by DjangoLux 1.9.3 require Composer 1.5.2 or later, and 1.9.4's
+manual first-launch setup (`--skip-config`) requires Composer 1.5.3. Validate the
 published wheel and release image before pushing the local release tag.
 
 ## One-time setup

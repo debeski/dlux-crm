@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.8.3
+- **DjangoLux 1.9.4**: Pins `django-lux[updater]==1.9.4` (from 1.9.3) with the matching hashed wheel URL; 1.9.4 honours `DLUX_SKIP_CONFIG_IMPORT`, so a first deploy with Composer 1.5.3 `--skip-config` leaves `config.json` unimported for manual setup. `docs/RELEASING.md` and `docs/ARCHITECTURE.md` follow the new baseline. No application schema changes.
+- **Release Validation**: `check`, `makemigrations --check`, and the CI test set (248 tests, SQLite settings) pass against the published 1.9.4 wheel; all 17 enabled ribbon list pages render.
+
 ## v0.8.2
 - **DjangoLux 1.9.3**: Pins `django-lux[updater]==1.9.3` (from 1.9.2), including the updated deployment/Composer maintenance controls and login feedback. No application schema changes.
 

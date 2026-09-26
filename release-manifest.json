@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "0.8.2",
-  "summary": "Updates the sales edition to DjangoLux 1.9.3.",
+  "version": "0.8.3",
+  "summary": "Updates the sales edition to DjangoLux 1.9.4.",
   "highlights": [
-    "Pins django-lux[updater] exactly to 1.9.3.",
-    "Includes DjangoLux 1.9.3 deployment and Composer maintenance controls and login feedback."
+    "Pins django-lux[updater] exactly to 1.9.4.",
+    "Supports manual first-launch setup: Composer 1.5.3 `--skip-config` leaves config.json unimported."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.2"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.3"
 }

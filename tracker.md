@@ -2,7 +2,7 @@
 
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- Sales v0.8.2 prepared for local commit/tag; pins `django-lux[updater]==1.9.3`; apps: finance, catalog, automotive, sales, common, public_catalog. Publication awaits user confirmation.
+- Sales v0.8.3 released 2026-09-26 on `django-lux[updater]==1.9.4` (hash-pinned wheel; tag pushed, CI publishes `debeski/dlux-crm`). Local tag v0.8.2 was never pushed and is superseded. Apps: finance, catalog, automotive, sales, common, public_catalog.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
@@ -60,6 +60,7 @@
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
   - [x] Date filters: Invoice/Payment/Expense on `DatedFilterSet` (year + range); `date_from` -> `date_gte`, old bookmarks lose their filter — user's call (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
+- 2026-09-26: dlux 1.9.4 — CI test set 248/248 (SQLite), check/migration drift clean, 17 enabled ribbon lists render; hashed 1.9.4 wheel from PyPI.
 - 2026-09-24: 285/285 tests, manifest validator, installed 1.9.3, pip check and runtime smoke pass on `sales-validation:0.8.2`; logs `.xclude/release-0.8.2/`. Fresh amd64 build cannot fetch gunicorn from PyPI; no publish/deploy.
 - 2026-09-23: Brand-neutral `config.json` parses, normalizes to 76 settings, contains no Switch/SwitchLibya/store-contact remnants, and scaffold tests pass 5/5.
 - 2026-09-23: 285/285 baseline; automotive 37/37 after gating sidebar discovery/rendering on the persisted enhancement state, with enabled/disabled and bilingual regressions.
@@ -77,6 +78,6 @@
 ### Global Rulesets:
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
-- v0.8.2 awaits release approval: do not push its tag or publish until confirmed. Running sales stack was not redeployed. Retailer Phase 0/4 remain open.
+- v0.8.3 is released; the running sales stack was not redeployed. On PostgreSQL, 2 tests assume fresh IDs (`test_grid_layout_renders_cards`, purchase-invoice numbering); CI's SQLite set passes. Retailer Phase 0/4 remain open.
 ### References and Links:
 - Dlux source: `../../pkg-django-lux`; release guide: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`.
