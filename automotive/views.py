@@ -21,6 +21,7 @@ from finance.services import get_current_rate
 
 from .browser import VehicleBrowser
 from .filters import (
+    EquipmentTypeFilter,
     VehicleEngineFilter,
     VehicleGenerationFilter,
     VehicleMakeFilter,
@@ -29,10 +30,11 @@ from .filters import (
 )
 from .fits import apply_chips, product_chips, products_with_fitments, search_vehicles
 from .forms import BulkFitmentForm, ProductFitmentFormSet
-from .models import VehicleEngine, VehicleGeneration, VehicleMake, VehicleModel, VehicleTrim
+from .models import EquipmentType, VehicleEngine, VehicleGeneration, VehicleMake, VehicleModel, VehicleTrim
 from .product_form import FITMENT_PERMS
 from .settings import get_automotive_config
 from .tables import (
+    EquipmentTypeTable,
     VehicleEngineTable,
     VehicleGenerationTable,
     VehicleMakeTable,
@@ -59,6 +61,7 @@ class OptionalEnhancementModalGuardMixin:
             config = get_automotive_config()
             model_name = kwargs.get("model_name", "").lower()
             criterion_by_model = {
+                "equipmenttype": "equipment_type",
                 "vehiclegeneration": "generation_chassis",
                 "vehicleengine": "engine",
                 "vehicletrim": "trim",
@@ -135,7 +138,7 @@ class VehicleBrowserView(
         context["extra_styles"] = ["automotive/css/browser.css", "catalog/css/product_card.css"]
         context["vehicle_search_url"] = reverse("automotive:vehicle_search")
         can_add_part = self.request.user.has_perms(("catalog.add_product",) + FITMENT_PERMS)
-        if can_add_part and context.get("selected_model") and context.get("selected_year"):
+        if can_add_part and context.get("selected_model"):
             params = {
                 "fit_model": context["selected_model"],
                 "fit_year": context["selected_year"],
@@ -150,6 +153,16 @@ class VehicleBrowserView(
 
 class AutomotiveListView(AutomotiveEnabledMixin, ScopedListView):
     extra_scripts = ("automotive/js/dependent_selects.js",)
+
+
+class EquipmentTypeListView(AutomotiveListView):
+    automotive_criterion = "equipment_type"
+    model = EquipmentType
+    permission_required = "automotive.view_equipmenttype"
+    table_class = EquipmentTypeTable
+    filterset_class = EquipmentTypeFilter
+    page_title_key = "page_equipment_types"
+    page_subtitle_key = "page_equipment_types_sub"
 
 
 class VehicleMakeListView(AutomotiveListView):
@@ -170,7 +183,7 @@ class VehicleModelListView(AutomotiveListView):
     page_subtitle_key = "page_vehicle_models_sub"
 
     def get_queryset(self):
-        return super().get_queryset().select_related("make")
+        return super().get_queryset().select_related("make", "equipment_type")
 
 
 class VehicleGenerationListView(AutomotiveListView):
@@ -331,10 +344,13 @@ class VehicleSearchView(
     raise_exception = True
 
     def get(self, request):
+        # The browser's jump box navigates to one machine, so it cannot use an
+        # engine-only suggestion that stands for many.
         results = search_vehicles(
             request.GET.get("q", ""),
             user=request.user,
             criteria=get_automotive_config()["criteria"],
+            include_shared_engines=request.GET.get("jump") != "1",
         )
         return JsonResponse({"results": results})
 
@@ -422,7 +438,7 @@ class AutomotiveDependenciesView(
             request.user,
         )
         engines = scope_filtered_queryset(
-            VehicleEngine.objects.filter(is_active=True).select_related("generation"),
+            VehicleEngine.objects.filter(is_active=True).select_related("generation").prefetch_related("fitted_models"),
             request.user,
         )
         trims = scope_filtered_queryset(
@@ -446,6 +462,8 @@ class AutomotiveDependenciesView(
                     "id": item.pk,
                     "label": str(item),
                     "model_id": item.vehicle_model_id,
+                    "model_ids": [model.pk for model in item.fitted_models.all()] if item.is_shared else [],
+                    "shared": item.is_shared,
                     "generation_id": item.generation_id,
                 }
                 for item in engines.order_by("display_name", "engine_code")

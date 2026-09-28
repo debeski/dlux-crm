@@ -8,6 +8,7 @@ A `dlux_navbar_crumbs` context entry replaces that trail with DLUX_STRINGS keys.
 HUB = {"url_name": "automotive:hub", "label_key": "automotive_hub"}
 
 ROUTE_CRUMBS = {
+    "automotive:type_list": [HUB, {"label_key": "models_equipmenttype"}],
     "automotive:make_list": [HUB, {"label_key": "page_title_automotive_make_list"}],
     "automotive:model_list": [HUB, {"label_key": "page_title_automotive_model_list"}],
     "automotive:generation_list": [HUB, {"label_key": "page_title_automotive_generation_list"}],

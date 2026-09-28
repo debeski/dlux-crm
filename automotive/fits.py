@@ -24,7 +24,7 @@ from .models import (
     VehicleTrim,
     normalize_part_number,
 )
-from .services import fitment_label
+from .services import engine_text, fitment_label, years_text
 
 
 SEARCH_LIMIT = 25
@@ -63,24 +63,22 @@ def _generation_text(generation):
     return generation.name
 
 
-def _engine_text(engine):
-    return f"{engine.display_name} ({engine.engine_code})" if engine.engine_code else engine.display_name
-
-
 def chip_label(vehicle_model, year_from, year_to, generation=None, engine=None):
+    if vehicle_model is None:
+        return f"{engine.label} · {t('fits_all_machines', 'every machine with this engine')}"
     parts = [f"{vehicle_model.make.name} {vehicle_model.name}"]
     if generation is not None:
         parts[0] = f"{parts[0]} {_generation_text(generation)}"
     if engine is not None:
-        parts.append(_engine_text(engine))
-    parts.append(f"{year_from}–{year_to}" if year_from != year_to else str(year_from))
+        parts.append(engine_text(engine))
+    parts.append(years_text(year_from, year_to))
     return " · ".join(parts)
 
 
 def _chip(vehicle_model, year_from, year_to, generation=None, engine=None):
     return {
-        "make": vehicle_model.make_id,
-        "vehicle_model": vehicle_model.pk,
+        "make": vehicle_model.make_id if vehicle_model else None,
+        "vehicle_model": vehicle_model.pk if vehicle_model else None,
         "generation": generation.pk if generation else None,
         "engine": engine.pk if engine else None,
         "year_from": year_from,
@@ -107,89 +105,78 @@ def _any_token(tokens, paths):
     return query
 
 
-def search_vehicles(query, *, user, criteria, limit=SEARCH_LIMIT):
-    """Suggestions for a free-text vehicle search such as ``camry 2014``."""
+def search_vehicles(query, *, user, criteria, limit=SEARCH_LIMIT, include_shared_engines=True):
+    """Suggestions for a free-text search such as ``camry 2014`` or ``perkins 1104``.
+
+    Without a typed year (or with model years switched off) a model chip means
+    all years; a shared engine yields an engine-only chip that fits every
+    machine the engine is fitted to.
+    """
     tokens, years = parse_query(query)
     if not tokens:
         return []
+    if not criteria.get("model_year"):
+        years = None
 
+    live_model = Q(vehicle_model__is_active=True, vehicle_model__make__is_active=True)
     models = _scoped(
         VehicleModel.objects.filter(is_active=True, make__is_active=True),
         user,
     ).select_related("make")
-    generations = _scoped(
-        VehicleGeneration.objects.filter(
-            is_active=True, vehicle_model__is_active=True, vehicle_model__make__is_active=True,
-        ),
-        user,
-    ).select_related("vehicle_model", "vehicle_model__make")
-    name_paths = ("vehicle_model__make__name", "vehicle_model__name")
+    generations = _scoped(VehicleGeneration.objects.filter(live_model, is_active=True), user).select_related(
+        "vehicle_model", "vehicle_model__make",
+    )
+    model_paths = ["make__name", "name"]
+    if criteria.get("equipment_type"):
+        model_paths.append("equipment_type__name")
+    name_paths = tuple(f"vehicle_model__{path}" for path in model_paths)
 
     results = []
-    model_rows = list(
-        models.filter(_token_filter(tokens, ("make__name", "name")))
-        .annotate(
-            span_from=Min("generations__year_from", filter=_live_generation),
-            span_to=Max("generations__year_to", filter=_live_generation),
-        )
-        .order_by("make__name", "name")[:limit]
-    )
-    for vehicle_model in model_rows:
-        if years:
-            results.append(_chip(vehicle_model, *years))
-        elif vehicle_model.span_from:
-            chip = _chip(vehicle_model, vehicle_model.span_from, vehicle_model.span_to)
-            chip["label"] = f"{vehicle_model.make.name} {vehicle_model.name} · {t('fits_all_years', 'all years')} ({vehicle_model.span_from}–{vehicle_model.span_to})"
-            chip["all_years"] = True
-            results.append(chip)
-        else:
-            results.append({
-                "make": vehicle_model.make_id,
-                "vehicle_model": vehicle_model.pk,
-                "needs_year": True,
-                "label": f"{vehicle_model.make.name} {vehicle_model.name} · {t('fits_type_year', 'add a year, e.g. 2015')}",
-            })
+    for vehicle_model in models.filter(_token_filter(tokens, model_paths)).order_by("make__name", "name")[:limit]:
+        chip = _chip(vehicle_model, *(years or (None, None)))
+        chip["all_years"] = years is None
+        results.append(chip)
 
     if criteria.get("generation_chassis"):
-        gen_rows = generations.filter(
-            _token_filter(tokens, (*name_paths, "name", "chassis_code")),
-        )
+        gen_rows = generations.filter(_token_filter(tokens, (*name_paths, "name", "chassis_code")))
         if years:
             gen_rows = gen_rows.filter(year_from__lte=years[1], year_to__gte=years[0])
-        for generation in gen_rows.order_by(*name_paths, "year_from")[:limit]:
-            results.append(_chip(
-                generation.vehicle_model, generation.year_from, generation.year_to, generation,
-            ))
+        for generation in gen_rows.order_by(*name_paths[:2], "year_from")[:limit]:
+            span = (generation.year_from, generation.year_to) if criteria.get("model_year") else (None, None)
+            results.append(_chip(generation.vehicle_model, *span, generation))
 
     if criteria.get("engine"):
-        engine_paths = ("engine_code", "display_name")
-        engines = _scoped(
-            VehicleEngine.objects.filter(
-                is_active=True, vehicle_model__is_active=True, vehicle_model__make__is_active=True,
-            ),
-            user,
-        ).select_related("vehicle_model", "vehicle_model__make", "generation")
+        engine_paths = ("engine_code", "display_name", "manufacturer")
+        engines = _scoped(VehicleEngine.objects.filter(is_active=True), user).select_related(
+            "vehicle_model", "vehicle_model__make", "generation",
+        )
+        bound = engines.filter(live_model)
         if not criteria.get("generation_chassis"):
-            engines = engines.filter(generation__isnull=True)
+            bound = bound.filter(generation__isnull=True)
         else:
-            engines = engines.filter(Q(generation__isnull=True) | Q(generation__is_active=True))
-        engines = engines.filter(
+            bound = bound.filter(Q(generation__isnull=True) | Q(generation__is_active=True))
+        bound = bound.filter(
             _token_filter(tokens, (*name_paths, "generation__name", "generation__chassis_code", *engine_paths)),
         ).filter(_any_token(tokens, engine_paths))
         if years:
-            engines = engines.filter(
+            bound = bound.filter(
                 Q(generation__isnull=True)
                 | Q(generation__year_from__lte=years[1], generation__year_to__gte=years[0]),
             )
-        for engine in engines.order_by(*name_paths, "generation__year_from", "display_name")[:limit]:
+        for engine in bound.order_by(*name_paths[:2], "generation__year_from", "display_name")[:limit]:
             generation = engine.generation
-            if generation is not None:
+            if not criteria.get("model_year"):
+                span = (None, None)
+            elif generation is not None:
                 span = (generation.year_from, generation.year_to)
-            elif years:
-                span = years
             else:
-                continue
+                span = years or (None, None)
             results.append(_chip(engine.vehicle_model, *span, generation, engine))
+
+        if include_shared_engines:
+            shared = engines.filter(vehicle_model__isnull=True).filter(_token_filter(tokens, engine_paths))
+            for engine in shared.order_by("manufacturer", "display_name")[:limit]:
+                results.append(_chip(None, None, None, engine=engine))
 
     return results[:limit]
 
@@ -280,10 +267,16 @@ def parse_chips(raw, *, user, criteria, existing_ids=()):
             continue
 
         label = item.get("label") or ""
-        vehicle_model = models.select_related("make").filter(pk=_integer(item.get("vehicle_model"))).first()
+        model_id = _integer(item.get("vehicle_model"))
+        vehicle_model = models.select_related("make").filter(pk=model_id).first() if model_id else None
         year_from, year_to = _integer(item.get("year_from")), _integer(item.get("year_to"))
-        if vehicle_model is None or year_from is None or year_to is None:
-            raise ValidationError(t("fits_needs_vehicle_year", "Each vehicle needs a model and years: {label}").format(label=label))
+        if not criteria.get("model_year"):
+            year_from = year_to = None
+        engine_only = model_id is None and _integer(item.get("engine")) and criteria.get("engine")
+        if (model_id and vehicle_model is None) or (vehicle_model is None and not engine_only):
+            raise ValidationError(t("fits_needs_vehicle", "Each entry needs a model or a shared engine: {label}").format(label=label))
+        if (year_from is None) != (year_to is None):
+            raise ValidationError(t("fits_needs_both_years", "Enter both years or none: {label}").format(label=label))
 
         values = {"vehicle_model": vehicle_model, "year_from": year_from, "year_to": year_to}
         related = (

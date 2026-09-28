@@ -102,13 +102,22 @@ class ProductFilter(django_filters.FilterSet):
         if not vehicle_model and not year:
             return queryset
         self._vehicle_applied = True
-        live = {"automotive_fitments__deleted_at__isnull": True}
+        from automotive.models import VehicleEngine
+
+        # One filter() call keeps every condition on the same fitment row.
+        condition = Q(automotive_fitments__deleted_at__isnull=True)
         if vehicle_model:
-            live["automotive_fitments__vehicle_model"] = vehicle_model
+            shared = VehicleEngine.objects.filter(vehicle_model__isnull=True, fitted_models=vehicle_model)
+            condition &= Q(automotive_fitments__vehicle_model=vehicle_model) | Q(
+                automotive_fitments__vehicle_model__isnull=True,
+                automotive_fitments__engine__in=shared.values("pk"),
+            )
         if year:
-            live["automotive_fitments__year_from__lte"] = int(year)
-            live["automotive_fitments__year_to__gte"] = int(year)
-        return queryset.filter(**live).distinct()
+            condition &= Q(automotive_fitments__year_from__isnull=True) | Q(
+                automotive_fitments__year_from__lte=int(year),
+                automotive_fitments__year_to__gte=int(year),
+            )
+        return queryset.filter(condition).distinct()
 
     def filter_keyword(self, queryset, name, value):
         if not value:
@@ -135,7 +144,10 @@ class ProductFilter(django_filters.FilterSet):
                 query |= (
                     Q(automotive_fitments__engine__display_name__icontains=value)
                     | Q(automotive_fitments__engine__engine_code__icontains=value)
+                    | Q(automotive_fitments__engine__manufacturer__icontains=value)
                 )
+            if criteria.get("equipment_type"):
+                query |= Q(automotive_fitments__vehicle_model__equipment_type__name__icontains=value)
             if criteria["fuel_type"]:
                 query |= Q(automotive_fitments__engine__fuel_type__icontains=value)
             if criteria["trim"]:

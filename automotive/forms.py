@@ -14,6 +14,7 @@ from common.i18n import t
 from common.views import scope_filtered_queryset
 
 from .models import (
+    EquipmentType,
     ProductFitment,
     VehicleEngine,
     VehicleGeneration,
@@ -57,6 +58,16 @@ class AutomotiveModelForm(forms.ModelForm):
         build_grid_helper(self, layout)
 
 
+class EquipmentTypeForm(AutomotiveModelForm):
+    class Meta:
+        model = EquipmentType
+        fields = ["name", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.finish([("name", "is_active")])
+
+
 class VehicleMakeForm(AutomotiveModelForm):
     class Meta:
         model = VehicleMake
@@ -70,14 +81,20 @@ class VehicleMakeForm(AutomotiveModelForm):
 class VehicleModelForm(AutomotiveModelForm):
     class Meta:
         model = VehicleModel
-        fields = ["make", "name", "is_active"]
+        fields = ["make", "equipment_type", "name", "is_active"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["make"].queryset = _for_user(
             VehicleMake.objects.filter(is_active=True), self.user,
         ).order_by("name")
-        self.finish([("make", "name"), ("is_active",)])
+        if get_automotive_config()["criteria"].get("equipment_type"):
+            self.fields["equipment_type"].queryset = _for_user(
+                EquipmentType.objects.filter(is_active=True), self.user,
+            ).order_by("name")
+        else:
+            self.fields.pop("equipment_type")
+        self.finish([("make", "equipment_type"), ("name", "is_active")])
 
 
 class VehicleGenerationForm(AutomotiveModelForm):
@@ -101,17 +118,28 @@ class VehicleEngineForm(AutomotiveModelForm):
     class Meta:
         model = VehicleEngine
         fields = [
-            "vehicle_model", "generation", "display_name", "engine_code",
-            "displacement", "fuel_type", "is_active",
+            "vehicle_model", "generation", "manufacturer", "display_name", "engine_code",
+            "displacement", "fuel_type", "fitted_models", "is_active",
         ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         criteria = get_automotive_config()["criteria"]
         model_id = _selected_id(self, "vehicle_model")
-        self.fields["vehicle_model"].queryset = _for_user(
+        live_models = _for_user(
             VehicleModel.objects.filter(is_active=True, make__is_active=True), self.user,
         ).select_related("make").order_by("make__name", "name")
+        self.fields["vehicle_model"].queryset = live_models
+        self.fields["vehicle_model"].help_text = t(
+            "help_engine_vehicle_model",
+            "Leave blank for a shared engine used by several machines, then list them below.",
+        )
+        self.fields["fitted_models"].queryset = live_models
+        self.fields["fitted_models"].widget = DluxMultipleChoiceSelectorWidget(
+            variant="searchable-list", searchable=True,
+            search_placeholder=t("ui_search_models", "Search models"),
+        )
+        self.fields["fitted_models"].widget.choices = self.fields["fitted_models"].choices
         generations = _for_user(VehicleGeneration.objects.filter(is_active=True), self.user).select_related(
             "vehicle_model", "vehicle_model__make",
         )
@@ -128,7 +156,16 @@ class VehicleEngineForm(AutomotiveModelForm):
             self.fields.pop("fuel_type")
         first_row = ("vehicle_model", "generation") if criteria["generation_chassis"] else ("vehicle_model",)
         spec_row = ("displacement", "fuel_type") if criteria["fuel_type"] else ("displacement",)
-        self.finish([first_row, ("display_name", "engine_code"), spec_row, ("is_active",)])
+        self.finish([
+            first_row, ("manufacturer", "display_name"), ("engine_code",), spec_row,
+            ("fitted_models",), ("is_active",),
+        ])
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("vehicle_model"):
+            cleaned_data["fitted_models"] = VehicleModel.objects.none()
+        return cleaned_data
 
 
 class VehicleTrimForm(AutomotiveModelForm):
@@ -181,27 +218,34 @@ class ProductFitmentForm(AutomotiveModelForm):
         engines = _for_user(
             VehicleEngine.objects.filter(is_active=True), self.user,
         ).select_related("vehicle_model", "generation")
+        shared_engines = engines.filter(vehicle_model__isnull=True)
         trims = _for_user(
             VehicleTrim.objects.filter(is_active=True), self.user,
         ).select_related("vehicle_model", "generation")
         if model_id:
             generations = generations.filter(vehicle_model_id=model_id)
-            engines = engines.filter(vehicle_model_id=model_id)
+            own = engines.filter(vehicle_model_id=model_id)
             trims = trims.filter(vehicle_model_id=model_id)
             if generation_id:
-                engines = engines.filter(Q(generation_id=generation_id) | Q(generation__isnull=True))
+                own = own.filter(Q(generation_id=generation_id) | Q(generation__isnull=True))
                 trims = trims.filter(Q(generation_id=generation_id) | Q(generation__isnull=True))
             else:
-                engines = engines.filter(generation__isnull=True)
+                own = own.filter(generation__isnull=True)
                 trims = trims.filter(generation__isnull=True)
+            engines = engines.filter(
+                Q(pk__in=own.values("pk")) | Q(pk__in=shared_engines.filter(fitted_models=model_id).values("pk"))
+            )
         else:
             generations = generations.none()
-            engines = engines.none()
+            engines = shared_engines
             trims = trims.none()
         self.fields["generation"].queryset = generations
         self.fields["engine"].queryset = engines
         self.fields["trim"].queryset = trims
 
+        if not self.criteria.get("model_year", True):
+            self.fields.pop("year_from", None)
+            self.fields.pop("year_to", None)
         criterion_fields = {
             "generation_chassis": "generation",
             "engine": "engine",
@@ -217,6 +261,13 @@ class ProductFitmentForm(AutomotiveModelForm):
             if field_name in self.fields:
                 self.fields[field_name].widget.attrs[f"data-fitment-{field_name.replace('_', '-')}"] = "1"
         self.finish([])
+
+
+def _spans_overlap(left, right):
+    """Blank years mean all years, so they overlap any range."""
+    if left.get("year_from") is None or right.get("year_from") is None:
+        return True
+    return max(left["year_from"], right["year_from"]) <= min(left["year_to"], right["year_to"])
 
 
 class BaseProductFitmentFormSet(BaseInlineFormSet):
@@ -258,9 +309,7 @@ class BaseProductFitmentFormSet(BaseInlineFormSet):
                         "fitment_duplicate_error",
                         "The same vehicle compatibility row is entered more than once.",
                     ))
-                if max(left.get("year_from"), right.get("year_from")) <= min(
-                    left.get("year_to"), right.get("year_to")
-                ):
+                if _spans_overlap(left, right):
                     overlaps = True
         if overlaps and not self.confirm_overlaps:
             raise ValidationError(t(

@@ -55,6 +55,14 @@ are the extension tables. The picker is one widget
 by the Product modal, the bulk *Assign vehicles* modal, purchase-invoice lines and
 the browser's *Find a vehicle* jump; it loads its own static and re-binds on
 `dlux:modal-content-loaded`.
+Heavy equipment reuses the same tables: `EquipmentType` groups models,
+`VehicleEngine.vehicle_model` may be blank for a shared engine linked to many
+models through `fitted_models`, and `ProductFitment.vehicle_model`/years may be
+blank (engine-only rows, all years). `VehicleBrowser._expanded_rows()` repeats an
+engine-only row once per fitted active model, so every later step counts and
+filters it like a model row. `automotive.terminology` derives the machine
+wording from the project's own strings and stores it in
+`SystemSettings.translations_override`.
 
 `common/` is a plain Python package (not a Django app, no models). It holds
 `ScopedListView`, `RibbonPageMixin` and the generic

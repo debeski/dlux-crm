@@ -231,7 +231,8 @@
                 closeResults();
                 return;
             }
-            getJSON(withQuery(root.dataset.searchUrl, {q: query}))
+            const params = jump ? {q: query, jump: "1"} : {q: query};
+            getJSON(withQuery(root.dataset.searchUrl, params))
                 .then(function (data) {
                     if (search.value === query) renderResults(data.results || []);
                 })

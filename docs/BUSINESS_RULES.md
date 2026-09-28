@@ -331,6 +331,23 @@ by a superuser from the **Optional enhancements** System Settings card.
   matches them (3+ significant characters).
 - The Products list adds **Vehicle** and **Vehicle year** filters while automotive
   is on; both must match the *same* fitment row.
+- **Heavy machinery and equipment.** A store can choose *Machines & equipment*
+  wording (Optional enhancements → What the store serves). The switch writes
+  machine wording (آلية/آليات, "Machine") as DLux translation overrides and
+  withdraws only the overrides it wrote, so an admin's own wording survives.
+- **Machine type** (excavator, loader, generator…) is an optional criterion on
+  each model. The browser shows types as chips over the make grid; untyped
+  models stay reachable without a type.
+- **Shared engines.** An engine with no model is shared: it has a manufacturer
+  (Perkins, Cat, Cummins…) and a list of fitted models. A part tagged to a
+  shared engine alone fits every machine that engine is fitted to — it appears
+  in the browser, the Vehicle filter and search for each of them. A part tagged
+  to a model *and* a shared engine is valid only when that engine is fitted to
+  the model.
+- **Years are optional.** A fitment with no years fits all years. Turning the
+  *Model year* criterion off hides year inputs and the browser's year step, and
+  is refused while any fitment still carries years. With the criterion on, the
+  year step is skipped for a model whose fitments have no years.
 
 ## Sales invoice variant selection
 

@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AutomotiveDependenciesView,
     AutomotiveHubView,
+    EquipmentTypeListView,
     BulkFitmentView,
     FitsSourceView,
     ProductFitmentEditorView,
@@ -34,6 +35,8 @@ _browse.sidebar_group = "workspace"
 _browse.sidebar_icon = "bi-car-front-fill"
 _browse.sidebar_permissions = list(VehicleBrowserView.permission_required)
 _browse.sidebar_exclude = _AutomotiveSidebarExclusion()
+_types = EquipmentTypeListView.as_view()
+_types.sidebar_exclude = True
 _makes = VehicleMakeListView.as_view()
 _makes.sidebar_exclude = True
 _models = VehicleModelListView.as_view()
@@ -58,6 +61,7 @@ _bulk_fitments.sidebar_exclude = True
 urlpatterns = [
     path("", _hub, name="hub"),
     path("browse/", _browse, name="browse"),
+    path("types/", _types, name="type_list"),
     path("makes/", _makes, name="make_list"),
     path("models/", _models, name="model_list"),
     path("generations/", _generations, name="generation_list"),

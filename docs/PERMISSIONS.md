@@ -84,6 +84,7 @@ permission sets in [`sales/management/commands/seed_roles.py`](../sales/manageme
 | `automotive.view_*` | Automotive lookups + ProductFitment | Browse vehicle compatibility; granted read-only to Sales Representatives |
 | `automotive.add_*` / `change_*` | Automotive lookups + ProductFitment | Maintain compatibility; granted to Sales Managers |
 | `automotive.delete_productfitment` | ProductFitment | Remove an incorrect Product/vehicle relationship in the multi-row editor; granted to Sales Managers |
+| `automotive.*_equipmenttype` | EquipmentType | Machine types; view for Sales Representatives, view/add/change for Sales Managers |
 | `automotive.*_partprofile` / `*_productpartnumber` | PartProfile, ProductPartNumber | Part brand and OEM/cross-reference numbers; view for Sales Representatives, view/add/change (+ delete numbers) for Sales Managers |
 
 The one-time **Opening Stock** bulk intake has no permission of its own — it

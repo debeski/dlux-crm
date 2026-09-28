@@ -25,6 +25,8 @@ from automotive.models import (
 
 User = get_user_model()
 CRITERIA = {
+    "equipment_type": True,
+    "model_year": True,
     "generation_chassis": True,
     "engine": True,
     "fuel_type": True,
@@ -115,9 +117,10 @@ class QuerySearchTests(VehicleFixtureMixin, TestCase):
         )
         self.assertTrue(all(item.get("generation") is None for item in results))
 
-    def test_model_without_generations_asks_for_a_year(self):
+    def test_model_without_a_year_means_all_years(self):
         [item] = search_vehicles("hilux", user=self.user, criteria=CRITERIA)
-        self.assertTrue(item["needs_year"])
+        self.assertEqual((item["year_from"], item["year_to"]), (None, None))
+        self.assertTrue(item["all_years"])
         [dated] = search_vehicles("hilux 2016", user=self.user, criteria=CRITERIA)
         self.assertEqual((dated["year_from"], dated["year_to"]), (2016, 2016))
 

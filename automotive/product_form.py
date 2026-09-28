@@ -59,12 +59,14 @@ def prefill_chip(params, user):
             VehicleGeneration.objects.filter(is_active=True, vehicle_model=vehicle_model), user,
         ).filter(pk=generation_id).first()
     year = _integer(params.get("fit_year"))
-    if generation is not None:
+    if not get_automotive_config()["criteria"].get("model_year"):
+        span = (None, None)
+    elif generation is not None:
         span = (generation.year_from, generation.year_to)
     elif year:
         span = (year, year)
     else:
-        return None
+        span = (None, None)
     return {
         "vehicle_model": vehicle_model.pk,
         "generation": generation.pk if generation else None,

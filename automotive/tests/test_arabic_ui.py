@@ -14,6 +14,8 @@ ENABLED = {
     "automotive": {
         "enabled": True,
         "criteria": {
+            "equipment_type": True,
+            "model_year": True,
             "generation_chassis": True, "engine": True, "fuel_type": True,
             "trim": True, "transmission": True, "position": True,
         },

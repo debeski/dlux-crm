@@ -44,6 +44,7 @@ REP_PERMS = [
     "automotive.view_productfitment",
     "automotive.view_partprofile",
     "automotive.view_productpartnumber",
+    "automotive.view_equipmenttype",
     # Hand over the cash they collected (an admin/manager confirms it)
     "finance.view_cashdeposit",
     "finance.add_cashdeposit",
@@ -84,6 +85,7 @@ MANAGER_PERMS = [
     "catalog.view_category", "catalog.add_category", "catalog.change_category",
     "catalog.view_supplier", "catalog.add_supplier", "catalog.change_supplier",
     # Optional automotive extension — shared lookup and fitment management
+    "automotive.view_equipmenttype", "automotive.add_equipmenttype", "automotive.change_equipmenttype",
     "automotive.view_vehiclemake", "automotive.add_vehiclemake", "automotive.change_vehiclemake",
     "automotive.view_vehiclemodel", "automotive.add_vehiclemodel", "automotive.change_vehiclemodel",
     "automotive.view_vehiclegeneration", "automotive.add_vehiclegeneration", "automotive.change_vehiclegeneration",

@@ -2,7 +2,7 @@ from collections import defaultdict
 from urllib.parse import urlencode
 
 from django.core.exceptions import FieldDoesNotExist
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.urls import reverse
 
 from dlux.utils import get_user_scope, is_scope_enabled
@@ -13,6 +13,7 @@ from common.i18n import t
 from .fits import part_number_q
 from .models import (
     MIN_VEHICLE_YEAR,
+    EquipmentType,
     ProductFitment,
     VehicleEngine,
     VehicleGeneration,
@@ -74,9 +75,9 @@ class VehicleBrowser:
 
         self.products = self._queryset(Product).filter(is_active=True)
         self.fitments = self._queryset(ProductFitment).filter(
+            Q(vehicle_model__is_active=True, vehicle_model__make__is_active=True)
+            | Q(vehicle_model__isnull=True, engine__isnull=False),
             product__is_active=True,
-            vehicle_model__is_active=True,
-            vehicle_model__make__is_active=True,
         )
         if self.criteria["generation_chassis"]:
             self.fitments = self.fitments.filter(
@@ -103,6 +104,38 @@ class VehicleBrowser:
         if self.user_scope is None:
             return queryset.none()
         return queryset.filter(scope=self.user_scope)
+
+    def _expanded_rows(self):
+        """Fitment rows keyed by machine; an engine-only row repeats for every
+        active model its shared engine is fitted to."""
+        fields = (
+            *self.row_fields, "vehicle_model_id", "vehicle_model__make_id",
+            "vehicle_model__equipment_type_id",
+        )
+        rows, engine_rows = [], []
+        for row in self.fitments.values(*fields):
+            row["make_id"] = row.pop("vehicle_model__make_id")
+            row["equipment_type_id"] = row.pop("vehicle_model__equipment_type_id")
+            (rows if row["vehicle_model_id"] else engine_rows).append(row)
+        if not engine_rows:
+            return rows
+        through = VehicleEngine.fitted_models.through
+        live_models = self._queryset(VehicleModel).filter(is_active=True, make__is_active=True)
+        fitted = defaultdict(list)
+        for link in through.objects.filter(
+            vehicleengine_id__in={row["engine_id"] for row in engine_rows},
+            vehiclemodel__in=live_models,
+        ).values("vehicleengine_id", "vehiclemodel_id", "vehiclemodel__make_id", "vehiclemodel__equipment_type_id"):
+            fitted[link["vehicleengine_id"]].append(link)
+        for row in engine_rows:
+            for link in fitted[row["engine_id"]]:
+                rows.append({
+                    **row,
+                    "vehicle_model_id": link["vehiclemodel_id"],
+                    "make_id": link["vehiclemodel__make_id"],
+                    "equipment_type_id": link["vehiclemodel__equipment_type_id"],
+                })
+        return rows
 
     def _options(self, rows, field, objects, label, param_name, broad=None):
         identifiers = {row[field] for row in rows if row[field] not in (None, "")}
@@ -223,65 +256,82 @@ class VehicleBrowser:
             "change_vehicle_url": reverse("automotive:browse"),
         }
 
-        make_rows = self.fitments.values(
-            "vehicle_model__make_id", "vehicle_model__make__name",
-        ).annotate(product_count=Count("product_id", distinct=True)).order_by("vehicle_model__make__name")
-        make_options = [
-            {
-                "id": row["vehicle_model__make_id"],
-                "label": row["vehicle_model__make__name"],
-                "count": row["product_count"],
-                "url": _url({"make": row["vehicle_model__make_id"]}),
-            }
-            for row in make_rows
-        ]
+        rows = self._expanded_rows()
+
+        if self.criteria.get("equipment_type"):
+            rows, type_options, _selected = self._relational_step(
+                rows,
+                field="equipment_type_id",
+                model=EquipmentType,
+                param_name="type",
+                label=lambda item: item.name,
+                broad="__untyped_stays_out__",
+            )
+            context["type_options"] = type_options
+
+        makes = {
+            item.pk: item
+            for item in self._queryset(VehicleMake).filter(
+                pk__in={row["make_id"] for row in rows}, is_active=True,
+            )
+        }
+        make_options = sorted(
+            self._options(rows, "make_id", makes, lambda item: item.name, "make"),
+            key=lambda option: option["label"].lower(),
+        )
         make_id = self._select_or_reach(make_options, "make", self._lookup_make)
         context["make_options"] = make_options
         if make_id is None:
             context["next_step"] = "make"
             context["breadcrumbs"] = self.breadcrumbs
             return context
+        rows = [row for row in rows if row["make_id"] == make_id]
 
-        model_rows = self.fitments.filter(vehicle_model__make_id=make_id).values(
-            "vehicle_model_id", "vehicle_model__name",
-        ).annotate(product_count=Count("product_id", distinct=True)).order_by("vehicle_model__name")
-        model_options = [
-            {
-                "id": row["vehicle_model_id"],
-                "label": row["vehicle_model__name"],
-                "count": row["product_count"],
-                "url": _url({"make": make_id, "model": row["vehicle_model_id"]}),
-            }
-            for row in model_rows
-        ]
+        vehicle_models = {
+            item.pk: item
+            for item in self._queryset(VehicleModel).filter(
+                pk__in={row["vehicle_model_id"] for row in rows}, is_active=True,
+            )
+        }
+        model_options = sorted(
+            self._options(rows, "vehicle_model_id", vehicle_models, lambda item: item.name, "model"),
+            key=lambda option: option["label"].lower(),
+        )
         model_id = self._select_or_reach(model_options, "model", self._lookup_model(make_id))
         context["model_options"] = model_options
         if model_id is None:
             context["next_step"] = "model"
             context["breadcrumbs"] = self.breadcrumbs
             return context
+        rows = [row for row in rows if row["vehicle_model_id"] == model_id]
 
-        rows = list(self.fitments.filter(vehicle_model_id=model_id).values(*self.row_fields))
-        year_products = defaultdict(set)
-        for row in rows:
-            for year in range(row["year_from"], row["year_to"] + 1):
-                year_products[year].add(row["product_id"])
-        year_options = [
-            {
-                "id": year,
-                "label": str(year),
-                "count": len(product_ids),
-                "url": _url({"make": make_id, "model": model_id, "year": year}),
-            }
-            for year, product_ids in sorted(year_products.items(), reverse=True)
-        ]
-        year = self._select_or_reach(year_options, "year", self._lookup_year)
-        context["year_options"] = year_options
-        if year is None:
-            context["next_step"] = "year"
-            context["breadcrumbs"] = self.breadcrumbs
-            return context
-        rows = [row for row in rows if row["year_from"] <= year <= row["year_to"]]
+        year = None
+        dated = [row for row in rows if row["year_from"] is not None]
+        if self.criteria.get("model_year") and (dated or self.params.get("year")):
+            year_products = defaultdict(set)
+            undated = {row["product_id"] for row in rows if row["year_from"] is None}
+            for row in dated:
+                for value in range(row["year_from"], row["year_to"] + 1):
+                    year_products[value].add(row["product_id"])
+            year_options = [
+                {
+                    "id": value,
+                    "label": str(value),
+                    "count": len(product_ids | undated),
+                    "url": _url({**self.base_params, "year": value}),
+                }
+                for value, product_ids in sorted(year_products.items(), reverse=True)
+            ]
+            year = self._select_or_reach(year_options, "year", self._lookup_year)
+            context["year_options"] = year_options
+            if year is None:
+                context["next_step"] = "year"
+                context["breadcrumbs"] = self.breadcrumbs
+                return context
+            rows = [
+                row for row in rows
+                if row["year_from"] is None or row["year_from"] <= year <= row["year_to"]
+            ]
 
         if self.criteria["generation_chassis"]:
             def generation_label(item):
@@ -299,8 +349,8 @@ class VehicleBrowser:
 
         if self.criteria["engine"]:
             def engine_label(item):
-                bits = [item.display_name]
-                if item.engine_code:
+                bits = [item.label if item.is_shared else item.display_name]
+                if item.engine_code and not item.is_shared:
                     bits.append(item.engine_code)
                 if item.displacement is not None:
                     bits.append(f"{item.displacement:g}L")

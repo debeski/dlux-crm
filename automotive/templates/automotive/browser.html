@@ -51,6 +51,11 @@
     {% if next_step == "make" %}
     <section class="vehicle-step" aria-labelledby="make-heading">
         <div class="vehicle-step-heading"><span class="vehicle-step-number">1</span><div><h2 id="make-heading">{{ DLUX_STRINGS.vehicle_choose_make|default:"Choose a make" }}</h2><p>{{ DLUX_STRINGS.vehicle_choose_make_help|default:"Start with the vehicle manufacturer." }}</p></div></div>
+        {% if type_options %}
+        <div class="vehicle-choice-row mb-3" aria-label="{{ DLUX_STRINGS.optional_criterion_equipment_type|default:'Machine type' }}">
+            {% for option in type_options %}<a href="{% if option.selected %}{% url 'automotive:browse' %}{% else %}{{ option.url }}{% endif %}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}
+        </div>
+        {% endif %}
         <div class="vehicle-choice-grid">
             {% for option in make_options %}<a class="vehicle-choice" href="{{ option.url }}"><span>{{ option.label }}</span><small>{{ option.count }} {{ DLUX_STRINGS.ui_products_count|default:"products" }}</small></a>
             {% empty %}<div class="vehicle-empty">{{ DLUX_STRINGS.vehicle_no_fitment_data|default:"No active vehicle compatibility data is available yet." }}</div>{% endfor %}

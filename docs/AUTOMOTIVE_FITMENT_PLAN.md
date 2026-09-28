@@ -473,6 +473,15 @@ formset) was too many steps per vehicle. Delivered without Product schema change
 The full editor remains the place for engine/trim/transmission/position/notes on
 existing rows and for confirming intentional overlaps.
 
+## Phase 3.6 — Heavy Machinery and Equipment (delivered in v0.9.0)
+
+The first retailer sells heavy-machinery parts, where parts fit engines across
+makes and years rarely identify a machine. Delivered on the same tables:
+machine types, shared engines with fitted-model lists and engine-only
+compatibility, optional years (blank = all years) with a *Model year* criterion,
+and a *Machines & equipment* wording switch. Serial-number ranges (Caterpillar
+serial prefixes) are the next candidate criterion.
+
 ---
 
 ## Phase 4 — Bulk Migration, Audit, and Retailer Pilot
