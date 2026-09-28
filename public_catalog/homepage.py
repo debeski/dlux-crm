@@ -68,7 +68,7 @@ LOCALIZED_KEYS = (
 
 HOMEPAGE_DEFAULTS = {
     # Hero (localized text default seeds go to the default language on first read)
-    "hero_kicker": "Switch Libya",
+    "hero_kicker": "",
     "hero_title": "",            # blank -> shop_title
     "hero_subtitle": "",         # blank -> shop_subtitle
     "hero_primary_label": "Shop",
@@ -99,11 +99,11 @@ HOMEPAGE_DEFAULTS = {
     "services_kicker": "What we do",
     "services_heading": "Services we provide",
     "story_kicker": "Who we are",
-    "story_heading": "About Switch",
+    "story_heading": "About us",
     "story_body": "",
     "story_image": "",           # not localized
     "contact_kicker": "Contact",
-    "contact_heading": "Talk to Switch about supply and installation",
+    "contact_heading": "Get in touch",
     # Ordered, toggleable sections
     "sections": DEFAULT_SECTIONS,
 }

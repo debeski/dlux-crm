@@ -3,11 +3,13 @@ from urllib.parse import quote
 from dlux.options import write_app_system_config
 from dlux.utils import get_app_system_config
 
+from common.identity import store_name
+
 PUBLIC_CATALOG_NS = "switch_pos.public_catalog"
 
 PUBLIC_CATALOG_DEFAULTS = {
-    "shop_title": "Switch Shop",
-    "shop_subtitle": "Smart locks, access control, installation and after-sale services.",
+    "shop_title": "",          # blank -> the store's system name
+    "shop_subtitle": "",
     "contact_phone": "",
     "contact_whatsapp": "",
     "contact_email": "",
@@ -19,7 +21,7 @@ PUBLIC_CATALOG_DEFAULTS = {
 }
 
 
-def get_public_catalog_config():
+def get_public_catalog_config(*, resolve_names=True):
     stored = get_app_system_config(PUBLIC_CATALOG_NS, {}) or {}
     if not isinstance(stored, dict):
         stored = {}
@@ -37,11 +39,13 @@ def get_public_catalog_config():
         cfg["featured_limit"] = max(0, int(cfg.get("featured_limit") or 0))
     except (TypeError, ValueError):
         cfg["featured_limit"] = PUBLIC_CATALOG_DEFAULTS["featured_limit"]
+    if resolve_names and not str(cfg.get("shop_title") or "").strip():
+        cfg["shop_title"] = store_name()
     return cfg
 
 
 def set_public_catalog_config(patch, *, request=None):
-    cfg = get_public_catalog_config()
+    cfg = get_public_catalog_config(resolve_names=False)
     cfg.update({k: v for k, v in patch.items() if k in PUBLIC_CATALOG_DEFAULTS})
     write_app_system_config(PUBLIC_CATALOG_NS, cfg, request=request)
     return cfg

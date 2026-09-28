@@ -15,6 +15,7 @@ from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
 from common.access import apply_ownership
+from common.identity import store_name
 from common.i18n import t
 from finance.services import get_current_rate, usd_to_lyd
 
@@ -138,7 +139,7 @@ def build_sales_report_xlsx(report):
     # --- Summary sheet ---
     ws = wb.active
     ws.title = "Summary"
-    ws["A1"] = "Switch — Sales Report"
+    ws["A1"] = f"{store_name() or 'Sales'} — Sales Report"
     ws["A1"].font = title_font
     ws["A2"] = f"Period: {report['date_from']} → {report['date_to']}"
     rows = [

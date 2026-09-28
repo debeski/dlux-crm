@@ -214,7 +214,7 @@ DLUX_STRINGS = {
         # dashboard
         "ui_dashboard": "Workspace",
         "ui_workspace": "Workspace",
-        "ui_workspace_subtitle": "Switch operations",
+        "ui_workspace_subtitle": "Live operating surface across sales, stock, finance and delivery.",
         "ui_customize": "Customize",
         "ui_tiles": "Tiles",
         "ui_open": "Open",
@@ -501,7 +501,7 @@ DLUX_STRINGS = {
         # dashboard
         "ui_dashboard": "مساحة العمل",
         "ui_workspace": "مساحة العمل",
-        "ui_workspace_subtitle": "عمليات Switch",
+        "ui_workspace_subtitle": "لوحة تشغيل مباشرة للمبيعات والمخزون والمالية والتوصيل.",
         "ui_customize": "تخصيص",
         "ui_tiles": "البطاقات",
         "ui_open": "فتح",

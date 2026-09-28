@@ -119,7 +119,7 @@
                                 <td><span class="badge rounded-pill {% if movement.movement_type == 'in' %}text-bg-success{% elif movement.movement_type == 'out' %}text-bg-danger{% else %}text-bg-warning{% endif %}">{{ movement.get_movement_type_display }}</span></td>
                                 <td>{{ movement.variant.display_label|default:"—" }}</td>
                                 <td class="text-end fw-semibold {% if movement.signed_quantity < 0 %}text-danger{% else %}text-success{% endif %}">{{ movement.signed_quantity|floatformat:"-2" }}</td>
-                                <td><div>{{ movement.reference|default:"—" }}</div>{% if movement.reason %}<div class="text-muted small">{{ movement.reason }}</div>{% endif %}</td>
+                                <td><div>{{ movement.reference|default:"—" }}</div>{% if movement.purchase_invoice_id %}<div class="text-muted small">{{ DLUX_STRINGS.model_purchaseinvoice|default:"Purchase Invoice" }}</div>{% elif movement.reason %}<div class="text-muted small">{{ movement.reason }}</div>{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

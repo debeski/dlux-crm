@@ -24,7 +24,7 @@ from dlux.utils import get_user_scope, is_scope_enabled
 
 from common.access import apply_ownership
 from common.formatting import format_money
-from common.forms import translate_choice_fields
+from common.forms import translate_filter_choice_fields
 
 
 def _money(value):
@@ -219,7 +219,7 @@ class ScopedListView(RibbonMixin, LoginRequiredMixin, PermissionRequiredMixin, S
         # The Ribbon derives the whole filter band from the FilterSet, but it
         # does not touch the choices *inside* a field, so the option labels
         # (status/method/… -> Arabic/English) are still localized here.
-        translate_choice_fields(filterset.form, self.request)
+        translate_filter_choice_fields(filterset.form, self.request)
         return filterset
 
     def get_ribbon_actions(self):

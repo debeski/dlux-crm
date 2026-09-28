@@ -124,6 +124,7 @@ DLUX_STRINGS = {
         "ui_no_sales_period": "No sales in this period.",
         "ui_cogs_note": "Cost of goods uses each line's unit cost frozen at the time of sale, at the invoice's frozen rate. Invoice lines created before cost-freezing fall back to the product's current cost.",
         "ui_expenses_note": "Net profit subtracts posted operating expenses recorded in Finance.",
+        "page_title_sales_invoice_create": "New Invoice",
     },
     "ar": {
         "app_sales": "المبيعات",
@@ -250,5 +251,6 @@ DLUX_STRINGS = {
         "ui_no_sales_period": "لا مبيعات في هذه الفترة.",
         "ui_cogs_note": "تُحسب تكلفة البضاعة من تكلفة الوحدة المجمَّدة لكل بند وقت البيع، بسعر الصرف المجمَّد للفاتورة. البنود المُنشأة قبل تجميد التكلفة تعود إلى التكلفة الحالية للصنف.",
         "ui_expenses_note": "صافي الربح يخصم مصروفات التشغيل المرحلة في المالية.",
+        "page_title_sales_invoice_create": "فاتورة جديدة",
     },
 }

@@ -122,6 +122,11 @@
     margin-top: .25rem;
 }
 
+/* With the list inline, "50% of the search block" is no longer the input. */
+.fits-cell .fits-picker__icon {
+    top: 1.15rem;
+}
+
 .fits-cell .fits-picker__tools .btn-link {
     display: none;
 }

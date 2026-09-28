@@ -90,6 +90,11 @@ def _use_dlux_image_widget(form):
     ``set_field_attrs`` so the captured label is already translated.
     """
     apply_dlux_file_widgets(form, accept={"image": "image/*"})
+    # A managed-asset picker is not a plain file field, so the helper above
+    # leaves its tag label unset and the widget falls back to the field name.
+    for field in form.fields.values():
+        if hasattr(field.widget, "field_label") and not field.widget.field_label:
+            field.widget.field_label = field.label
 
 
 def _use_dlux_document_widget(form):
