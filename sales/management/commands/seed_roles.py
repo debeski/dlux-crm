@@ -42,6 +42,8 @@ REP_PERMS = [
     "automotive.view_vehicleengine",
     "automotive.view_vehicletrim",
     "automotive.view_productfitment",
+    "automotive.view_partprofile",
+    "automotive.view_productpartnumber",
     # Hand over the cash they collected (an admin/manager confirms it)
     "finance.view_cashdeposit",
     "finance.add_cashdeposit",
@@ -89,6 +91,9 @@ MANAGER_PERMS = [
     "automotive.view_vehicletrim", "automotive.add_vehicletrim", "automotive.change_vehicletrim",
     "automotive.view_productfitment", "automotive.add_productfitment", "automotive.change_productfitment",
     "automotive.delete_productfitment",
+    "automotive.view_partprofile", "automotive.add_partprofile", "automotive.change_partprofile",
+    "automotive.view_productpartnumber", "automotive.add_productpartnumber",
+    "automotive.change_productpartnumber", "automotive.delete_productpartnumber",
     # Inventory: purchase invoices, stock movements, physical counts + valuation
     "catalog.view_purchaseinvoice", "catalog.add_purchaseinvoice",
     "catalog.change_purchaseinvoice",

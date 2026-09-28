@@ -42,6 +42,19 @@ of fitment rows so selecting a qualifier still includes blank broad/all rows.
 Only the final Product query carries live category, stock and price data; result
 size therefore does not create per-card compatibility queries. Query parameters
 are the browser state, making Back, refresh and shared vehicle paths deterministic.
+`automotive.fits` is the quick-entry layer: vehicle search, chip parsing and
+validation (through `ProductFitment.clean`), additive/replace application, and
+part-number sync. `automotive.product_form.AutomotiveProductExtension` grafts the
+*Fits vehicles*, part brand and part-number fields onto `catalog.ProductForm`
+without touching the Product model: it is attached in `ProductForm.__init__`
+only while automotive is on, validates in `clean()`, and saves in `_save_m2m()`,
+which DjangoLux's modal save calls after the Product row exists. `PartProfile`
+(one-to-one) and `ProductPartNumber` (many, with an indexed normalized column)
+are the extension tables. The picker is one widget
+(`automotive/widgets/fits_picker.html` + `automotive/js/fits_picker.js`) reused
+by the Product modal, the bulk *Assign vehicles* modal, purchase-invoice lines and
+the browser's *Find a vehicle* jump; it loads its own static and re-binds on
+`dlux:modal-content-loaded`.
 
 `common/` is a plain Python package (not a Django app, no models). It holds
 `ScopedListView`, `RibbonPageMixin` and the generic

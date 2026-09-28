@@ -79,7 +79,7 @@
                             {% for itemform in formset %}
                             <tr class="line-row" data-price-sync-row>
                                 {{ itemform.id }}{{ itemform.product.as_hidden }}
-                                <td class="{% if itemform.name.errors %}field-invalid{% endif %}">{{ itemform.name }}{{ itemform.name.errors }}</td>
+                                <td class="{% if itemform.name.errors %}field-invalid{% endif %}">{{ itemform.name }}{{ itemform.name.errors }}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=itemform.fits %}{% endif %}</td>
                                 <td>{{ itemform.category }}</td>
                                 <td>{{ itemform.unit }}</td>
                                 <td>{{ itemform.barcode }}</td>
@@ -133,7 +133,7 @@
 <template id="empty-form-row">
     <tr class="line-row" data-price-sync-row>
         {{ formset.empty_form.id }}{{ formset.empty_form.product.as_hidden }}
-        <td>{{ formset.empty_form.name }}</td>
+        <td>{{ formset.empty_form.name }}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=formset.empty_form.fits %}{% endif %}</td>
         <td>{{ formset.empty_form.category }}</td>
         <td>{{ formset.empty_form.unit }}</td>
         <td>{{ formset.empty_form.barcode }}</td>
@@ -261,6 +261,7 @@
         totalForms.value = idx + 1;
         wireRow(tr);
         if (window.initCatalogColorPalettes) window.initCatalogColorPalettes();
+        if (window.AutomotiveFitsPicker) window.AutomotiveFitsPicker.initAll(tr);
     });
 
     body.querySelectorAll('.line-row').forEach(wireRow);

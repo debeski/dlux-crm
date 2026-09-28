@@ -15,9 +15,15 @@ from automotive.views import (
 
 
 def staff_entry(request):
-    if request.user.is_authenticated:
-        return redirect("common:workspace_dashboard")
-    return redirect("login")
+    if not request.user.is_authenticated:
+        return redirect("login")
+    from automotive.settings import automotive_enabled
+    from automotive.views import VehicleBrowserView
+
+    # A parts counter starts from the vehicle, so automotive mode lands there.
+    if automotive_enabled() and request.user.has_perms(VehicleBrowserView.permission_required):
+        return redirect("automotive:browse")
+    return redirect("common:workspace_dashboard")
 
 
 staff_entry.sidebar_exclude = True

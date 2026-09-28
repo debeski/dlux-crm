@@ -280,11 +280,12 @@ by a superuser from the **Optional enhancements** System Settings card.
 - The settings modal stages changes until Save. **Manage vehicle data** is
   disabled when Automotive Compatibility is not yet persistently enabled, so
   checking an unsaved switch cannot lead to a feature-gated 404.
-- The automotive hub is the single route exposed to the sidebar builder, and
-  only while the persisted enhancement switch is on. Turning the enhancement
-  off removes it from discovery and rendering even if it was previously saved
-  in the sidebar; the individual make/model/generation/engine/trim routes remain
-  internal hub destinations.
+- The automotive hub and **Browse by Vehicle** are the only routes exposed to the
+  sidebar builder, and only while the persisted enhancement switch is on. Turning
+  the enhancement off removes them from discovery and rendering even if they were
+  previously saved in the sidebar; the individual make/model/generation/engine/trim
+  routes remain internal hub destinations. While automotive is on, `/staff/` lands
+  a user who can use the browser on it instead of the Workspace dashboard.
 - The Product Item card shows its compatible vehicles using enabled criteria
   only. Managers edit several ranges in one save; exact duplicates are rejected
   and matching overlapping ranges require explicit confirmation.
@@ -300,8 +301,36 @@ by a superuser from the **Optional enhancements** System Settings card.
   out-of-stock items, and open the existing Product Item card. Out-of-stock items
   are currently shown by default; the retailer pilot must confirm whether that
   should become a user-controlled or store-wide filter.
-- Direct browser search accepts Product name, SKU or barcode without requiring a
-  vehicle path. The XLSX fitment intake remains a later plan phase.
+- Direct browser search accepts Product name, SKU, barcode, OEM/cross-reference
+  number or part brand without requiring a vehicle path. The XLSX fitment intake
+  remains a later plan phase.
+- **Quick Fits entry.** The Product add/edit modal carries a *Fits vehicles*
+  search-and-tag picker right after name/category. Typing `camry 2014`, a chassis
+  code (`xv50`) or an engine (`hilux 2.8`) suggests model-year, generation and
+  engine matches; a typed year or `2010-2012` range becomes the row's years, a
+  generation brings its own span. A model with no generations needs a typed year.
+  Tags for existing rows are kept untouched (their engine/position/notes are
+  edited in the full editor, linked as *Advanced*); removing a tag retires that
+  row, new tags create rows. Exact duplicates collapse; overlap confirmation stays
+  a rule of the full editor only.
+- **Same cars as…** copies another product's compatibility as new tags,
+  including its engine/trim/transmission/position values.
+- **Assign vehicles** (Products ribbon) adds the same tags to several products in
+  one save. It is additive: existing compatibility is never removed.
+- **Purchase invoice lines** carry a collapsed *Fits vehicles* picker; on posting,
+  its tags are added to the created or reused Product (additive, same transaction
+  as the stock-in).
+- **Vehicle-first add.** The browser's *Find a vehicle* search reaches any active
+  make/model/year, including one no product fits yet, and its results offer *Add
+  part for this vehicle*, opening the Product modal with that vehicle tagged.
+  The name is suggested as `<category> – <vehicle>` when left blank.
+- **Part identity** lives beside the Product: `PartProfile` holds the part brand,
+  `ProductPartNumber` holds OEM and cross-reference numbers. Numbers are
+  comma-separated in the form and matched by an uppercase alphanumeric form, so
+  `04465-33450` and `0446533450` are the same number. Product keyword search
+  matches them (3+ significant characters).
+- The Products list adds **Vehicle** and **Vehicle year** filters while automotive
+  is on; both must match the *same* fitment row.
 
 ## Sales invoice variant selection
 

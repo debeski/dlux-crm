@@ -155,8 +155,13 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
             "track_stock", "reorder_level", "is_active",
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, request=None, user=None, **kwargs):
+        # `request` is taken for the optional automotive extension only; it is not
+        # stored as `self.request`, which would change managed-asset attribution.
         super().__init__(*args, **kwargs)
+        from automotive.product_form import AutomotiveProductExtension
+
+        self.automotive = AutomotiveProductExtension.attach(self, request)
         self.fields["sku"].required = False
         # Data hooks the price-sync JS keys off (see catalog/js/price_sync.js).
         self.fields["cost_usd"].widget.attrs["data-price-cost"] = "1"
@@ -171,7 +176,7 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         # LYD field's placeholder to show the live derived price, so clear it here.
         self.fields["price_lyd_override"].widget.attrs.pop("placeholder", None)
         _use_dlux_image_widget(self)
-        build_grid_helper(self, [
+        rows = [
             ("name", "sku"),
             ("category", "unit"),
             ("barcode",),
@@ -180,7 +185,21 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
             ("price_lyd_override", "reorder_level"),
             ("track_stock", "is_active"),
             ("description",),
-        ])
+        ]
+        if self.automotive:
+            rows = self.automotive.layout(rows)
+        build_grid_helper(self, rows)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.automotive:
+            self.automotive.clean(cleaned_data)
+        return cleaned_data
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        if self.automotive:
+            self.automotive.save(self.instance)
 
 
 class ServiceForm(ManagedAssetFormMixin, forms.ModelForm):
@@ -356,16 +375,24 @@ class PurchaseInvoiceLineForm(OpeningStockLineForm):
     """Purchase-line row with the same product autofill/price-sync controls as
     Opening Stock, but a filled row must carry a positive purchased quantity."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         s = get_strings()
         self.fields["quantity"].label = s.get("label_purchaseinvoiceline_quantity", "Qty Purchased")
         self.fields["quantity"].widget.attrs["placeholder"] = self.fields["quantity"].label
+        from automotive.product_form import attach_line_fits
+
+        self.fits_user = user
+        self.fits_enabled = attach_line_fits(self, user)
 
     def clean(self):
         cleaned = super().clean()
         if cleaned.get("DELETE"):
             return cleaned
+        if self.fits_enabled:
+            from automotive.product_form import clean_line_fits
+
+            clean_line_fits(self, cleaned, self.fits_user)
         has_data = any(
             cleaned.get(name)
             for name in (

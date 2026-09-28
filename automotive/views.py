@@ -1,12 +1,16 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db import transaction
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
 
+from dlux.notifications import notify
 from dlux.utils import log_user_action
 from dlux.views import DynamicModalDeleteView, DynamicModalManagerView
 
@@ -23,8 +27,10 @@ from .filters import (
     VehicleModelFilter,
     VehicleTrimFilter,
 )
-from .forms import ProductFitmentFormSet
+from .fits import apply_chips, product_chips, products_with_fitments, search_vehicles
+from .forms import BulkFitmentForm, ProductFitmentFormSet
 from .models import VehicleEngine, VehicleGeneration, VehicleMake, VehicleModel, VehicleTrim
+from .product_form import FITMENT_PERMS
 from .settings import get_automotive_config
 from .tables import (
     VehicleEngineTable,
@@ -127,6 +133,18 @@ class VehicleBrowserView(
         for product in context["products"]:
             product.browser_price_lyd = product.selling_price_lyd(rate)
         context["extra_styles"] = ["automotive/css/browser.css", "catalog/css/product_card.css"]
+        context["vehicle_search_url"] = reverse("automotive:vehicle_search")
+        can_add_part = self.request.user.has_perms(("catalog.add_product",) + FITMENT_PERMS)
+        if can_add_part and context.get("selected_model") and context.get("selected_year"):
+            params = {
+                "fit_model": context["selected_model"],
+                "fit_year": context["selected_year"],
+                "fit_generation": context.get("selected_generation") or "",
+            }
+            query = urlencode({key: value for key, value in params.items() if value})
+            context["add_part_url"] = (
+                f"{reverse('scoped_modal_manager', args=['catalog', 'product', 'new'])}?{query}"
+            )
         return context
 
 
@@ -301,6 +319,87 @@ class ProductFitmentEditorView(
             log_user_action(request, "UPDATE", instance=product)
         messages.success(request, "Vehicle compatibility saved.")
         return redirect("catalog:product_list")
+
+
+class VehicleSearchView(
+    AutomotiveEnabledMixin,
+    LoginRequiredMixin,
+    PermissionRequiredMixin,
+    View,
+):
+    permission_required = "automotive.view_vehiclemodel"
+    raise_exception = True
+
+    def get(self, request):
+        results = search_vehicles(
+            request.GET.get("q", ""),
+            user=request.user,
+            criteria=get_automotive_config()["criteria"],
+        )
+        return JsonResponse({"results": results})
+
+
+class FitsSourceView(
+    AutomotiveEnabledMixin,
+    LoginRequiredMixin,
+    PermissionRequiredMixin,
+    View,
+):
+    """Products to copy vehicles from, or one product's vehicles as new chips."""
+
+    permission_required = ("automotive.view_productfitment", "catalog.view_product")
+    raise_exception = True
+
+    def get(self, request):
+        product_id = request.GET.get("product")
+        if product_id:
+            queryset = scope_filtered_queryset(Product.objects.all(), request.user)
+            product = get_object_or_404(queryset, pk=product_id)
+            chips = product_chips(product, get_automotive_config()["criteria"], as_new=True)
+            return JsonResponse({"chips": chips})
+        return JsonResponse({
+            "products": products_with_fitments(request.GET.get("q", ""), user=request.user),
+        })
+
+
+class BulkFitmentView(
+    AutomotiveEnabledMixin,
+    LoginRequiredMixin,
+    PermissionRequiredMixin,
+    View,
+):
+    """Modal: add the same vehicles to several products at once (additive)."""
+
+    permission_required = FITMENT_PERMS + ("catalog.view_product",)
+    raise_exception = True
+    template_name = "automotive/bulk_fitments.html"
+
+    def render_modal(self, form):
+        return render_to_string(self.template_name, {"form": form}, request=self.request)
+
+    def get(self, request):
+        form = BulkFitmentForm(user=request.user, request=request)
+        return JsonResponse({"html": self.render_modal(form)})
+
+    def post(self, request):
+        form = BulkFitmentForm(request.POST, user=request.user, request=request)
+        if not form.is_valid():
+            return JsonResponse({"success": False, "html": self.render_modal(form)})
+        created = 0
+        with transaction.atomic():
+            for product in form.cleaned_data["products"]:
+                added, _removed = apply_chips(product, set(), form.fit_rows, replace=False)
+                created += added
+                if added:
+                    log_user_action(request, "UPDATE", instance=product)
+        notify.success(
+            t("fits_bulk_done", "{count} compatibility rows added.").format(count=created),
+            request=request,
+            user=request.user,
+            flash=True,
+            persist=False,
+        )
+        return JsonResponse({"success": True, "refresh_parent": True})
 
 
 class AutomotiveDependenciesView(

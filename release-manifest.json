@@ -1,10 +1,12 @@
 {
   "schema_version": 1,
-  "version": "0.8.3",
-  "summary": "Updates the sales edition to DjangoLux 1.9.4.",
+  "version": "0.9.0",
+  "summary": "Makes the automotive mode parts-first: tag vehicles while adding a part, search by part number, and add parts straight from a vehicle.",
   "highlights": [
-    "Pins django-lux[updater] exactly to 1.9.4.",
-    "Supports manual first-launch setup: Composer 1.5.3 `--skip-config` leaves config.json unimported."
+    "Fits vehicles search-and-tag picker in the product form: type camry 2014, xv50 or hilux 2.8.",
+    "Same cars as… copy, bulk Assign vehicles, and vehicle tags on purchase-invoice lines.",
+    "Part brand plus OEM and cross-reference numbers, searchable in Products and Browse by Vehicle.",
+    "Find a vehicle and Add part for this vehicle in the browser; /staff/ opens the browser in parts mode."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.3"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.9.0"
 }

@@ -84,6 +84,7 @@ permission sets in [`sales/management/commands/seed_roles.py`](../sales/manageme
 | `automotive.view_*` | Automotive lookups + ProductFitment | Browse vehicle compatibility; granted read-only to Sales Representatives |
 | `automotive.add_*` / `change_*` | Automotive lookups + ProductFitment | Maintain compatibility; granted to Sales Managers |
 | `automotive.delete_productfitment` | ProductFitment | Remove an incorrect Product/vehicle relationship in the multi-row editor; granted to Sales Managers |
+| `automotive.*_partprofile` / `*_productpartnumber` | PartProfile, ProductPartNumber | Part brand and OEM/cross-reference numbers; view for Sales Representatives, view/add/change (+ delete numbers) for Sales Managers |
 
 The one-time **Opening Stock** bulk intake has no permission of its own — it
 reuses `catalog.add_product` + `catalog.change_product` + `catalog.add_stockmovement`
@@ -104,6 +105,12 @@ ProductFitment, and Delivery Couriers receive none. Managers are intentionally
 not granted delete permissions for vehicle reference data: obsolete makes,
 models, generations, engines and trims are deactivated. Fitment removal is an
 explicit correction from the Product compatibility editor.
+
+The quick *Fits vehicles* picker (Product modal, *Assign vehicles*, purchase-invoice
+lines, *Add part for this vehicle*) renders and saves only for users holding all four
+ProductFitment permissions; a posted picker value from anyone else is ignored. Part
+brand and part numbers are part of the Product form, so they follow the product's
+own add/change permissions.
 
 Standard `view/add/change/delete` permissions exist for every model. Reports and
 the Workspace/Sales Overview sales figures are additionally row-scoped by the

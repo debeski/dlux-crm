@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from django.core.exceptions import ValidationError
@@ -385,3 +386,66 @@ class ProductFitment(ScopedModel):
 
     def __str__(self):
         return f"{self.product} → {self.vehicle_model} · {self.year_from}–{self.year_to}"
+
+
+def normalize_part_number(value):
+    """Uppercase alphanumerics only, so `04465-33450` and `0446533450` match."""
+    return re.sub(r"[^0-9A-Z]", "", (value or "").upper())
+
+
+class PartProfile(ScopedModel):
+    """Automotive identity kept beside a Product instead of on it."""
+
+    product = models.OneToOneField(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="part_profile",
+        verbose_name="Product",
+    )
+    part_brand = models.CharField(max_length=120, blank=True, verbose_name="Part Brand")
+
+    class Meta:
+        verbose_name = "Part Profile"
+        verbose_name_plural = "Part Profiles"
+
+    def __str__(self):
+        return f"{self.product} · {self.part_brand}" if self.part_brand else str(self.product)
+
+
+class ProductPartNumber(ScopedModel):
+    KIND_OEM = "oem"
+    KIND_CROSS = "cross"
+    KIND_CHOICES = (
+        (KIND_OEM, "OEM"),
+        (KIND_CROSS, "Cross-reference"),
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="part_numbers",
+        verbose_name="Product",
+    )
+    kind = models.CharField(max_length=8, choices=KIND_CHOICES, verbose_name="Type")
+    number = models.CharField(max_length=80, verbose_name="Part Number")
+    normalized = models.CharField(max_length=80, editable=False, db_index=True)
+
+    class Meta:
+        verbose_name = "Part Number"
+        verbose_name_plural = "Part Numbers"
+        ordering = ["product__name", "kind", "number"]
+        constraints = [
+            models.UniqueConstraint(
+                F("product_id"), F("kind"), F("normalized"),
+                condition=Q(deleted_at__isnull=True),
+                name="auto_part_number_uniq",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.number = (self.number or "").strip()
+        self.normalized = normalize_part_number(self.number)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.number

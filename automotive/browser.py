@@ -10,7 +10,16 @@ from dlux.utils import get_user_scope, is_scope_enabled
 from catalog.models import Category, Product
 from common.i18n import t
 
-from .models import ProductFitment, VehicleEngine, VehicleGeneration, VehicleTrim
+from .fits import part_number_q
+from .models import (
+    MIN_VEHICLE_YEAR,
+    ProductFitment,
+    VehicleEngine,
+    VehicleGeneration,
+    VehicleMake,
+    VehicleModel,
+    VehicleTrim,
+)
 
 
 def _integer(value):
@@ -122,6 +131,44 @@ class VehicleBrowser:
                 return option["id"]
         return None
 
+    def _select_or_reach(self, options, param_name, lookup):
+        """Select a requested vehicle even when no product fits it yet.
+
+        Staff reach an empty vehicle from the quick vehicle search to add its
+        first part; it joins the options with a zero count instead of being
+        rejected for having no fitments.
+        """
+        selected = self._selected_option(options, param_name)
+        if selected is not None or not self.params.get(param_name):
+            return selected
+        found = lookup(_integer(self.params.get(param_name)))
+        if found is None:
+            return None
+        identifier, label = found
+        params = {**self.base_params, param_name: identifier}
+        options.append({"id": identifier, "label": label, "count": 0, "url": _url(params)})
+        return self._selected_option(options, param_name)
+
+    def _lookup_make(self, identifier):
+        make = self._queryset(VehicleMake).filter(pk=identifier, is_active=True).first()
+        return (make.pk, make.name) if make else None
+
+    def _lookup_model(self, make_id):
+        def lookup(identifier):
+            vehicle_model = self._queryset(VehicleModel).filter(
+                pk=identifier, make_id=make_id, is_active=True,
+            ).first()
+            return (vehicle_model.pk, vehicle_model.name) if vehicle_model else None
+        return lookup
+
+    @staticmethod
+    def _lookup_year(year):
+        from datetime import date
+
+        if year is None or not MIN_VEHICLE_YEAR <= year <= date.today().year + 2:
+            return None
+        return year, str(year)
+
     def _relational_step(self, rows, *, field, model, param_name, label, broad=None):
         identifiers = {row[field] for row in rows if row[field] not in (None, "")}
         objects = {
@@ -151,7 +198,8 @@ class VehicleBrowser:
             Q(name__icontains=query)
             | Q(sku__icontains=query)
             | Q(barcode__icontains=query)
-        ).select_related("category", "image_asset").order_by("name")
+            | part_number_q(query)
+        ).distinct().select_related("category", "image_asset").order_by("name")
         count = queryset.count()
         return {
             "search_query": query,
@@ -187,7 +235,7 @@ class VehicleBrowser:
             }
             for row in make_rows
         ]
-        make_id = self._selected_option(make_options, "make")
+        make_id = self._select_or_reach(make_options, "make", self._lookup_make)
         context["make_options"] = make_options
         if make_id is None:
             context["next_step"] = "make"
@@ -206,7 +254,7 @@ class VehicleBrowser:
             }
             for row in model_rows
         ]
-        model_id = self._selected_option(model_options, "model")
+        model_id = self._select_or_reach(model_options, "model", self._lookup_model(make_id))
         context["model_options"] = model_options
         if model_id is None:
             context["next_step"] = "model"
@@ -227,7 +275,7 @@ class VehicleBrowser:
             }
             for year, product_ids in sorted(year_products.items(), reverse=True)
         ]
-        year = self._selected_option(year_options, "year")
+        year = self._select_or_reach(year_options, "year", self._lookup_year)
         context["year_options"] = year_options
         if year is None:
             context["next_step"] = "year"
@@ -329,5 +377,7 @@ class VehicleBrowser:
             "show_results": True,
             "breadcrumbs": self.breadcrumbs,
             "selected_year": year,
+            "selected_model": model_id,
+            "selected_generation": self.base_params.get("generation") or _integer(self.params.get("generation")),
         })
         return context

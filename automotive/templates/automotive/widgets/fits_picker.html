@@ -1,0 +1,31 @@
+{% load dlux_tags %}<link rel="stylesheet" href="{% dlux_static 'automotive/css/fits_picker.css' %}">
+<div class="fits-picker" data-fits-picker
+     data-search-url="{{ widget.search_url }}"
+     data-copy-url="{{ widget.copy_url }}"
+     data-str-empty="{{ widget.strings.empty }}"
+     data-str-no-results="{{ widget.strings.no_results }}"
+     data-str-remove="{{ widget.strings.remove }}"
+     data-str-copy-empty="{{ widget.strings.copy_empty }}"
+     data-str-added="{{ widget.strings.added }}"{% if widget.suggest_name %}
+     data-suggest-name="1"{% endif %}>
+    <input type="hidden" name="{{ widget.name }}" value="{{ widget.value }}" data-fits-value{% if widget.attrs.id %} id="{{ widget.attrs.id }}"{% endif %}>
+    <div class="fits-picker__chips" data-fits-chips aria-live="polite"></div>
+    <div class="fits-picker__search">
+        <i class="bi bi-car-front fits-picker__icon" aria-hidden="true"></i>
+        <input type="search" class="form-control" data-fits-search autocomplete="off"
+               placeholder="{{ widget.strings.placeholder }}" aria-label="{{ widget.strings.placeholder }}">
+        <div class="fits-picker__results list-group shadow-sm" data-fits-results role="listbox" hidden></div>
+    </div>
+    <div class="fits-picker__tools">
+        {% if widget.allow_copy %}<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-fits-copy-toggle><i class="bi bi-files me-1"></i>{{ widget.strings.copy }}</button>{% endif %}
+        {% if widget.editor_url %}<a href="{{ widget.editor_url }}" target="_top" class="btn btn-sm btn-link">{{ widget.strings.advanced }}</a>{% endif %}
+    </div>
+    {% if widget.allow_copy %}
+    <div class="fits-picker__copy" data-fits-copy hidden>
+        <input type="search" class="form-control form-control-sm" data-fits-copy-search autocomplete="off"
+               placeholder="{{ widget.strings.copy_placeholder }}" aria-label="{{ widget.strings.copy_placeholder }}">
+        <div class="list-group mt-1" data-fits-copy-results></div>
+    </div>
+    {% endif %}
+</div>
+<script src="{% dlux_static 'automotive/js/fits_picker.js' %}"></script>

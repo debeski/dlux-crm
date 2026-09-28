@@ -1,9 +1,13 @@
+import json
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.forms import BaseInlineFormSet, inlineformset_factory
+from django.urls import reverse
 
 from dlux.utils import set_field_attrs
+from dlux.widgets import DluxMultipleChoiceSelectorWidget
 
 from common.forms import build_grid_helper, translate_choice_fields, translate_help_text
 from common.i18n import t
@@ -263,6 +267,103 @@ class BaseProductFitmentFormSet(BaseInlineFormSet):
                 "fitment_overlap_error",
                 "Some matching compatibility rows overlap. Consolidate their years or confirm the overlap and save again.",
             ))
+
+
+class FitsPickerWidget(forms.Widget):
+    """Search-and-chip vehicle picker posting its chips as one JSON value."""
+
+    template_name = "automotive/widgets/fits_picker.html"
+
+    def __init__(self, attrs=None, *, editor_url="", allow_copy=True, suggest_name=False):
+        super().__init__(attrs)
+        self.editor_url = editor_url
+        self.allow_copy = allow_copy
+        self.suggest_name = suggest_name
+
+    def format_value(self, value):
+        if value in (None, ""):
+            return "[]"
+        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"].update({
+            "search_url": reverse("automotive:vehicle_search"),
+            "copy_url": reverse("automotive:fits_source"),
+            "editor_url": self.editor_url,
+            "allow_copy": self.allow_copy,
+            "suggest_name": self.suggest_name,
+            "strings": {
+                "placeholder": t("fits_search_placeholder", "Type a vehicle: camry 2014, xv50, hilux 2.8…"),
+                "empty": t("fits_no_vehicles", "No vehicles yet — search above to add one."),
+                "no_results": t("fits_no_results", "No matching vehicle."),
+                "remove": t("ui_remove", "Remove"),
+                "copy": t("fits_copy_from", "Same cars as…"),
+                "copy_placeholder": t("fits_copy_placeholder", "Search a product that already has vehicles"),
+                "copy_empty": t("fits_copy_empty", "No product with vehicles matches."),
+                "added": t("fits_added", "Added"),
+                "advanced": t("fits_advanced", "Advanced: engine, position, notes"),
+                "vehicles": t("ui_fits_vehicles", "Fits vehicles"),
+            },
+        })
+        return context
+
+
+class FitsField(forms.CharField):
+    widget = FitsPickerWidget
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("strip", False)
+        super().__init__(*args, **kwargs)
+
+
+class BulkFitmentForm(forms.Form):
+    """Same vehicles for many products; existing rows are never removed."""
+
+    products = forms.ModelMultipleChoiceField(queryset=None)
+    fits = FitsField()
+
+    def __init__(self, *args, request=None, user=None, **kwargs):
+        self.request = request
+        self.user = user
+        super().__init__(*args, **kwargs)
+        from catalog.models import Product
+
+        self.fit_rows = []
+        self.fields["products"].queryset = _for_user(
+            Product.objects.filter(is_active=True), user,
+        ).order_by("name")
+        self.fields["products"].label = t("fits_bulk_products", "Products")
+        self.fields["products"].help_text = t(
+            "fits_bulk_products_help", "Choose every product that fits the same vehicles.",
+        )
+        self.fields["products"].widget = DluxMultipleChoiceSelectorWidget(
+            variant="searchable-list",
+            searchable=True,
+            search_placeholder=t("fits_bulk_products_search", "Search products"),
+        )
+        self.fields["products"].widget.choices = self.fields["products"].choices
+        self.fields["fits"].label = t("ui_fits_vehicles", "Fits vehicles")
+        self.fields["fits"].widget = FitsPickerWidget()
+        set_field_attrs(self)
+        build_grid_helper(self, [("products",), ("fits",)])
+
+    def clean(self):
+        cleaned_data = super().clean()
+        from .fits import parse_chips
+
+        try:
+            _kept, self.fit_rows = parse_chips(
+                cleaned_data.get("fits"), user=self.user,
+                criteria=get_automotive_config()["criteria"],
+            )
+        except ValidationError as error:
+            self.add_error("fits", error)
+            return cleaned_data
+        if not self.fit_rows:
+            self.add_error("fits", t("fits_bulk_need_vehicle", "Add at least one vehicle."))
+        return cleaned_data
 
 
 ProductFitmentFormSet = inlineformset_factory(

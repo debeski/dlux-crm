@@ -183,21 +183,39 @@ class ProductListView(ScopedListView):
             request=self.request,
         )
         actions = [{"html": toggle}]
+        from automotive.product_form import FITMENT_PERMS
         from automotive.settings import automotive_enabled
 
-        if (
-            automotive_enabled()
-            and self.request.user.has_perm("automotive.view_productfitment")
-        ):
+        user = self.request.user
+        if automotive_enabled() and user.has_perm("automotive.view_productfitment"):
+            strings = get_strings(get_current_language_code(self.request))
             actions.append({
-                "label": get_strings(get_current_language_code(self.request)).get(
-                    "ui_browse_by_vehicle", "Browse by vehicle",
-                ),
+                "label": strings.get("ui_browse_by_vehicle", "Browse by vehicle"),
                 "icon": "bi bi-car-front",
                 "url": reverse("automotive:browse"),
                 "css_class": "btn btn-outline-primary rounded-pill",
             })
+            if user.has_perms(FITMENT_PERMS):
+                label = strings.get("fits_bulk_title", "Assign vehicles")
+                actions.append({
+                    "label": label,
+                    "icon": "bi bi-diagram-3",
+                    "css_class": "btn btn-outline-primary rounded-pill",
+                    "attrs": {
+                        "data-dynamic-modal": reverse("automotive:bulk_fitments"),
+                        "data-modal-title": label,
+                    },
+                })
         return actions + list(super().get_ribbon_action_specs())
+
+    @property
+    def ribbon_primary(self):
+        from automotive.settings import automotive_enabled
+
+        names = list(super().ribbon_primary or [])
+        if automotive_enabled():
+            names += [name for name in ProductFilter.vehicle_fields if name not in names]
+        return names or None
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -736,9 +754,12 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
     template_name = "catalog/purchase_invoice_form.html"
 
     def _context(self, form, formset):
+        from automotive.product_form import line_fits_enabled
+
         return {
             "form": form,
             "formset": formset,
+            "fits_enabled": line_fits_enabled(self.request.user),
             "current_rate": get_current_rate(),
             "product_map_json": _product_autofill_map_json(),
             "products": Product.objects.order_by("name"),
@@ -773,6 +794,10 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
             invoice.save()
             for cd in kept:
                 product = _save_product_from_intake_line(cd)
+                if cd.get("fit_rows"):
+                    from automotive.fits import apply_chips
+
+                    apply_chips(product, set(), cd["fit_rows"], replace=False)
                 variant = _variant_from_intake_line(product, cd)
                 qty = cd.get("quantity") or Decimal("0")
                 PurchaseInvoiceLine.objects.create(
@@ -806,12 +831,12 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
 
     def get(self, request):
         form = PurchaseInvoiceForm()
-        formset = PurchaseInvoiceLineFormSet(initial=[{}])
+        formset = PurchaseInvoiceLineFormSet(initial=[{}], form_kwargs={"user": request.user})
         return render(request, self.template_name, self._context(form, formset))
 
     def post(self, request):
         form = PurchaseInvoiceForm(request.POST, request.FILES)
-        formset = PurchaseInvoiceLineFormSet(request.POST)
+        formset = PurchaseInvoiceLineFormSet(request.POST, form_kwargs={"user": request.user})
         if form.is_valid() and formset.is_valid():
             invoice = self._save(request, form, formset)
             if invoice is None:
