@@ -231,6 +231,7 @@ class VehicleBrowser:
             Q(name__icontains=query)
             | Q(sku__icontains=query)
             | Q(barcode__icontains=query)
+            | Q(extra_barcodes__code=query, extra_barcodes__deleted_at__isnull=True)
             | part_number_q(query)
         ).distinct().select_related("category", "image_asset").order_by("name")
         count = queryset.count()
@@ -307,7 +308,9 @@ class VehicleBrowser:
 
         year = None
         dated = [row for row in rows if row["year_from"] is not None]
-        if self.criteria.get("model_year") and (dated or self.params.get("year")):
+        # `any_year` lets a caller (the till's vehicle panel) list every year at once.
+        wants_years = not self.params.get("any_year")
+        if self.criteria.get("model_year") and wants_years and (dated or self.params.get("year")):
             year_products = defaultdict(set)
             undated = {row["product_id"] for row in rows if row["year_from"] is None}
             for row in dated:

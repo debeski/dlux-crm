@@ -84,6 +84,8 @@ permission sets in [`sales/management/commands/seed_roles.py`](../sales/manageme
 | `automotive.view_*` | Automotive lookups + ProductFitment | Browse vehicle compatibility; granted read-only to Sales Representatives |
 | `automotive.add_*` / `change_*` | Automotive lookups + ProductFitment | Maintain compatibility; granted to Sales Managers |
 | `automotive.delete_productfitment` | ProductFitment | Remove an incorrect Product/vehicle relationship in the multi-row editor; granted to Sales Managers |
+| `sales.use_pos` | PosSale | Sell from the till (with `add_invoice`, `issue_invoice`, `add_payment`); granted to Sales Representatives and Sales Managers |
+| `sales.pos_unlimited_discount` | PosSale | Give discounts above the seller limit at the till; granted to Sales Managers |
 | `automotive.*_equipmenttype` | EquipmentType | Machine types; view for Sales Representatives, view/add/change for Sales Managers |
 | `automotive.*_partprofile` / `*_productpartnumber` | PartProfile, ProductPartNumber | Part brand and OEM/cross-reference numbers; view for Sales Representatives, view/add/change (+ delete numbers) for Sales Managers |
 

@@ -19,6 +19,12 @@ def staff_entry(request):
         return redirect("login")
     from automotive.settings import automotive_enabled
     from automotive.views import VehicleBrowserView
+    from sales.pos_settings import get_pos_config
+    from sales.pos_views import POS_PERMS
+
+    pos = get_pos_config()
+    if pos["enabled"] and pos["open_on_login"] and request.user.has_perms(POS_PERMS):
+        return redirect("sales:pos_till")
 
     # A parts counter starts from the vehicle, so automotive mode lands there.
     if automotive_enabled() and request.user.has_perms(VehicleBrowserView.permission_required):

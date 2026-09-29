@@ -64,6 +64,14 @@ filters it like a model row. `automotive.terminology` derives the machine
 wording from the project's own strings and stores it in
 `SystemSettings.translations_override`.
 
+`sales.pos` holds the till's lookup and `complete_sale` service; it builds an
+invoice with the editor's own pricing helper, then reuses `issue_invoice` and
+`Payment`, so the till adds no parallel sales model — only `PosSale` (retry key,
+cash given, change). Settings live in the `switch_pos.point_of_sale` app config
+(`sales.pos_settings`, card in `sales/dlux_options.py`). Phase 1 keeps the cart
+in the browser (localStorage) and sends it once at checkout; the till page,
+lookup, checkout, receipt and vehicle panel are under `/staff/sales/pos/`.
+
 `common/` is a plain Python package (not a Django app, no models). It holds
 `ScopedListView`, `RibbonPageMixin` and the generic
 `common/templates/common/scoped_list.html` so every simple list page stays a few

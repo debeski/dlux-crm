@@ -125,6 +125,7 @@ class ProductFilter(django_filters.FilterSet):
         query = (
             Q(name__icontains=value) | Q(sku__icontains=value) | Q(barcode__icontains=value)
             | Q(size__icontains=value)
+            | Q(extra_barcodes__code=value.strip(), extra_barcodes__deleted_at__isnull=True)
         )
         from automotive.settings import get_automotive_config
 

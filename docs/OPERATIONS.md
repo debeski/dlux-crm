@@ -192,6 +192,16 @@ through the setup wizard and Options instead of committing a customer's brand.
 | `/staff/sales/report/` | Sales report (XLSX export from here; owner-only) |
 | `/staff/sales/financial/` | Fiscal-year financial report with expenses/net profit |
 
+## Point of sale hardware
+
+- **Barcode scanners**: any USB or Bluetooth scanner that types like a keyboard
+  works with the till; no driver or setup.
+- **Receipt printers**: choose the paper width in the Point of sale settings
+  and print from the browser; set the printer's margins to none.
+- **Phone camera scanning** needs a secure page. It works on `localhost` and
+  over HTTPS; on the store network the guided certificate install (POS phase 2)
+  is what enables it for phones.
+
 ## Scheduled tasks (Celery Beat)
 
 The `celery` service runs both a worker and Beat (see `compose.yml`). Scheduled

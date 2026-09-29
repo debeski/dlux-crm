@@ -349,6 +349,39 @@ by a superuser from the **Optional enhancements** System Settings card.
   is refused while any fitment still carries years. With the criterion on, the
   year step is skipped for a model whose fitments have no years.
 
+## Point of sale (نقطة البيع)
+
+An optional till for quick walk-in sales, switched on from the **Point of sale**
+settings card (off by default).
+
+- A till sale is an ordinary walk-in invoice: created, issued (stock out, with
+  the usual shortage check) and paid in one transaction. Reports, the stock
+  ledger and cash deposits treat it like any other sale. A shortage or any
+  refusal rolls the whole sale back.
+- Every sale carries a till-generated key (`PosSale.key`); resubmitting the same
+  key returns the same invoice, so a double tap or a dropped connection cannot
+  sell twice.
+- Payment: cash, card (the store's own card machine) and bank transfer, as
+  enabled in settings, and split across them. Non-cash amounts may not exceed
+  what is left to pay; cash covers the rest and the change is recorded on the
+  `PosSale` (with the cash given) and printed on the receipt.
+- Discounts: a lowered line price and a sale discount both count. Their total,
+  against the list price, may not exceed the seller limit (settings, default
+  10%) unless the user holds `sales.pos_unlimited_discount`.
+- Scanning: the always-focused box resolves an extra barcode (per product or
+  per variant), the product barcode, the SKU or a normalized part number as an
+  exact hit and adds it; anything else searches names and part numbers. Keys a
+  hardware scanner types while focus is elsewhere are routed to the box. An
+  unknown code offers **Add a new item with this barcode**; after saving, the
+  till adds it to the still-open cart.
+- Camera scanning uses the browser's built-in barcode reader where available,
+  which requires a secure page (localhost or HTTPS).
+- Receipts: none, thermal 58 mm / 80 mm, or A4 (settings), printed from the
+  browser.
+- With **Open the till on login**, users who can sell land on the till.
+- **Extra barcodes** (`catalog.ProductBarcode`) are edited in the product form
+  whether or not the till is on; a code already used by another item is refused.
+
 ## Sales invoice variant selection
 
 When adding a product line on a sales invoice, the editor reads the selected

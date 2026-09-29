@@ -297,6 +297,8 @@ DLUX_STRINGS = {
         "pr_print_save": "Print / Save as PDF",
         "pr_no": "#",
         "pr_description": "Description",
+        "method_card": "Card",
+        "choice_card": "Card",
     },
     "ar": {
         # ---- generic table headers ----
@@ -584,5 +586,7 @@ DLUX_STRINGS = {
         "pr_print_save": "طباعة / حفظ PDF",
         "pr_no": "#",
         "pr_description": "الوصف",
+        "method_card": "بطاقة",
+        "choice_card": "بطاقة",
     },
 }

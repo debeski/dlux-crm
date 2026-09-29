@@ -68,9 +68,10 @@ def _source_strings():
     from automotive.translations import DLUX_STRINGS as automotive
     from catalog.translations import DLUX_STRINGS as catalog
     from common.translations import DLUX_STRINGS as common
+    from sales.translations import DLUX_STRINGS as sales
 
     merged = {}
-    for bundle in (common, catalog, automotive):
+    for bundle in (common, catalog, sales, automotive):
         for lang, strings in bundle.items():
             merged.setdefault(lang, {}).update(strings)
     return merged

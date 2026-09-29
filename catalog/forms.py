@@ -14,7 +14,9 @@ from common.forms import (
 )
 from finance.services import get_current_rate
 
-from .models import Category, Product, PurchaseInvoice, Service, StockMovement, Supplier, PRODUCT_COLOR_SWATCHES
+from .models import (
+    Category, Product, ProductBarcode, PurchaseInvoice, Service, StockMovement, Supplier, PRODUCT_COLOR_SWATCHES,
+)
 
 
 COLOR_SWATCHES = PRODUCT_COLOR_SWATCHES
@@ -167,6 +169,15 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         from automotive.product_form import AutomotiveProductExtension
 
         self.automotive = AutomotiveProductExtension.attach(self, request)
+        codes = ", ".join(self.instance.extra_barcodes.values_list("code", flat=True)) if self.instance.pk else ""
+        self.fields["extra_barcodes"] = forms.CharField(
+            required=False, initial=codes, label=get_strings().get("label_extra_barcodes", "Extra barcodes"),
+            help_text=get_strings().get("help_extra_barcodes", "Other codes that should find this item, separated by commas."),
+        )
+        # A code scanned at the till that matched nothing arrives here to pre-fill.
+        scanned = getattr(request, "GET", {}).get("barcode") if request is not None else None
+        if scanned and not self.is_bound and not self.instance.pk:
+            self.initial["barcode"] = scanned[:64]
         self.fields["sku"].required = False
         # Data hooks the price-sync JS keys off (see catalog/js/price_sync.js).
         self.fields["cost_usd"].widget.attrs["data-price-cost"] = "1"
@@ -184,7 +195,7 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         rows = [
             ("name", "sku"),
             ("category", "unit"),
-            ("barcode",),
+            ("barcode", "extra_barcodes"),
             ("image_asset",),
             ("cost_usd", "markup_percent", "price_usd"),
             ("price_lyd_override", "reorder_level"),
@@ -199,12 +210,39 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         cleaned_data = super().clean()
         if self.automotive:
             self.automotive.clean(cleaned_data)
+        self._clean_extra_barcodes(cleaned_data)
         return cleaned_data
+
+    def _clean_extra_barcodes(self, cleaned_data):
+        codes = []
+        for raw in (cleaned_data.get("extra_barcodes") or "").replace("\n", ",").split(","):
+            code = raw.strip()
+            if code and code not in codes and code != cleaned_data.get("barcode"):
+                codes.append(code[:64])
+        taken = ProductBarcode.objects.filter(code__in=codes)
+        products = Product.objects.filter(barcode__in=codes)
+        if self.instance.pk:
+            taken = taken.exclude(product=self.instance)
+            products = products.exclude(pk=self.instance.pk)
+        clash = sorted(set(taken.values_list("code", flat=True)) | set(products.values_list("barcode", flat=True)))
+        if clash:
+            self.add_error("extra_barcodes", get_strings().get(
+                "error_barcode_taken", "Already used by another item: {codes}",
+            ).format(codes=", ".join(clash)))
+        cleaned_data["extra_barcodes"] = codes
 
     def _save_m2m(self):
         super()._save_m2m()
         if self.automotive:
             self.automotive.save(self.instance)
+        wanted = self.cleaned_data.get("extra_barcodes") or []
+        for barcode in self.instance.extra_barcodes.all():
+            if barcode.code not in wanted:
+                barcode.delete()
+        have = set(self.instance.extra_barcodes.values_list("code", flat=True))
+        for code in wanted:
+            if code not in have:
+                ProductBarcode.objects.create(product=self.instance, scope=self.instance.scope, code=code)
 
 
 class ServiceForm(ManagedAssetFormMixin, forms.ModelForm):

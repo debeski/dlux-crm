@@ -321,10 +321,12 @@ class Payment(ScopedModel):
     OWNER_FIELDS = ("created_by", "invoice__salesperson")
 
     METHOD_CASH = "cash"
+    METHOD_CARD = "card"
     METHOD_BANK = "bank_transfer"
     METHOD_CHEQUE = "cheque"
     METHOD_CHOICES = (
         (METHOD_CASH, "Cash"),
+        (METHOD_CARD, "Card"),
         (METHOD_BANK, "Bank Transfer"),
         (METHOD_CHEQUE, "Cheque"),
     )
@@ -478,3 +480,34 @@ class Delivery(ScopedModel):
         if self.status == self.STATUS_DELIVERED and self.delivered_at is None:
             self.delivered_at = timezone.now()
         super().save(*args, **kwargs)
+
+
+class PosSale(ScopedModel):
+    """One completed till sale: the invoice it became, keyed for safe retries.
+
+    The till sends a fresh ``key`` per sale; a repeated submit (double tap,
+    flaky Wi-Fi) finds this row and returns the same invoice instead of
+    selling twice.
+    """
+
+    key = models.CharField(max_length=64, unique=True, verbose_name="Idempotency Key")
+    invoice = models.OneToOneField(Invoice, on_delete=models.PROTECT, related_name="pos_sale", verbose_name="Invoice")
+    till = models.CharField(max_length=60, blank=True, verbose_name="Till")
+    tendered_lyd = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Cash Tendered (LYD)",
+    )
+    change_lyd = models.DecimalField(
+        max_digits=14, decimal_places=2, default=Decimal("0.00"), verbose_name="Change (LYD)",
+    )
+
+    class Meta:
+        verbose_name = "POS Sale"
+        verbose_name_plural = "POS Sales"
+        ordering = ["-created_at"]
+        permissions = [
+            ("use_pos", "Can sell from the point-of-sale till"),
+            ("pos_unlimited_discount", "Can give any discount at the till"),
+        ]
+
+    def __str__(self):
+        return f"{self.invoice} ({self.till or 'till'})"

@@ -888,3 +888,37 @@ class StockTakeLine(models.Model):
         if v is None:
             return Decimal("0.00")
         return usd_to_lyd(v * (self.product.cost_usd or Decimal("0")), rate)
+
+
+class ProductBarcode(ScopedModel):
+    """Extra barcodes for a product, or for one of its variants.
+
+    ``Product.barcode`` stays the primary code; these cover suppliers that
+    print their own labels and per-size/colour codes.
+    """
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="extra_barcodes", verbose_name="Product")
+    variant = models.ForeignKey(
+        ProductVariant, null=True, blank=True, on_delete=models.CASCADE,
+        related_name="extra_barcodes", verbose_name="Variant",
+    )
+    code = models.CharField(max_length=64, verbose_name="Barcode")
+
+    class Meta:
+        verbose_name = "Product Barcode"
+        verbose_name_plural = "Product Barcodes"
+        ordering = ["product__name", "code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["code"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="catalog_barcode_code_uniq",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.code

@@ -1,0 +1,137 @@
+{% extends "dlux/base.html" %}
+{% load dlux_tags %}
+
+{% block title %}{{ DLUX_STRINGS.pos_till_title|default:"Point of Sale" }}{% endblock %}
+
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% dlux_static 'sales/pos/css/main.css' %}">
+{% endblock %}
+
+{% block content %}
+<script type="application/json" id="pos-setup">{{ pos_setup|safe }}</script>
+<div class="pos" data-pos>
+    <section class="pos-catalog" aria-label="{{ DLUX_STRINGS.pos_catalog|default:'Find items' }}">
+        <div class="pos-scan">
+            <i class="bi bi-upc-scan pos-scan__icon" aria-hidden="true"></i>
+            <input type="search" class="form-control form-control-lg" id="pos-search" autocomplete="off" autofocus
+                   placeholder="{{ DLUX_STRINGS.pos_scan_placeholder|default:'Scan a barcode or type a name, SKU or part number' }}"
+                   aria-label="{{ DLUX_STRINGS.pos_scan_placeholder|default:'Scan a barcode or type a name, SKU or part number' }}">
+            <button type="button" class="btn btn-outline-primary pos-scan__camera" data-pos-camera hidden
+                    title="{{ DLUX_STRINGS.pos_camera|default:'Scan with camera' }}" aria-label="{{ DLUX_STRINGS.pos_camera|default:'Scan with camera' }}">
+                <i class="bi bi-camera"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary pos-scan__vehicle" data-pos-vehicle-toggle hidden>
+                <i class="bi bi-car-front me-1"></i><span>{{ DLUX_STRINGS.pos_find_by_vehicle|default:"By vehicle" }}</span>
+            </button>
+        </div>
+
+        <div class="pos-notice" data-pos-notice hidden></div>
+
+        <div class="pos-unknown" data-pos-unknown hidden>
+            <p class="mb-2"><i class="bi bi-question-circle me-1"></i><span data-pos-unknown-text></span></p>
+            <button type="button" class="btn btn-primary rounded-pill" data-pos-unknown-add hidden>
+                <i class="bi bi-plus-lg me-1"></i>{{ DLUX_STRINGS.pos_add_unknown|default:"Add a new item with this barcode" }}
+            </button>
+        </div>
+
+        <div class="pos-vehicle" data-pos-vehicle hidden>
+            <input type="search" class="form-control" data-pos-vehicle-search autocomplete="off"
+                   placeholder="{{ DLUX_STRINGS.vehicle_jump_placeholder|default:'camry 2014, xv50, hilux 2.8…' }}">
+            <div class="list-group mt-2" data-pos-vehicle-results></div>
+            <p class="small text-muted mt-2 mb-0" data-pos-vehicle-path></p>
+        </div>
+
+        <div class="pos-results" data-pos-results role="list"></div>
+    </section>
+
+    <aside class="pos-cart" aria-label="{{ DLUX_STRINGS.pos_cart|default:'Cart' }}">
+        <header class="pos-cart__head">
+            <h2 class="h5 mb-0">{{ DLUX_STRINGS.pos_cart|default:"Cart" }} <span class="badge rounded-pill text-bg-secondary" data-pos-count>0</span></h2>
+            <button type="button" class="btn btn-sm btn-link text-danger" data-pos-clear>{{ DLUX_STRINGS.pos_clear|default:"Clear" }}</button>
+        </header>
+        <ol class="pos-lines" data-pos-lines></ol>
+        <p class="pos-empty text-muted" data-pos-empty>{{ DLUX_STRINGS.pos_empty|default:"Scan or tap an item to start a sale." }}</p>
+
+        <details class="pos-customer">
+            <summary class="small">{{ DLUX_STRINGS.pos_customer_optional|default:"Customer name and phone (optional)" }}</summary>
+            <div class="d-flex gap-2 mt-2">
+                <input type="text" class="form-control form-control-sm" data-pos-customer-name maxlength="200"
+                       placeholder="{{ DLUX_STRINGS.label_invoice_customer_name|default:'Customer Name' }}">
+                <input type="tel" class="form-control form-control-sm" data-pos-customer-phone maxlength="40"
+                       placeholder="{{ DLUX_STRINGS.label_invoice_customer_phone|default:'Customer Phone' }}">
+            </div>
+        </details>
+
+        <dl class="pos-totals">
+            <div><dt>{{ DLUX_STRINGS.pos_subtotal|default:"Subtotal" }}</dt><dd data-pos-subtotal>0.00</dd></div>
+            <div>
+                <dt><button type="button" class="btn btn-sm btn-link p-0" data-pos-discount>{{ DLUX_STRINGS.pos_discount|default:"Discount" }}</button></dt>
+                <dd data-pos-discount-value>0.00</dd>
+            </div>
+            <div class="pos-totals__grand"><dt>{{ DLUX_STRINGS.pos_total|default:"Total" }}</dt><dd><span data-pos-total>0.00</span> <small>LYD</small></dd></div>
+        </dl>
+
+        <div class="pos-pay-buttons" data-pos-pay-buttons>
+            {% for method in pos_methods %}
+            <button type="button" class="btn btn-lg {% if forloop.first %}btn-success{% else %}btn-outline-success{% endif %} pos-pay-btn" data-pos-pay="{{ method }}">
+                {% if method == "cash" %}<i class="bi bi-cash-coin me-1"></i>{% elif method == "card" %}<i class="bi bi-credit-card me-1"></i>{% else %}<i class="bi bi-bank me-1"></i>{% endif %}
+                {% if method == "cash" %}{{ DLUX_STRINGS.method_cash|default:"Cash" }}{% elif method == "card" %}{{ DLUX_STRINGS.method_card|default:"Card" }}{% else %}{{ DLUX_STRINGS.method_bank_transfer|default:"Bank Transfer" }}{% endif %}
+            </button>
+            {% endfor %}
+        </div>
+    </aside>
+</div>
+
+<div class="pos-overlay" data-pos-pay-dialog hidden role="dialog" aria-modal="true" aria-labelledby="pos-pay-title">
+    <div class="pos-dialog">
+        <h2 class="h4" id="pos-pay-title">{{ DLUX_STRINGS.pos_take_payment|default:"Take payment" }}</h2>
+        <p class="pos-dialog__total"><span data-pos-pay-total>0.00</span> <small>LYD</small></p>
+        <div class="pos-pay-rows">
+            {% for method in pos_methods %}
+            <label class="pos-pay-row">
+                <span>{% if method == "cash" %}{{ DLUX_STRINGS.method_cash|default:"Cash" }}{% elif method == "card" %}{{ DLUX_STRINGS.method_card|default:"Card" }}{% else %}{{ DLUX_STRINGS.method_bank_transfer|default:"Bank Transfer" }}{% endif %}</span>
+                <input type="number" min="0" step="any" inputmode="decimal" class="form-control form-control-lg" data-pos-amount="{{ method }}">
+            </label>
+            {% endfor %}
+        </div>
+        <div class="pos-quick-cash" data-pos-quick-cash></div>
+        <p class="pos-dialog__change"><span data-pos-change-label>{{ DLUX_STRINGS.pos_change|default:"Change" }}</span>: <strong data-pos-change>0.00</strong></p>
+        <p class="text-danger small" data-pos-pay-error hidden></p>
+        <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-secondary btn-lg rounded-pill" data-pos-pay-cancel>{{ DLUX_STRINGS.ui_cancel|default:"Cancel" }}</button>
+            <button type="button" class="btn btn-success btn-lg rounded-pill px-4" data-pos-complete disabled>
+                <i class="bi bi-check2-circle me-1"></i>{{ DLUX_STRINGS.pos_complete|default:"Complete sale" }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="pos-overlay" data-pos-done hidden role="dialog" aria-modal="true" aria-labelledby="pos-done-title">
+    <div class="pos-dialog text-center">
+        <i class="bi bi-check-circle-fill text-success pos-done__icon" aria-hidden="true"></i>
+        <h2 class="h4" id="pos-done-title">{{ DLUX_STRINGS.pos_sale_done|default:"Sale complete" }} · <span data-pos-done-number></span></h2>
+        <p class="pos-dialog__change" data-pos-done-change-row>{{ DLUX_STRINGS.pos_change|default:"Change" }}: <strong data-pos-done-change>0.00</strong> LYD</p>
+        <div class="d-flex gap-2 justify-content-center">
+            <button type="button" class="btn btn-outline-primary btn-lg rounded-pill" data-pos-print hidden>
+                <i class="bi bi-printer me-1"></i>{{ DLUX_STRINGS.pos_print_receipt|default:"Print receipt" }}
+            </button>
+            <button type="button" class="btn btn-primary btn-lg rounded-pill px-4" data-pos-new>{{ DLUX_STRINGS.pos_new_sale|default:"New sale" }}</button>
+        </div>
+    </div>
+</div>
+
+<div class="pos-overlay" data-pos-camera-view hidden role="dialog" aria-modal="true">
+    <div class="pos-dialog pos-camera">
+        <video data-pos-video playsinline muted></video>
+        <p class="small text-muted mt-2 mb-2" data-pos-camera-status></p>
+        <button type="button" class="btn btn-outline-secondary rounded-pill" data-pos-camera-close>{{ DLUX_STRINGS.ui_close|default:"Close" }}</button>
+    </div>
+</div>
+<iframe class="pos-print-frame" data-pos-print-frame title="receipt" hidden></iframe>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script src="{% dlux_static 'sales/pos/js/main.js' %}"></script>
+{% endblock %}

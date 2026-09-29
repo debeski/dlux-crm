@@ -1,6 +1,8 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
+from .pos_settings import pos_enabled
+from .pos_views import CheckoutView, LookupView, ReceiptView, TillView, VehicleProductsView
 from .views import (
     CustomerListView,
     DashboardView,
@@ -33,7 +35,29 @@ _report_export.sidebar_exclude = True
 _sales_home = RedirectView.as_view(pattern_name="sales:dashboard", permanent=False)
 _sales_home.sidebar_exclude = True
 
+class _PosSidebarExclusion:
+    def __bool__(self):
+        return not pos_enabled()
+
+
+_till = TillView.as_view()
+_till.sidebar_group = "workspace"
+_till.sidebar_icon = "bi-upc-scan"
+_till.sidebar_permissions = ["sales.use_pos"]
+_till.sidebar_exclude = _PosSidebarExclusion()
+_pos_hidden = {}
+for _name, _view in (
+    ("lookup", LookupView), ("checkout", CheckoutView), ("receipt", ReceiptView), ("vehicle", VehicleProductsView),
+):
+    _pos_hidden[_name] = _view.as_view()
+    _pos_hidden[_name].sidebar_exclude = True
+
 urlpatterns = [
+    path("pos/", _till, name="pos_till"),
+    path("pos/lookup/", _pos_hidden["lookup"], name="pos_lookup"),
+    path("pos/checkout/", _pos_hidden["checkout"], name="pos_checkout"),
+    path("pos/receipt/<int:pk>/", _pos_hidden["receipt"], name="pos_receipt"),
+    path("pos/vehicle/", _pos_hidden["vehicle"], name="pos_vehicle"),
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
     path("", _sales_home, name="sales_home"),
     path("invoices/", InvoiceListView.as_view(), name="invoice_list"),
