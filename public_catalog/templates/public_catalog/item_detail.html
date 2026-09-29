@@ -4,7 +4,7 @@
 
 {% block public_content %}
 <nav class="public-breadcrumb" aria-label="Breadcrumb">
-    <a href="{% url 'public_catalog:shop' %}"><i class="bi bi-arrow-left"></i> Shop</a>
+    <a href="{% url 'public_catalog:shop' %}"><i class="bi bi-arrow-left"></i> {{ DLUX_STRINGS.public_nav_shop|default:'Shop' }}</a>
 </nav>
 <section class="public-detail">
     <div class="public-detail__media">

@@ -2,8 +2,8 @@
     {% if sent %}
     <div class="public-contact-success">
         <i class="bi bi-check2-circle"></i>
-        <h2>Message received</h2>
-        <p>We have your request and will follow up through the contact details you provided.</p>
+        <h2>{{ DLUX_STRINGS.public_contact_sent_title|default:'Message received' }}</h2>
+        <p>{{ DLUX_STRINGS.public_contact_sent_body|default:'We have your request and will follow up through the contact details you provided.' }}</p>
     </div>
     {% else %}
     <form method="post" action="{% url 'public_catalog:contact_modal' %}" class="public-contact-form" novalidate>
@@ -12,44 +12,44 @@
         {{ form.source_path }}
         {{ form.company }}
         <div class="public-contact-modal__head">
-            <p class="public-kicker">{{ DLUX_STRINGS.hp_contact_title|default:"Contact us" }}</p>
-            <h2>Send a request</h2>
-            <p>Ask about products, availability, installation fees, warranty, or site checks.</p>
+            <p class="public-kicker">{{ DLUX_STRINGS.hp_contact_title|default:'Contact us' }}</p>
+            <h2>{{ DLUX_STRINGS.public_contact_heading|default:'Send a request' }}</h2>
+            <p>{{ DLUX_STRINGS.public_contact_intro|default:'Ask about products, availability, installation fees, warranty, or site checks.' }}</p>
         </div>
         {% if form.non_field_errors %}
         <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
         {% endif %}
         <div class="public-contact-grid">
             <label>
-                <span>Name</span>
+                <span>{{ DLUX_STRINGS.public_contact_name|default:'Name' }}</span>
                 {{ form.name }}
                 {% if form.name.errors %}<em>{{ form.name.errors|striptags }}</em>{% endif %}
             </label>
             <label>
-                <span>Email</span>
+                <span>{{ DLUX_STRINGS.public_contact_email|default:'Email' }}</span>
                 {{ form.email }}
                 {% if form.email.errors %}<em>{{ form.email.errors|striptags }}</em>{% endif %}
             </label>
             <label>
-                <span>Phone</span>
+                <span>{{ DLUX_STRINGS.public_contact_phone|default:'Phone' }}</span>
                 {{ form.phone }}
                 {% if form.phone.errors %}<em>{{ form.phone.errors|striptags }}</em>{% endif %}
             </label>
             <label>
-                <span>Subject</span>
+                <span>{{ DLUX_STRINGS.public_contact_subject|default:'Subject' }}</span>
                 {{ form.subject }}
                 {% if form.subject.errors %}<em>{{ form.subject.errors|striptags }}</em>{% endif %}
             </label>
             <label class="public-contact-grid__wide">
-                <span>Message</span>
+                <span>{{ DLUX_STRINGS.public_contact_message|default:'Message' }}</span>
                 {{ form.message }}
                 {% if form.message.errors %}<em>{{ form.message.errors|striptags }}</em>{% endif %}
             </label>
         </div>
         <div class="public-contact-actions" data-dlux-modal-footer>
-            <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">{{ DLUX_STRINGS.public_modal_close|default:'Close' }}</button>
             <button type="submit" class="btn btn-primary px-4">
-                <i class="bi bi-send me-1"></i>Send message
+                <i class="bi bi-send me-1"></i>{{ DLUX_STRINGS.public_contact_send|default:'Send message' }}
             </button>
         </div>
     </form>

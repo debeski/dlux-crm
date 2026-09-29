@@ -2,6 +2,8 @@ import uuid
 
 from django import forms
 
+from common.i18n import t
+
 
 class PublicContactForm(forms.Form):
     idempotency_key = forms.CharField(widget=forms.HiddenInput)
@@ -18,14 +20,14 @@ class PublicContactForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["idempotency_key"].initial = uuid.uuid4().hex
         self.fields["source_path"].initial = source_path
-        self.fields["name"].widget.attrs.update({"autocomplete": "name", "placeholder": "Your name"})
+        self.fields["name"].widget.attrs.update({"autocomplete": "name", "placeholder": t("public_contact_ph_name", "Your name")})
         self.fields["email"].widget.attrs.update({"autocomplete": "email", "placeholder": "you@example.com"})
-        self.fields["phone"].widget.attrs.update({"autocomplete": "tel", "placeholder": "Optional"})
-        self.fields["subject"].widget.attrs.update({"placeholder": "What can we help with?"})
-        self.fields["message"].widget.attrs.update({"placeholder": "Tell us what you need installed, supplied, or checked."})
+        self.fields["phone"].widget.attrs.update({"autocomplete": "tel", "placeholder": t("public_contact_ph_phone", "Optional")})
+        self.fields["subject"].widget.attrs.update({"placeholder": t("public_contact_ph_subject", "What can we help with?")})
+        self.fields["message"].widget.attrs.update({"placeholder": t("public_contact_ph_message", "Tell us what you need installed, supplied, or checked.")})
 
     def clean_idempotency_key(self):
         key = (self.cleaned_data["idempotency_key"] or "").strip()
         if len(key) < 16:
-            raise forms.ValidationError("Invalid submission key.")
+            raise forms.ValidationError(t("public_contact_invalid_key", "Invalid submission key."))
         return key[:64]

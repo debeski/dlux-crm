@@ -1,3 +1,4 @@
+{% load dlux_tags %}
 <article class="public-card public-card--{{ listing.source_kind }}">
     {% if public_config.shop_enabled %}
     <a class="public-card__media" href="{{ listing.get_absolute_url }}">
@@ -11,7 +12,7 @@
         {% endif %}
         {% if public_config.show_availability and listing.show_availability %}
         <em class="public-card__status public-availability--{{ listing.availability_code }}">
-            {{ listing.availability_label }}
+            {{ DLUX_STRINGS|get_item:listing.availability_key|default:listing.availability_label }}
         </em>
         {% endif %}
     {% if public_config.shop_enabled %}
@@ -22,7 +23,7 @@
     <div class="public-card__body">
         <div class="public-card__meta">
             <span>{{ listing.source_label }}</span>
-            <span>{{ listing.source_kind }}</span>
+            <span>{{ DLUX_STRINGS|get_item:listing.source_kind_key|default:listing.source_kind }}</span>
         </div>
         <h3>
             {% if public_config.shop_enabled %}
@@ -37,12 +38,12 @@
                 {% if listing.price_lyd %}
                 <span class="public-price"><i class="bi bi-cash-coin"></i>{{ listing.price_lyd|floatformat:2 }} LYD</span>
                 {% else %}
-                <span class="public-muted"><i class="bi bi-chat-dots"></i>Contact for price</span>
+                <span class="public-muted"><i class="bi bi-chat-dots"></i>{{ DLUX_STRINGS.public_contact_for_price|default:'Contact for price' }}</span>
                 {% endif %}
             {% endif %}
         </div>
         {% if listing.public_variants %}
-        <div class="public-swatches" aria-label="Available options">
+        <div class="public-swatches" aria-label="{{ DLUX_STRINGS.public_options_label|default:'Available options' }}">
             {% for variant in listing.public_variants|slice:":6" %}
             <span title="{{ variant.label }}">
                 {% if variant.color %}
@@ -56,12 +57,12 @@
     </div>
     {% if public_config.shop_enabled %}
     <div class="public-card__actions">
-        <a class="btn btn-sm btn-link public-card__link" href="{{ listing.get_absolute_url }}">View page</a>
+        <a class="btn btn-sm btn-link public-card__link" href="{{ listing.get_absolute_url }}">{{ DLUX_STRINGS.public_view_page|default:'View page' }}</a>
         <button type="button"
                 class="btn btn-sm btn-outline-secondary"
                 data-dynamic-modal="{% url 'public_catalog:item_modal' listing.slug %}"
                 data-modal-title="{{ listing.display_title }}">
-            <i class="bi bi-arrows-angle-expand me-1"></i>Quick view
+            <i class="bi bi-arrows-angle-expand me-1"></i>{{ DLUX_STRINGS.public_quick_view|default:'Quick view' }}
         </button>
     </div>
     {% endif %}

@@ -3,6 +3,7 @@ from urllib.parse import quote
 from dlux.options import write_app_system_config
 from dlux.utils import get_app_system_config
 
+from common.i18n import t
 from common.identity import store_name
 
 PUBLIC_CATALOG_NS = "switch_pos.public_catalog"
@@ -54,7 +55,7 @@ def set_public_catalog_config(patch, *, request=None):
 def contact_links(listing=None):
     cfg = get_public_catalog_config()
     title = listing.display_title if listing is not None else cfg["shop_title"]
-    message = quote(f"Hello, I am interested in {title}.")
+    message = quote(t("public_link_message", "Hello, I am interested in {title}.").replace("{title}", str(title)))
     links = []
     phone = str(cfg.get("contact_phone") or "").strip()
     whatsapp = str(cfg.get("contact_whatsapp") or "").strip()
@@ -63,21 +64,21 @@ def contact_links(listing=None):
         normalized = "".join(ch for ch in whatsapp if ch.isdigit())
         if normalized:
             links.append({
-                "label": "WhatsApp",
+                "label": t("public_link_whatsapp", "WhatsApp"),
                 "icon": "bi-whatsapp",
                 "url": f"https://wa.me/{normalized}?text={message}",
                 "kind": "whatsapp",
             })
     if phone:
         links.append({
-            "label": "Call",
+            "label": t("public_link_call", "Call"),
             "icon": "bi-telephone",
             "url": f"tel:{phone}",
             "kind": "phone",
         })
     if email:
         links.append({
-            "label": "Email",
+            "label": t("public_link_email", "Email"),
             "icon": "bi-envelope",
             "url": f"mailto:{email}?subject={quote(title)}",
             "kind": "email",

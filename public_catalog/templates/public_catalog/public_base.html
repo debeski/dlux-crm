@@ -41,12 +41,12 @@
         </a>
         <div class="public-nav__actions">
             <nav aria-label="Public navigation">
-                <a href="{% url 'public_catalog:shop' %}">Shop</a>
+                <a href="{% url 'public_catalog:shop' %}">{{ DLUX_STRINGS.public_nav_shop|default:'Shop' }}</a>
                 <button type="button"
                         data-dynamic-modal="{% url 'public_catalog:contact_modal' %}"
                         data-modal-title="{{ DLUX_STRINGS.hp_contact_title|default:'Contact us' }}"
                         data-public-modal-size="fullscreen">
-                    Contact
+                    {{ DLUX_STRINGS.hp_contact|default:'Contact' }}
                 </button>
             </nav>
             {% if LANGUAGES|length > 1 %}
@@ -64,7 +64,7 @@
     {% if not public_bare %}
     <footer class="public-footer">
         <span>{{ APP_CONFIG.identity.display_name }}</span>
-        <span>Smart locks · access control · installation</span>
+        <span>{{ DLUX_STRINGS.public_footer_tagline|default:'Smart locks · access control · installation' }}</span>
     </footer>
     {% endif %}
 </main>
@@ -76,13 +76,13 @@
             <div class="modal-header border-0">
                 <h5 class="modal-title" id="dynamicModalTitle">
                     <i class="bi bi-info-circle me-2"></i>
-                    <span id="dynamicModalTitleText" class="fw-bold">Details</span>
+                    <span id="dynamicModalTitleText" class="fw-bold">{{ DLUX_STRINGS.public_modal_details|default:'Details' }}</span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="universalDynamicModalBody"></div>
             <div class="modal-footer border-0 pt-0" id="universalDynamicModalFooter">
-                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">{{ DLUX_STRINGS.public_modal_close|default:'Close' }}</button>
             </div>
         </div>
     </div>
