@@ -218,17 +218,9 @@ class ProductsLayoutOptionCardTests(TestCase):
         ids_plain = [c["id"] for c in options.get_visible_cards(req_plain)]
         self.assertNotIn("switch_pos.products_layout", ids_plain)
 
-    def test_global_default_settings_tile_superuser_only(self):
-        options = _import_options_or_skip(self)
-        if not hasattr(options, "get_visible_app_settings"):
-            self.skipTest("register_app_settings not available (dlux < 1.4.4)")
+    def test_global_default_is_a_crm_options_section(self):
         import catalog.dlux_options  # noqa: F401
+        from common.crm_options import crm_sections
 
-        req_super = _attach(rf.get("/sys/options/"), self.super)
-        ns = [d["namespace"] for d in options.get_visible_app_settings(req_super)]
-        self.assertIn("switch_pos.products_layout", ns)
-
-        # Settings tiles are superuser-only — a plain user sees none of them.
-        req_plain = _attach(rf.get("/sys/options/"), self.plain)
-        ns_plain = [d["namespace"] for d in options.get_visible_app_settings(req_plain)]
-        self.assertNotIn("switch_pos.products_layout", ns_plain)
+        sections = {section["key"]: section for section in crm_sections()}
+        self.assertEqual(sections["products_layout"]["namespace"], "switch_pos.products_layout")

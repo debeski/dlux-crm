@@ -227,8 +227,8 @@ The Products page renders three ways. The effective layout resolves
   (a scalar; same app-preference store as the workspace dashboard).
 - **Global admin default** — a superuser setting saved to
   `SystemSettings.extra_config['app']['switch_pos.products_layout']['default_layout']`,
-  registered with dlux 1.4.4's `register_app_settings` (a settings tile in the
-  Options admin grid) and read via `dlux.utils.get_app_system_config`.
+  edited in the *Products layout* section of the **CRM options** tile (see
+  below) and read via `dlux.utils.get_app_system_config`.
 
 `ProductListView` branches on the resolved value:
 
@@ -247,11 +247,25 @@ Per-user switching has two surfaces sharing one component
 then reloads only after a successful save): an inline header toggle and a
 `/staff/sys/options` card registered with `dlux.options.register_card`
 (`catalog/dlux_options.py`, gated on `catalog.view_product`). The global default
-is the superuser settings tile above (`register_app_settings`). The shared
+is the *Products layout* section of the **CRM options** tile. The shared
 `templates/common/scoped_list.html` exposes a `{% block list_body %}` so alternate
 layouts can replace the table body while keeping the header, filter and modal-CRUD
-wiring. **Requires dlux ≥ 1.4.4** (`register_app_settings` + `get_app_system_config`);
-registrations import defensively so an older runtime still gets the per-user card.
+wiring.
+
+### CRM options tile
+
+dlux draws one Options tile per `register_app_settings` call, and a tile saves
+one `extra_config['app']` namespace. The CRM's store-wide settings are small, so
+`common/crm_options.py` registers a single **CRM options** tile
+(`switch_pos.crm_options`, order 50) and apps add *sections* to it with
+`register_crm_section(key, namespace, title, fields=… | form_class=…)`:
+*Products layout* (`catalog`), *Public catalog* (`public_catalog`) and *Point of
+sale* (`sales`). `CrmOptionsForm` renders each section's own form (prefixed by
+its key) under a dlux-style `<h6>` heading, validates all of them together, and
+saves each section to its **own** namespace — so readers such as
+`get_pos_config()` are unchanged and nothing is migrated. The tile's own
+namespace stores nothing. *Optional enhancements* (store types) stay a separate
+tile after it.
 
 ## Money & currency
 

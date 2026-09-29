@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import Client, RequestFactory, TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from catalog.models import Product, Service
@@ -12,7 +12,6 @@ from public_catalog.settings import get_public_catalog_config, set_public_catalo
 from .test_public_split import configure_dlux_public_split
 
 User = get_user_model()
-rf = RequestFactory()
 
 
 class PublicCatalogBuilderTests(TestCase):
@@ -38,12 +37,10 @@ class PublicCatalogBuilderTests(TestCase):
         self.assertIn('data-kind="service"', html)
 
     def test_dlux_options_tiles_are_builder_focused(self):
-        from dlux import options
         import public_catalog.dlux_options  # noqa: F401
+        from common.crm_options import crm_sections
 
-        req = rf.get("/staff/sys/options/")
-        req.user = self.admin
-        settings = {item["namespace"]: item for item in options.get_visible_app_settings(req)}
+        settings = {section["namespace"]: section for section in crm_sections()}
 
         self.assertNotIn("switch_pos.public_homepage", settings)
         self.assertIn("switch_pos.public_catalog", settings)

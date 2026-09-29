@@ -4,11 +4,13 @@ A till sale is an ordinary walk-in invoice that is issued (stock out) and paid
 in one transaction, so reports, the stock ledger and cash deposits see it like
 any other sale. ``PosSale`` carries the idempotency key and the cash change.
 """
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
+from django.utils import timezone
 
 from catalog.models import Product, ProductBarcode
 from common.i18n import t
@@ -20,6 +22,8 @@ from .pos_settings import enabled_methods
 from .services import issue_invoice
 
 LOOKUP_LIMIT = 20
+POPULAR_LIMIT = 12
+POPULAR_DAYS = 90
 
 
 def _decimal(value, default=None):
@@ -97,6 +101,28 @@ def lookup(query, *, user):
         | Q(pk__in=_part_number_products(text, products).values("pk"))
     ).order_by("name")[:LOOKUP_LIMIT]
     return {"exact": False, "items": [_item(product, None, rate) for product in matches]}
+
+
+def popular(*, user):
+    """The till's opening grid: best sellers of the last 90 days, topped up
+    with the newest items so a fresh store is not empty. Only items that can
+    be sold now; out-of-stock ones are still found by search."""
+    rate = get_current_rate()
+    products = _products(user).filter(Q(track_stock=False) | Q(stock_qty__gt=0)).prefetch_related("variants")
+    sold = Invoice.objects.filter(
+        status__in=(Invoice.STATUS_ISSUED, Invoice.STATUS_PARTIAL, Invoice.STATUS_PAID),
+        issued_at__gte=timezone.now() - timedelta(days=POPULAR_DAYS),
+    )
+    ranked = [
+        row["product"] for row in
+        InvoiceItem.objects.filter(invoice__in=sold, product__in=products)
+        .values("product").annotate(sold=Sum("quantity")).order_by("-sold")[:POPULAR_LIMIT]
+    ]
+    chosen = products.in_bulk(ranked)
+    items = [chosen[pk] for pk in ranked if pk in chosen]
+    if len(items) < POPULAR_LIMIT:
+        items += list(products.exclude(pk__in=ranked).order_by("-created_at")[:POPULAR_LIMIT - len(items)])
+    return {"exact": False, "popular": True, "items": [_item(product, None, rate) for product in items]}
 
 
 def _sale_result(sale):

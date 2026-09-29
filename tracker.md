@@ -36,7 +36,9 @@
   - [ ] Verify `show_scan=True` still renders a scanner button on the purchase-invoice/expense attachment: ScanLink is opt-in since dlux 1.8.0.
   - [ ] Verify the packaged smtp-relay reads `SystemSettings.email_config` — the deployment's unset SMTP credentials may be fixable through the UI now.
 - **Priority 2 — decisions and follow-ups:**
-  - [ ] POS phase 2 (P1 done 2026-09-29, uncommitted): P2 phone paired as scanner (server cart per user+till, 1s polling), parked sales, guided cert install (Caddy internal CA on the PC's static IP, QR setup page); P3 shifts/Z-report, returns. Heavy-equipment serial ranges deferred.
+  - [ ] Integrate `main/`'s uncommitted v0.8.4 storefront i18n (17 files; overlaps this branch on `public_catalog/{homepage,settings,translations}.py`, `_contact_modal.html`, `public_base.html`, CHANGELOG/VERSION/manifest/tracker): commit on main first, then rebase or merge this branch onto it.
+  - [ ] Decide store-type architecture for Optional enhancements (parts-fitment pack with vehicle/machine flavours vs future pharmacy/cafe packs).
+  - [ ] POS phase 2 (P1 committed `80c7d96`; most-sold grid, search dropdown, payment balancing, ZXing fallback uncommitted): P2 phone paired as scanner (server cart per user+till, 1s polling), parked sales, guided cert install (Caddy internal CA on the PC's static IP, QR setup page); P3 shifts/Z-report, returns. Heavy-equipment serial ranges deferred.
   - [ ] Automotive Phases 0/4: obtain the retailer workbook, confirm controlled values/out-of-stock behavior, then build reviewed XLSX import, audit and pilot tooling.
   - [ ] Design ribbon tab strips (Invoice status — `_status_counts` already feeds `get_ribbon_tab_counts`; StockMovement type; PurchaseInvoice status; Product category).
   - [ ] Ask upstream for a detail-modal hook: `get_modal_context()` is merged before `auto_detail_fields` is set, the only reason `templates/dlux/helpers/dynamic_modal_detail.html` is forked.
@@ -44,6 +46,8 @@
   - [ ] Purchase-invoice/stock-take/opening-stock editors do NOT fit `DocumentEditorView` — intake lines are plain Forms that create Products, not an inline formset. Left alone deliberately; revisit only if they gain a header+lines shape.
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
 - **Completed Recently:**
+  - [x] CRM options tile (uncommitted): layout/public catalog/POS tiles merged into `common/crm_options.py` sections; namespaces unchanged (2026-09-29).
+  - [x] Test data (2026-09-29): PINV-000003 "Libya Heavy Parts Co." — 21 machines/7 Arabic types, 13 shared engines, 35 products (EAN-13 `624…`, size variants with own codes, low/out-of-stock cases, Fleetguard supplier-label extra code).
   - [x] POS phase 1: till `/staff/sales/pos/`, `sales.pos.complete_sale` (idempotent `PosSale`), card method, discount cap, receipts, `ProductBarcode`; dev POS on; all demo data soft-deleted (2026-09-29).
   - [x] Heavy machinery (uncommitted): `EquipmentType`, shared engines + engine-only/all-years fitments (`automotive.0003`), `equipment_type`/`model_year` criteria, machine wording switch via tracked translation overrides; heavy demo data on PINV-000002; dev set to "equipment" wording (2026-09-29).
   - [x] v0.9.0 (untagged) parts-first automotive UX: Fits picker in Product modal, Same cars as…/Assign vehicles, `PartProfile`/`ProductPartNumber` extension (Product unchanged), browser Find a vehicle + Add part, purchase-line fits, `/staff/` → browser, Vehicle/Year product filters (2026-09-28).
@@ -64,7 +68,7 @@
   - [x] `common/css/ribbon_actions.css` repairs a `.btn-group` in the ribbon's action area — the panel skin pilled each button, splitting the Products layout switch into loose half-pills (2026-09-02).
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-09-29: 334/334 app tests (+14 `sales.tests.test_pos`); till driven in-browser (scan, cash change, receipt).
+- 2026-09-29: 341/341 app tests (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 - 2026-09-26: dlux 1.9.4 — CI test set 248/248 (SQLite), check/migration drift clean, 17 enabled ribbon lists render; hashed 1.9.4 wheel from PyPI.

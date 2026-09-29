@@ -13,7 +13,7 @@ from common.i18n import t
 from common.views import RibbonPageMixin
 from finance.services import get_current_rate
 
-from .pos import complete_sale, lookup
+from .pos import complete_sale, lookup, popular
 from .pos_settings import enabled_methods, get_pos_config
 from .views import _visible_invoices
 
@@ -92,6 +92,8 @@ class TillView(PosEnabledMixin, RibbonPageMixin, TemplateView):
 
 class LookupView(PosEnabledMixin, View):
     def get(self, request):
+        if request.GET.get("popular"):
+            return JsonResponse(popular(user=request.user))
         return JsonResponse(lookup(request.GET.get("q", ""), user=request.user))
 
 

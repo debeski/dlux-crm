@@ -105,6 +105,29 @@ class PosLookupTests(PosTestCase):
         self.assertEqual(len(data["items"]), 2)
 
 
+class PosPopularTests(PosTestCase):
+    def popular(self):
+        with pos_on():
+            return self.client.get(reverse("sales:pos_lookup"), {"popular": "1"}).json()["items"]
+
+    def test_best_sellers_lead_and_new_items_fill_the_rest(self):
+        grease = Product.objects.create(name="Grease", price_lyd_override=Decimal("5.00"), track_stock=True)
+        self.stock_in(grease, 10)
+        Product.objects.create(name="Newest Hose", track_stock=False)
+        self.assertEqual(self.popular()[0]["name"], "Newest Hose")
+        self.checkout(self.sale(lines=[{"product": grease.pk, "qty": 3}], payments=[
+            {"method": "cash", "amount": "15"},
+        ]))
+        names = [item["name"] for item in self.popular()]
+        self.assertEqual(names[0], "Grease")
+        self.assertEqual(sorted(names), ["Grease", "Newest Hose", "Oil Filter"])
+
+    def test_out_of_stock_items_stay_off_the_grid(self):
+        Product.objects.create(name="Turbo", track_stock=True)
+        self.assertNotIn("Turbo", [item["name"] for item in self.popular()])
+        self.assertIn("Turbo", [item["name"] for item in self.lookup("turbo")["items"]])
+
+
 class PosCheckoutTests(PosTestCase):
     def test_sale_issues_and_pays_one_invoice_with_change(self):
         response = self.checkout(self.sale(payments=[

@@ -112,3 +112,16 @@ def apply_terminology(mode):
         settings.translations_override = {lang: values for lang, values in overrides.items() if values}
         settings.save()
     return changed
+
+
+def refresh_terminology(**kwargs):
+    """After migrate: strings an upgrade added get the store's chosen wording."""
+    from django.db import DatabaseError
+
+    from .settings import get_automotive_config
+
+    try:
+        if get_automotive_config()["terminology"] == TERMINOLOGY_EQUIPMENT:
+            apply_terminology(TERMINOLOGY_EQUIPMENT)
+    except DatabaseError:
+        pass

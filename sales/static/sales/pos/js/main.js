@@ -222,8 +222,10 @@
     });
 
     // ---- lookup -------------------------------------------------------
-    function showResults(items, choosingVariant) {
-        results.replaceChildren();
+    // Search hits open in a dropdown over the "most sold" grid; clicking
+    // anywhere else folds it away and focusing the search box brings it back.
+    function fillGrid(box, items, choosingVariant) {
+        box.replaceChildren();
         items.forEach((item) => {
             const entries = choosingVariant && item.variants.length
                 ? item.variants.map((variant) => Object.assign({}, item, {
@@ -243,13 +245,31 @@
                 button.querySelector(".pos-result__price").textContent = money(entry.price) + " LYD";
                 if (entry.track_stock && entry.stock <= 0) button.classList.add("pos-result--out");
                 button.addEventListener("click", () => { addItem(entry); search.focus(); });
-                results.appendChild(button);
+                box.appendChild(button);
             });
         });
     }
 
-    function showUnknown(code) {
+    function showResults(items, choosingVariant) {
+        fillGrid(results, items, choosingVariant);
+        results.hidden = !results.children.length;
+    }
+
+    function clearResults() {
         results.replaceChildren();
+        results.hidden = true;
+    }
+
+    const finder = $("[data-pos-finder]");
+    document.addEventListener("pointerdown", (event) => {
+        if (!results.hidden && !finder.contains(event.target)) results.hidden = true;
+    });
+    const reopenResults = () => { if (results.children.length) results.hidden = false; };
+    search.addEventListener("focus", reopenResults);
+    search.addEventListener("click", reopenResults);
+
+    function showUnknown(code) {
+        clearResults();
         unknown.hidden = false;
         $("[data-pos-unknown-text]").textContent = (S.not_found || "Nothing matches") + ": " + code;
         const add = $("[data-pos-unknown-add]");
@@ -259,17 +279,17 @@
 
     function runLookup(text, fromScan) {
         const query = text.trim();
-        if (!query) { results.replaceChildren(); unknown.hidden = true; return Promise.resolve(); }
+        if (!query) { clearResults(); unknown.hidden = true; return Promise.resolve(); }
         return getJSON(setup.lookup + "?q=" + encodeURIComponent(query)).then((data) => {
             if (data.exact && data.items.length === 1) {
                 addItem(data.items[0]);
                 search.value = "";
-                results.replaceChildren();
+                if (!data.items[0].variants.length) clearResults();
                 return;
             }
             if (!data.items.length) {
                 if (fromScan) showUnknown(query);
-                else { results.replaceChildren(); unknown.hidden = true; }
+                else { clearResults(); unknown.hidden = true; }
                 return;
             }
             unknown.hidden = true;
@@ -283,6 +303,7 @@
         typing = setTimeout(() => runLookup(search.value, false), 250);
     });
     search.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") { results.hidden = true; return; }
         if (event.key !== "Enter") return;
         event.preventDefault();
         clearTimeout(typing);
@@ -332,6 +353,64 @@
         return {total, nonCash, cash, change: Math.max(cash - cashDue, 0), covered: nonCash <= total + 0.001 && nonCash + cash + 0.001 >= total};
     }
 
+    // Amounts the cashier typed are kept as typed. What is left to pay flows
+    // into the method the dialog was opened with, or else into cash, as long
+    // as the cashier has not typed there; other methods are never guessed.
+    // The field being typed in is never rewritten.
+    const typed = new Set();
+    let opener = "cash";
+    let target = "cash";
+
+    function rebalance() {
+        const total = totals().total;
+        const inputs = amountInputs();
+        const fixed = inputs.filter((input) => typed.has(input.dataset.posAmount))
+            .reduce((sum, input) => sum + num(input.value), 0);
+        const left = total - fixed;
+        const receiver = [opener, "cash"].find((method) => {
+            const input = amountInputs().find((item) => item.dataset.posAmount === method);
+            return input && !typed.has(method) && input !== document.activeElement;
+        });
+        inputs.forEach((input) => {
+            if (typed.has(input.dataset.posAmount) || input === document.activeElement) return;
+            input.value = input.dataset.posAmount === receiver && left > 0.001 ? money(left) : "";
+        });
+    }
+
+    function quickAmounts() {
+        const total = totals().total;
+        const others = amountInputs()
+            .filter((input) => input.dataset.posAmount !== target && typed.has(input.dataset.posAmount))
+            .reduce((sum, input) => sum + num(input.value), 0);
+        const due = Math.max(total - others, 0);
+        if (due <= 0) return [];
+        if (target !== "cash") return [due];
+        return [due, Math.ceil(due / 5) * 5, Math.ceil(due / 10) * 10, Math.ceil(due / 50) * 50, Math.ceil(due / 100) * 100];
+    }
+
+    function renderQuick() {
+        const quick = $("[data-pos-quick-cash]");
+        quick.replaceChildren();
+        [...new Set(quickAmounts().map((value) => money(value)))].forEach((value) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-outline-secondary rounded-pill";
+            button.textContent = value;
+            button.addEventListener("click", () => {
+                const input = $(`[data-pos-amount="${target}"]`);
+                if (!input) return;
+                input.value = value;
+                typed.add(target);
+                rebalance();
+                refreshPay();
+            });
+            quick.appendChild(button);
+        });
+        amountInputs().forEach((input) => {
+            input.closest(".pos-pay-row").classList.toggle("pos-pay-row--active", input.dataset.posAmount === target);
+        });
+    }
+
     function refreshPay() {
         const state = payState();
         $("[data-pos-change]").textContent = money(state.change);
@@ -339,28 +418,17 @@
         const error = $("[data-pos-pay-error]");
         error.hidden = state.nonCash <= state.total + 0.001;
         error.textContent = S.card_over || "Card or transfer is more than the total.";
+        renderQuick();
     }
 
     function openPay(method) {
         const t = totals();
         $("[data-pos-pay-total]").textContent = money(t.total);
-        amountInputs().forEach((input) => { input.value = input.dataset.posAmount === method ? money(t.total) : ""; });
-        const quick = $("[data-pos-quick-cash]");
-        quick.replaceChildren();
-        if (setup.methods.includes("cash")) {
-            const options = [t.total, Math.ceil(t.total / 5) * 5, Math.ceil(t.total / 10) * 10, Math.ceil(t.total / 50) * 50, Math.ceil(t.total / 100) * 100];
-            [...new Set(options.map((value) => money(value)))].forEach((value) => {
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = "btn btn-outline-secondary rounded-pill";
-                button.textContent = value;
-                button.addEventListener("click", () => {
-                    const cash = $('[data-pos-amount="cash"]');
-                    if (cash) { cash.value = value; refreshPay(); }
-                });
-                quick.appendChild(button);
-            });
-        }
+        typed.clear();
+        opener = method;
+        target = method;
+        amountInputs().forEach((input) => { input.value = ""; });
+        rebalance();
         $("[data-pos-pay-error]").hidden = true;
         payDialog.hidden = false;
         refreshPay();
@@ -371,8 +439,32 @@
     document.querySelectorAll("[data-pos-pay]").forEach((button) => {
         button.addEventListener("click", () => { if (cart.lines.length) openPay(button.dataset.posPay); });
     });
-    payDialog.addEventListener("input", refreshPay);
-    $("[data-pos-pay-cancel]").addEventListener("click", () => { payDialog.hidden = true; search.focus(); });
+    payDialog.addEventListener("focusin", (event) => {
+        const input = event.target.closest("[data-pos-amount]");
+        if (input && input.dataset.posAmount !== target) {
+            target = input.dataset.posAmount;
+            renderQuick();
+        }
+    });
+    payDialog.addEventListener("input", (event) => {
+        const input = event.target.closest("[data-pos-amount]");
+        if (input) {
+            if (input.value.trim() === "") typed.delete(input.dataset.posAmount);
+            else typed.add(input.dataset.posAmount);
+            rebalance();
+        }
+        refreshPay();
+    });
+    const closePay = () => { payDialog.hidden = true; search.focus(); };
+    payDialog.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closePay();
+        if (event.key === "Enter" && event.target.closest("[data-pos-amount]")) {
+            event.preventDefault();
+            const complete = $("[data-pos-complete]");
+            if (!complete.disabled) complete.click();
+        }
+    });
+    $("[data-pos-pay-cancel]").addEventListener("click", closePay);
 
     let lastSale = null;
     $("[data-pos-complete]").addEventListener("click", (event) => {
@@ -411,6 +503,9 @@
                 payDialog.hidden = true;
                 cart = blankCart();
                 render();
+                search.value = "";
+                clearResults();
+                refreshBrowse();
                 $("[data-pos-done-number]").textContent = data.number;
                 $("[data-pos-done-change]").textContent = money(data.change);
                 $("[data-pos-done-change-row]").hidden = num(data.change) <= 0;
@@ -444,45 +539,106 @@
     let lastCode = "";
     let lastAt = 0;
 
-    if ("BarcodeDetector" in window && window.isSecureContext && navigator.mediaDevices) {
+    let zxingReader = null;
+
+    // The camera needs a secure page (localhost or HTTPS). Browsers with a
+    // built-in BarcodeDetector use it; others (iPhone Safari) load the bundled
+    // ZXing reader on first use.
+    if (window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         cameraButton.hidden = false;
+    }
+
+    function onCode(code) {
+        const now = Date.now();
+        if (!code || (code === lastCode && now - lastAt < 1500)) return;
+        lastCode = code;
+        lastAt = now;
+        runLookup(code, true);
     }
 
     function stopCamera() {
         scanning = false;
+        if (zxingReader) { try { zxingReader.reset(); } catch (error) { /* already stopped */ } }
+        zxingReader = null;
         if (stream) stream.getTracks().forEach((track) => track.stop());
         stream = null;
         cameraView.hidden = true;
         search.focus();
     }
 
-    cameraButton.addEventListener("click", () => {
+    function loadZxing() {
+        if (window.ZXing) return Promise.resolve(window.ZXing);
+        return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = root.dataset.zxing;
+            script.onload = () => resolve(window.ZXing);
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    function startNative() {
         const detector = new window.BarcodeDetector({
             formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "code_93", "itf", "codabar", "qr_code"],
         });
-        navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}}).then((media) => {
+        return navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}}).then((media) => {
             stream = media;
             video.srcObject = media;
             video.play();
-            cameraView.hidden = false;
-            scanning = true;
-            $("[data-pos-camera-status]").textContent = S.camera_hint || "Point the camera at a barcode.";
             const tick = () => {
                 if (!scanning) return;
-                detector.detect(video).then((codes) => {
-                    const code = codes.length ? codes[0].rawValue : "";
-                    const now = Date.now();
-                    if (code && (code !== lastCode || now - lastAt > 1500)) {
-                        lastCode = code;
-                        lastAt = now;
-                        runLookup(code, true);
-                    }
-                }).catch(() => {}).finally(() => setTimeout(tick, 200));
+                detector.detect(video).then((codes) => onCode(codes.length ? codes[0].rawValue : ""))
+                    .catch(() => {}).finally(() => setTimeout(tick, 200));
             };
             tick();
-        }).catch(() => flash(S.camera_denied || "The camera could not be opened.", "error"));
+        });
+    }
+
+    function startZxing() {
+        return loadZxing().then((ZXing) => {
+            zxingReader = new ZXing.BrowserMultiFormatReader();
+            return zxingReader.decodeFromConstraints({video: {facingMode: "environment"}}, video, (result) => {
+                if (result && scanning) onCode(result.getText());
+            });
+        });
+    }
+
+    cameraButton.addEventListener("click", () => {
+        cameraView.hidden = false;
+        scanning = true;
+        $("[data-pos-camera-status]").textContent = S.camera_hint || "Point the camera at a barcode.";
+        ("BarcodeDetector" in window ? startNative() : startZxing()).catch(() => {
+            stopCamera();
+            flash(S.camera_denied || "The camera could not be opened.", "error");
+        });
     });
     $("[data-pos-camera-close]").addEventListener("click", stopCamera);
+
+    // ---- browse grid: most sold, or what fits a picked vehicle --------
+    const browse = $("[data-pos-browse]");
+    const browseTitle = $("[data-pos-browse-title]");
+    const browseReset = $("[data-pos-browse-reset]");
+    const browseEmpty = $("[data-pos-browse-empty]");
+    const popularTitle = browseTitle.textContent;
+    let browseVehicle = null;
+
+    function showBrowse(title, items, picked) {
+        browseTitle.textContent = title;
+        browseReset.hidden = !picked;
+        fillGrid(browse, items, false);
+        browseEmpty.hidden = items.length > 0;
+    }
+
+    function showPopular() {
+        browseVehicle = null;
+        return getJSON(setup.lookup + "?popular=1").then((data) => {
+            if (!browseVehicle) showBrowse(popularTitle, data.items, false);
+        }).catch(() => {});
+    }
+
+    function refreshBrowse() { return browseVehicle ? browseVehicle() : showPopular(); }
+
+    browseReset.addEventListener("click", () => { showPopular(); search.focus(); });
 
     // ---- find by vehicle ---------------------------------------------
     const vehicleToggle = $("[data-pos-vehicle-toggle]");
@@ -520,16 +676,23 @@
             if (chip.engine) params.set("engine", chip.engine);
             if (chip.year_from && chip.year_from === chip.year_to) params.set("year", chip.year_from);
             else params.set("any_year", "1");
-            getJSON(setup.vehicle + "?" + params.toString()).then((data) => {
+            const load = () => getJSON(setup.vehicle + "?" + params.toString()).then((data) => {
+                if (browseVehicle !== load) return;
                 vehicleResults.replaceChildren();
-                $("[data-pos-vehicle-path]").textContent = chip.label + " · " + data.items.length + " " + (S.items || "items");
-                showResults(data.items.map((item) => Object.assign({variants: []}, item)), false);
+                showBrowse(
+                    chip.label + " · " + data.items.length + " " + (S.items || "items"),
+                    data.items.map((item) => Object.assign({variants: []}, item)),
+                    true,
+                );
             });
+            browseVehicle = load;
+            load();
         };
     }
 
     // ---- start --------------------------------------------------------
     render();
+    showPopular();
     try {
         const pending = localStorage.getItem(pendingKey);
         if (pending) {

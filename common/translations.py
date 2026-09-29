@@ -12,6 +12,8 @@ DjangoLux. Three families:
 """
 DLUX_STRINGS = {
     "en": {
+        "options_crm": "CRM options",
+        "options_crm_desc": "Store-wide settings for the products list, the public shop and the till.",
         # ---- generic table headers (label_<column>) ----
         "label_rate": "Rate (LYD/USD)",
         "label_source": "Source",
@@ -301,6 +303,8 @@ DLUX_STRINGS = {
         "choice_card": "Card",
     },
     "ar": {
+        "options_crm": "خيارات CRM",
+        "options_crm_desc": "إعدادات عامة للمتجر: عرض الأصناف، والمتجر العام، ونقطة البيع.",
         # ---- generic table headers ----
         "label_rate": "السعر (دينار/دولار)",
         "label_source": "المصدر",

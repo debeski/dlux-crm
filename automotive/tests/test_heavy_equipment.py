@@ -143,3 +143,15 @@ class TerminologyTests(TestCase):
         apply_terminology(TERMINOLOGY_VEHICLE)
         overrides = SystemSettings.load().translations_override
         self.assertEqual(overrides, {"ar": {"models_vehiclemake": "مصنعو المعدات"}})
+
+    def test_migrate_gives_new_strings_the_stores_wording(self):
+        from dlux.models import SystemSettings
+
+        from automotive.terminology import refresh_terminology
+
+        with patch("automotive.settings.get_automotive_config", return_value={"terminology": TERMINOLOGY_VEHICLE}):
+            refresh_terminology()
+        self.assertFalse(SystemSettings.load().translations_override)
+        with patch("automotive.settings.get_automotive_config", return_value={"terminology": TERMINOLOGY_EQUIPMENT}):
+            refresh_terminology()
+        self.assertEqual(SystemSettings.load().translations_override["ar"]["pos_find_by_vehicle"], "حسب الآلية")

@@ -10,20 +10,23 @@
 
 {% block content %}
 <script type="application/json" id="pos-setup">{{ pos_setup|safe }}</script>
-<div class="pos" data-pos>
+<div class="pos" data-pos data-zxing="{% dlux_static 'sales/pos/vendor/zxing-library-0.23.0.min.js' %}">
     <section class="pos-catalog" aria-label="{{ DLUX_STRINGS.pos_catalog|default:'Find items' }}">
-        <div class="pos-scan">
-            <i class="bi bi-upc-scan pos-scan__icon" aria-hidden="true"></i>
-            <input type="search" class="form-control form-control-lg" id="pos-search" autocomplete="off" autofocus
-                   placeholder="{{ DLUX_STRINGS.pos_scan_placeholder|default:'Scan a barcode or type a name, SKU or part number' }}"
-                   aria-label="{{ DLUX_STRINGS.pos_scan_placeholder|default:'Scan a barcode or type a name, SKU or part number' }}">
-            <button type="button" class="btn btn-outline-primary pos-scan__camera" data-pos-camera hidden
-                    title="{{ DLUX_STRINGS.pos_camera|default:'Scan with camera' }}" aria-label="{{ DLUX_STRINGS.pos_camera|default:'Scan with camera' }}">
-                <i class="bi bi-camera"></i>
-            </button>
-            <button type="button" class="btn btn-outline-secondary pos-scan__vehicle" data-pos-vehicle-toggle hidden>
-                <i class="bi bi-car-front me-1"></i><span>{{ DLUX_STRINGS.pos_find_by_vehicle|default:"By vehicle" }}</span>
-            </button>
+        <div class="pos-finder" data-pos-finder>
+            <div class="pos-scan">
+                <i class="bi bi-upc-scan pos-scan__icon" aria-hidden="true"></i>
+                <input type="search" class="form-control form-control-lg" id="pos-search" autocomplete="off" autofocus
+                       placeholder="{{ DLUX_STRINGS.pos_scan_placeholder|default:'Scan a barcode or type a name, SKU or part number' }}"
+                       aria-label="{{ DLUX_STRINGS.pos_scan_placeholder|default:'Scan a barcode or type a name, SKU or part number' }}">
+                <button type="button" class="btn btn-outline-primary pos-scan__camera" data-pos-camera hidden
+                        title="{{ DLUX_STRINGS.pos_camera|default:'Scan with camera' }}" aria-label="{{ DLUX_STRINGS.pos_camera|default:'Scan with camera' }}">
+                    <i class="bi bi-camera"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary pos-scan__vehicle" data-pos-vehicle-toggle hidden>
+                    <i class="bi bi-car-front me-1"></i><span>{{ DLUX_STRINGS.pos_find_by_vehicle|default:"By vehicle" }}</span>
+                </button>
+            </div>
+            <div class="pos-results" data-pos-results role="list" hidden></div>
         </div>
 
         <div class="pos-notice" data-pos-notice hidden></div>
@@ -39,10 +42,18 @@
             <input type="search" class="form-control" data-pos-vehicle-search autocomplete="off"
                    placeholder="{{ DLUX_STRINGS.vehicle_jump_placeholder|default:'camry 2014, xv50, hilux 2.8…' }}">
             <div class="list-group mt-2" data-pos-vehicle-results></div>
-            <p class="small text-muted mt-2 mb-0" data-pos-vehicle-path></p>
         </div>
 
-        <div class="pos-results" data-pos-results role="list"></div>
+        <div class="pos-browse">
+            <div class="pos-browse__head">
+                <h2 class="h6 mb-0" data-pos-browse-title>{{ DLUX_STRINGS.pos_popular|default:"Most sold" }}</h2>
+                <button type="button" class="btn btn-sm btn-link" data-pos-browse-reset hidden>
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>{{ DLUX_STRINGS.pos_show_popular|default:"Back to most sold" }}
+                </button>
+            </div>
+            <div class="pos-grid" data-pos-browse role="list"></div>
+            <p class="text-muted small mb-0" data-pos-browse-empty hidden>{{ DLUX_STRINGS.pos_popular_empty|default:"No items yet." }}</p>
+        </div>
     </section>
 
     <aside class="pos-cart" aria-label="{{ DLUX_STRINGS.pos_cart|default:'Cart' }}">

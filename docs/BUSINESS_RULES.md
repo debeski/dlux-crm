@@ -351,8 +351,8 @@ by a superuser from the **Optional enhancements** System Settings card.
 
 ## Point of sale (نقطة البيع)
 
-An optional till for quick walk-in sales, switched on from the **Point of sale**
-settings card (off by default).
+An optional till for quick walk-in sales, switched on in the *Point of sale*
+section of the **CRM options** settings tile (off by default).
 
 - A till sale is an ordinary walk-in invoice: created, issued (stock out, with
   the usual shortage check) and paid in one transaction. Reports, the stock
@@ -365,6 +365,11 @@ settings card (off by default).
   enabled in settings, and split across them. Non-cash amounts may not exceed
   what is left to pay; cash covers the rest and the change is recorded on the
   `PosSale` (with the cash given) and printed on the receipt.
+  The payment dialog opens with the total in the chosen method. Amounts the
+  cashier types stay as typed; what is left to pay flows into the chosen method
+  or else cash, never into another card or transfer field. Quick-amount buttons
+  fill the field last focused (cash: the amount due and round-ups; card or
+  transfer: the amount due).
 - Discounts: a lowered line price and a sale discount both count. Their total,
   against the list price, may not exceed the seller limit (settings, default
   10%) unless the user holds `sales.pos_unlimited_discount`.
@@ -374,8 +379,16 @@ settings card (off by default).
   hardware scanner types while focus is elsewhere are routed to the box. An
   unknown code offers **Add a new item with this barcode**; after saving, the
   till adds it to the still-open cart.
-- Camera scanning uses the browser's built-in barcode reader where available,
-  which requires a secure page (localhost or HTTPS).
+- Before any search the till shows the **Most sold** grid: best sellers of the
+  last 90 days, topped up with the newest items, leaving out tracked items
+  with no stock (search still finds them). Search hits open in a dropdown
+  over it; clicking elsewhere folds the dropdown and focusing the box reopens
+  it. Picking a vehicle fills the grid with what fits it until **Back to most
+  sold**.
+- Camera scanning uses the browser's built-in barcode reader where available
+  and otherwise the bundled ZXing reader (`sales/static/sales/pos/vendor/`,
+  Apache-2.0, loaded on first use, e.g. iPhone Safari). Either needs a secure
+  page (localhost or HTTPS).
 - Receipts: none, thermal 58 mm / 80 mm, or A4 (settings), printed from the
   browser.
 - With **Open the till on login**, users who can sell land on the till.
