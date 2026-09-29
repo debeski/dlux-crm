@@ -1,29 +1,29 @@
 {% extends "public_catalog/public_base.html" %}
 
-{% block public_title %}Shop{% endblock %}
+{% block public_title %}{{ DLUX_STRINGS.public_nav_shop|default:'Shop' }}{% endblock %}
 
 {% block public_content %}
 <section class="public-page-head">
     <div>
-        <p class="public-kicker">Catalog</p>
+        <p class="public-kicker">{{ DLUX_STRINGS.public_catalog_kicker|default:'Catalog' }}</p>
         <h1>{{ public_config.shop_title }}</h1>
         <p>{{ public_config.shop_subtitle }}</p>
     </div>
-    <div class="public-page-metrics" aria-label="Catalog summary">
-        <span><strong>{{ listing_counts.total }}</strong> public items</span>
-        <span><strong>{{ listing_counts.products }}</strong> products</span>
-        <span><strong>{{ listing_counts.services }}</strong> services</span>
+    <div class="public-page-metrics" aria-label="{{ DLUX_STRINGS.hp_stats_label|default:'Catalog summary' }}">
+        <span><strong>{{ listing_counts.total }}</strong> {{ DLUX_STRINGS.hp_stats_items|default:'public items' }}</span>
+        <span><strong>{{ listing_counts.products }}</strong> {{ DLUX_STRINGS.hp_stats_products|default:'products' }}</span>
+        <span><strong>{{ listing_counts.services }}</strong> {{ DLUX_STRINGS.hp_stats_services|default:'services' }}</span>
     </div>
     <form class="public-search" method="get">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search products and services">
+            <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="{{ DLUX_STRINGS.public_search_placeholder|default:'Search products and services' }}">
             <select class="form-select" name="kind">
-                <option value="">All</option>
-                <option value="products"{% if kind == "products" %} selected{% endif %}>Products</option>
-                <option value="services"{% if kind == "services" %} selected{% endif %}>Services</option>
+                <option value="">{{ DLUX_STRINGS.public_filter_all|default:'All' }}</option>
+                <option value="products"{% if kind == "products" %} selected{% endif %}>{{ DLUX_STRINGS.public_filter_products|default:'Products' }}</option>
+                <option value="services"{% if kind == "services" %} selected{% endif %}>{{ DLUX_STRINGS.public_filter_services|default:'Services' }}</option>
             </select>
-            <button class="btn btn-primary" type="submit">Search</button>
+            <button class="btn btn-primary" type="submit">{{ DLUX_STRINGS.public_search_button|default:'Search' }}</button>
         </div>
     </form>
 </section>
@@ -31,8 +31,8 @@
 <section class="public-section">
     <div class="public-section__head public-section__head--compact">
         <div>
-            <p class="public-kicker">Showing</p>
-            <h2>{{ filtered_count }} item{% if filtered_count != 1 %}s{% endif %}</h2>
+            <p class="public-kicker">{{ DLUX_STRINGS.public_showing|default:'Showing' }}</p>
+            <h2>{{ filtered_count }} {% if filtered_count == 1 %}{{ DLUX_STRINGS.public_item_singular|default:'item' }}{% else %}{{ DLUX_STRINGS.public_item_plural|default:'items' }}{% endif %}</h2>
         </div>
     </div>
     {% if listings %}
@@ -44,7 +44,7 @@
     {% else %}
     <div class="public-empty">
         <i class="bi bi-shop"></i>
-        <p>No matching public items yet.</p>
+        <p>{{ DLUX_STRINGS.public_no_results|default:'No matching public items yet.' }}</p>
     </div>
     {% endif %}
 </section>

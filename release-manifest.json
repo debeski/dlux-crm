@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "version": "0.8.3",
-  "summary": "Updates the sales edition to DjangoLux 1.9.4.",
+  "version": "0.8.4",
+  "summary": "Translates the public storefront into the visitor's language.",
   "highlights": [
-    "Pins django-lux[updater] exactly to 1.9.4.",
-    "Supports manual first-launch setup: Composer 1.5.3 `--skip-config` leaves config.json unimported."
+    "Shop, item, contact and homepage labels now follow the selected storefront language, including Arabic.",
+    "Untouched homepage section headings show translated default copy instead of the English seed."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.3"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.8.4"
 }

@@ -127,6 +127,15 @@ and settings exports. If `shop_enabled` is off while `homepage_enabled` remains 
 homepage listing cards may still appear as public teasers, but they do not render
 item-detail links or the Quick view item-modal button.
 
+Storefront text is localized like the staff UI: templates read `DLUX_STRINGS.public_*`
+keys from `public_catalog/translations.py` (with the English text as the template
+default), code-keyed labels such as availability and product/service kind resolve
+through `listing.availability_key` / `listing.source_kind_key` and dlux's `get_item`
+filter, and `contact_links()` / `PublicContactForm` use `common.i18n.t`. Homepage
+copy fields that still equal their English `HOMEPAGE_DEFAULTS` seed resolve to the
+visitor-language `hp_seed_<field>` string in `resolve_homepage()`; anything edited in
+the Homepage Builder is shown as saved.
+
 `PublicContactMessage` is the first public write path. Contact form posts carry a
 stable hidden idempotency key enforced by a database unique constraint; repeated
 submits with the same key return success without creating a second row or sending

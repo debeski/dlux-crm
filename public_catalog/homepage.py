@@ -9,6 +9,7 @@ so the builder can edit each discovered DLux language and the public page render
 the visitor's language (falling back to the default language, then any value).
 """
 from dlux.options import write_app_system_config
+from dlux.translations import get_strings
 from dlux.utils import get_app_system_config, get_system_config
 
 HOMEPAGE_NS = "switch_pos.public_homepage"
@@ -236,8 +237,16 @@ def resolve_homepage(cfg=None, lang=None):
     _codes, default = _lang_codes()
     lang = lang or default
     flat = dict(cfg)
+    strings = None
     for key in LOCALIZED_KEYS:
-        flat[key] = localize(cfg.get(key), lang, default)
+        text = localize(cfg.get(key), lang, default)
+        seed = HOMEPAGE_DEFAULTS.get(key)
+        if seed and text == seed:
+            # Untouched English seed: show the visitor-language copy instead.
+            if strings is None:
+                strings = get_strings(lang)
+            text = strings.get(f"hp_seed_{key}", seed)
+        flat[key] = text
     return flat
 
 

@@ -166,6 +166,35 @@ class PublicStaffSplitTests(TestCase):
         self.assertNotIn("3.00", combined)
         self.assertNotIn("/staff/app-modals/", combined)
 
+    def test_public_storefront_chrome_and_labels_follow_visitor_language(self):
+        ExchangeRate.objects.create(rate=Decimal("6.50"))
+        product = Product.objects.create(
+            name="Smart Lock Beta",
+            cost_usd=Decimal("4.00"),
+            price_usd=Decimal("9.00"),
+            stock_qty=Decimal("7.00"),
+            reorder_level=Decimal("2.00"),
+        )
+        listing = PublicCatalogListing.objects.create(product=product, is_published=True, is_featured=True)
+
+        visitor = Client()
+        shop_html = visitor.get(reverse("public_catalog:shop") + "?lang=ar").content.decode()
+        landing_html = visitor.get(reverse("public_catalog:landing") + "?lang=ar").content.decode()
+        modal_html = json.loads(visitor.get(reverse("public_catalog:item_modal", args=[listing.slug])).content)["html"]
+        contact_html = json.loads(visitor.get(reverse("public_catalog:contact_modal")).content)["html"]
+        arabic = "\n".join([shop_html, landing_html, modal_html, contact_html])
+
+        for text in ["ابحث في المنتجات والخدمات", "نظرة سريعة", "عرض الصفحة", "متوفر", "منتج",
+                     "التوفر", "أرسل طلباً", "إرسال الرسالة", "جاهزة لعرضها على العملاء"]:
+            self.assertIn(text, arabic)
+        for text in ["Search products and services", "Quick view", "View page", "Send message",
+                     "Ready for customer viewing", ">Availability<"]:
+            self.assertNotIn(text, arabic)
+
+        english = visitor.get(reverse("public_catalog:shop") + "?lang=en").content.decode()
+        self.assertIn("Quick view", english)
+        self.assertIn("Available", english)
+
     def test_public_shop_excludes_unpublished_and_inactive_sources(self):
         active = Product.objects.create(name="Visible Lock", price_usd=Decimal("10.00"), stock_qty=Decimal("2.00"))
         inactive = Product.objects.create(

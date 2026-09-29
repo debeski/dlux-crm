@@ -181,6 +181,15 @@ class PublicCatalogListing(ScopedModel):
         return labels.get(self.availability_code, "Contact us")
 
     @property
+    def availability_key(self):
+        """DLUX_STRINGS key for ``availability_label`` in the visitor's language."""
+        return f"public_avail_{self.availability_code}"
+
+    @property
+    def source_kind_key(self):
+        return f"public_kind_{self.source_kind}"
+
+    @property
     def is_available_for_public(self):
         return self.availability_code != "unavailable"
 

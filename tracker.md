@@ -42,7 +42,9 @@
   - [ ] Re-check that fork against dlux's partial on every upgrade (a test asserts the audit trail and Back control, not full parity).
   - [ ] Purchase-invoice/stock-take/opening-stock editors do NOT fit `DocumentEditorView` — intake lines are plain Forms that create Products, not an inline formset. Left alone deliberately; revisit only if they gain a header+lines shape.
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
+  - [ ] Storefront polish: mobile `/shop/` search input collapses (placeholder hidden); landing hero kicker has low contrast.
 - **Completed Recently:**
+  - [x] v0.8.4 (untagged): public storefront labels, modals, contact form/links and untouched homepage seed copy follow the visitor language (`public_*` / `hp_seed_*` keys) (2026-09-29).
   - [x] Generated app READMEs now recommend the Dlux Ribbon instead of the deprecated `advanced_filter_helper`; active code has no helper or `AUDIT_FIELD_NAMES` dependency (merged 2026-09-26).
   - [x] v0.8.1 version/manifest/changelog aligned and DjangoLux pinned exactly to 1.9.2 for patch-release validation (2026-09-23).
   - [x] DjangoLux runtime pin advanced exactly from 1.8.13 to 1.9.1 for the v0.8.0 release candidate (2026-09-23).
@@ -57,21 +59,20 @@
   - [x] Product/Service/Listing images moved onto dlux 1.8.4 `ManagedAssetField` (namespaces `catalog.product`, `catalog.service`, `public_catalog.publiccataloglisting`), with `image_url` readers, camera capture, and the `adopt_image_assets` dry-run backfill (2026-09-02).
   - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
-  - [x] `common/css/ribbon_actions.css` repairs a `.btn-group` in the ribbon's action area — the panel skin pilled each button, splitting the Products layout switch into loose half-pills (2026-09-02).
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
   - [x] Date filters: Invoice/Payment/Expense on `DatedFilterSet` (year + range); `date_from` -> `date_gte`, old bookmarks lose their filter — user's call (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
+- 2026-09-29: v0.8.4 storefront i18n — CI set 249/249 (SQLite, throwaway `sales-deck-shots` container), migrations clean, manifest validator OK for v0.8.4.
 - 2026-09-26: dlux 1.9.4 — CI test set 248/248 (SQLite), check/migration drift clean, 17 enabled ribbon lists render; hashed 1.9.4 wheel from PyPI.
 - 2026-09-24: 285/285 tests, manifest validator, installed 1.9.3, pip check and runtime smoke pass on `sales-validation:0.8.2`; logs `.xclude/release-0.8.2/`. Fresh amd64 build cannot fetch gunicorn from PyPI; no publish/deploy.
 - 2026-09-23: Brand-neutral `config.json` parses, normalizes to 76 settings, contains no Switch/SwitchLibya/store-contact remnants, and scaffold tests pass 5/5.
 - 2026-09-23: 285/285 baseline; automotive 37/37 after gating sidebar discovery/rendering on the persisted enhancement state, with enabled/disabled and bilingual regressions.
 - 2026-09-23: Rebuilt live Docker stack 9/9 healthy; `/health/` 200 and installed django-lux 1.9.2 confirmed.
-- 2026-09-11: v0.7.3 — 237 OK on dlux 1.8.13 in a scratch py3.13 venv (`finance catalog sales common public_catalog tests`, sqlite); 231 OK in `sales-web-1` on mounted 1.8.14b3 before the valuation render test; manifest gate OK for v0.7.3.
 ### One-line info about last time edited Docs: [Max 2 lines]
+- 2026-09-29: `docs/ARCHITECTURE.md` describes storefront localization keys and homepage seed-copy fallback.
 - 2026-09-26: finance/catalog/sales app READMEs now direct new list pages to `RibbonMixin` and `{% dlux_ribbon %}`.
 - 2026-09-24: Architecture/Operations/Release docs describe 1.9.3, the official hash-pinned wheel, and Composer 1.5.2 maintenance requirements; changelog/manifest/version aligned at 0.8.2.
 - 2026-09-11: `docs/BUSINESS_RULES.md` Inventory valuation covers sale value, expected profit and margin.
-- 2026-09-04: `docs/RELEASING.md` + `docs/OPERATIONS.md` name `debeski/dlux-crm` and the `:sales-<ver>` / `:sales` tags.
 
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:

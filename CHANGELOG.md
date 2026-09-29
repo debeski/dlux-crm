@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.8.4
+- **Storefront Follows Visitor Language**: The public shop, item page, quick-view and contact modals, header/footer and dynamic-modal chrome now read their labels from `public_catalog/translations.py` (`public_*` keys) instead of hardcoded English, so `?lang=ar` renders Arabic search, filters, counts, card actions, price/availability facts, contact form fields and placeholders. `PublicCatalogListing.availability_key` / `source_kind_key` feed the `get_item` lookup for availability and product/service labels, and `contact_links()` translates its WhatsApp/Call/Email labels and pre-filled message.
+- **Translated Homepage Seed Copy**: `resolve_homepage()` swaps any localized field still equal to its English `HOMEPAGE_DEFAULTS` seed for the visitor-language `hp_seed_<field>` string, so untouched section kickers/headings and the hero button no longer fall back to English. Copy edited in the Homepage Builder is unaffected.
+- **Validation**: New `test_public_storefront_chrome_and_labels_follow_visitor_language` regression; CI test set 249/249 (SQLite) and `makemigrations --check` clean. No schema changes.
+
 ## v0.8.3
 - **DjangoLux 1.9.4**: Pins `django-lux[updater]==1.9.4` (from 1.9.3) with the matching hashed wheel URL; 1.9.4 honours `DLUX_SKIP_CONFIG_IMPORT`, so a first deploy with Composer 1.5.3 `--skip-config` leaves `config.json` unimported for manual setup. `docs/RELEASING.md` and `docs/ARCHITECTURE.md` follow the new baseline. No application schema changes.
 - **Release Validation**: `check`, `makemigrations --check`, and the CI test set (248 tests, SQLite settings) pass against the published 1.9.4 wheel; all 17 enabled ribbon list pages render.
