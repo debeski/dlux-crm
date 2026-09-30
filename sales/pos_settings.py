@@ -12,7 +12,6 @@ POS_DEFAULTS = {
     "methods": {method: True for method in POS_METHODS},
     "max_discount_percent": "10",
     "receipt_size": "80",
-    "open_on_login": False,
 }
 
 
@@ -20,7 +19,6 @@ def normalize_pos_config(value):
     config = deepcopy(POS_DEFAULTS)
     source = value if isinstance(value, dict) else {}
     config["enabled"] = source.get("enabled") is True
-    config["open_on_login"] = source.get("open_on_login") is True
     methods = source.get("methods") if isinstance(source.get("methods"), dict) else {}
     for method in POS_METHODS:
         if method in methods:

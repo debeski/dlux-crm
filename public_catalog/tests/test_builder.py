@@ -37,10 +37,11 @@ class PublicCatalogBuilderTests(TestCase):
         self.assertIn('data-kind="service"', html)
 
     def test_dlux_options_tiles_are_builder_focused(self):
-        import public_catalog.dlux_options  # noqa: F401
-        from common.crm_options import crm_sections
+        from dlux import options
 
-        settings = {section["namespace"]: section for section in crm_sections()}
+        import public_catalog.dlux_options  # noqa: F401
+
+        settings = dict(options._SETTINGS_REGISTRY)
 
         self.assertNotIn("switch_pos.public_homepage", settings)
         self.assertIn("switch_pos.public_catalog", settings)

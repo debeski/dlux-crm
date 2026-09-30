@@ -75,11 +75,6 @@ class PosAccessTests(PosTestCase):
         with pos_on():
             self.assertEqual(self.client.get(reverse("sales:pos_till")).status_code, 403)
 
-    def test_open_on_login_lands_on_the_till(self):
-        with pos_on(open_on_login=True):
-            response = self.client.get(reverse("staff_entry"))
-        self.assertRedirects(response, reverse("sales:pos_till"), fetch_redirect_response=False)
-
 
 class PosLookupTests(PosTestCase):
     def test_primary_barcode_and_sku_are_exact_hits(self):

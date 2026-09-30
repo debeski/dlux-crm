@@ -2,6 +2,7 @@ import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -125,6 +126,11 @@ class HeavyEquipmentTests(TestCase):
 
 
 class TerminologyTests(TestCase):
+    def setUp(self):
+        # The settings row is cached; a rollback does not reach the cache.
+        cache.clear()
+        self.addCleanup(cache.clear)
+
     def test_switch_writes_and_withdraws_only_its_own_overrides(self):
         from dlux.models import SystemSettings
 
@@ -155,3 +161,19 @@ class TerminologyTests(TestCase):
         with patch("automotive.settings.get_automotive_config", return_value={"terminology": TERMINOLOGY_EQUIPMENT}):
             refresh_terminology()
         self.assertEqual(SystemSettings.load().translations_override["ar"]["pos_find_by_vehicle"], "حسب الآلية")
+
+    def test_wording_follows_any_save_of_the_settings_row(self):
+        # The setup wizard and imports save the whole row; the wording must follow
+        # the mode it carries rather than a separate save of the form's own.
+        from dlux.models import SystemSettings
+
+        from automotive.settings import OPTIONAL_ENHANCEMENTS_NS
+
+        def save_mode(mode):
+            settings = SystemSettings.load()
+            settings.extra_config = {"app": {OPTIONAL_ENHANCEMENTS_NS: {"automotive": {"enabled": True, "terminology": mode}}}}
+            settings.save()
+            return SystemSettings.objects.get(pk=settings.pk).translations_override or {}
+
+        self.assertEqual(save_mode(TERMINOLOGY_EQUIPMENT)["ar"]["models_vehiclemodel"], "طرازات الآليات")
+        self.assertNotIn("models_vehiclemodel", save_mode(TERMINOLOGY_VEHICLE).get("ar", {}))

@@ -467,8 +467,10 @@ formset) was too many steps per vehicle. Delivered without Product schema change
   line tags (additive), and *Add part for this vehicle* from the browser.
 - `PartProfile` (brand) and `ProductPartNumber` (OEM/cross-reference, normalized)
   as extension tables searched by the Products list and the browser.
-- Parts-mode navigation: `/staff/` lands on the browser, Browse by Vehicle joins
-  the workspace sidebar group, and the Products list gains Vehicle/Year filters.
+- Parts-mode navigation: Browse by Vehicle joins the workspace sidebar group and
+  the Products list gains Vehicle/Year filters. Landing on the browser after
+  login is DjangoLux's Home setting (`/staff/automotive/browse/`), not an
+  automotive redirect.
 
 The full editor remains the place for engine/trim/transmission/position/notes on
 existing rows and for confirming intentional overlaps.

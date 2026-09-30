@@ -169,9 +169,9 @@ through the setup wizard and Options instead of committing a customer's brand.
 | `/shop/` | Public catalog |
 | `/shop/items/<slug>/` | Public item page |
 | `/contact/modal/` | Public contact dynamic modal endpoint |
-| `/staff/` | Staff entry redirect |
+| `/staff/` | Staff entry redirect (to the Workspace dashboard) |
 | `/staff/accounts/login/` | Staff login |
-| `/staff/workspace/` | Workspace dashboard (DLux Home URL) |
+| `/staff/workspace/` | Workspace dashboard (default DLux Home URL; set Home to `/staff/sales/pos/` or `/staff/automotive/browse/` to open the till or the vehicle browser after login) |
 | `/staff/sales/dashboard/` | Sales Overview |
 | `/staff/sales/invoices/` | Invoices |
 | `/staff/sales/new/` | New invoice editor |

@@ -6,6 +6,7 @@ from crispy_forms.layout import Div, HTML, Layout, Row
 from dlux.forms import build_settings_toggle_field
 
 from common.i18n import lazy_t, t
+from common.settings_forms import dependent_block, lock_dependents
 
 from .settings import (
     AUTOMOTIVE_CRITERIA,
@@ -108,6 +109,7 @@ class OptionalEnhancementsSettingsForm(forms.Form):
             initial.setdefault(field_name, automotive["criteria"][criterion])
         kwargs["initial"] = initial
         super().__init__(*args, **kwargs)
+        lock_dependents(self, "automotive_enabled", ["terminology", *CRITERION_FIELDS.values()])
 
         self.helper = FormHelper()
         self.helper.form_tag = False
@@ -135,30 +137,33 @@ class OptionalEnhancementsSettingsForm(forms.Form):
                     build_settings_toggle_field(self, "automotive_enabled", css_class="col-12"),
                     css_class="g-3",
                 ),
-                Row(Div("terminology", css_class="col-12 col-lg-6"), css_class="g-3 mt-1"),
-                Div(
-                    HTML(
-                        f"<h6 class='fw-semibold mb-1'>{t('optional_automotive_criteria', 'Vehicle criteria')}</h6>"
-                        f"<p class='small text-muted mb-3'>{t('optional_automotive_criteria_help', 'Make, model, and year are always available. Choose the extra criteria this store uses.')}</p>"
+                dependent_block(
+                    self, "automotive_enabled",
+                    Row(Div("terminology", css_class="col-12 col-lg-6"), css_class="g-3 mt-1"),
+                    Div(
+                        HTML(
+                            f"<h6 class='fw-semibold mb-1'>{t('optional_automotive_criteria', 'Vehicle criteria')}</h6>"
+                            f"<p class='small text-muted mb-3'>{t('optional_automotive_criteria_help', 'Make, model, and year are always available. Choose the extra criteria this store uses.')}</p>"
+                        ),
+                        Row(*criterion_toggles, css_class="g-3"),
+                        HTML(
+                            "<div class='border rounded bg-light p-3 mt-3' data-automotive-workflow-preview "
+                            f"data-core-label='{t('optional_preview_core', 'Make → Model → Year')}' "
+                            f"data-end-label='{t('optional_preview_end', 'Category → Products')}'>"
+                            f"<div class='small text-muted mb-1'>{t('optional_preview_title', 'Staff browsing path')}</div>"
+                            "<div class='fw-semibold' data-automotive-workflow-output></div>"
+                            "</div>"
+                        ),
+                        HTML(
+                            "<div class='mt-3'>"
+                            f"{manage_vehicle_data}"
+                            "<div class='small text-muted mt-2' data-automotive-manage-hint hidden>"
+                            f"{t('ui_save_vehicle_settings_first', 'Save these settings before managing vehicle data.')}"
+                            "</div></div>"
+                        ),
+                        css_id="automotive-criteria-fields",
+                        css_class="mt-3",
                     ),
-                    Row(*criterion_toggles, css_class="g-3"),
-                    HTML(
-                        "<div class='border rounded bg-light p-3 mt-3' data-automotive-workflow-preview "
-                        f"data-core-label='{t('optional_preview_core', 'Make → Model → Year')}' "
-                        f"data-end-label='{t('optional_preview_end', 'Category → Products')}'>"
-                        f"<div class='small text-muted mb-1'>{t('optional_preview_title', 'Staff browsing path')}</div>"
-                        "<div class='fw-semibold' data-automotive-workflow-output></div>"
-                        "</div>"
-                    ),
-                    HTML(
-                        "<div class='mt-3'>"
-                        f"{manage_vehicle_data}"
-                        "<div class='small text-muted mt-2' data-automotive-manage-hint hidden>"
-                        f"{t('ui_save_vehicle_settings_first', 'Save these settings before managing vehicle data.')}"
-                        "</div></div>"
-                    ),
-                    css_id="automotive-criteria-fields",
-                    css_class="mt-3",
                 ),
                 css_id="optional-enhancements-form",
             )
@@ -214,9 +219,7 @@ class OptionalEnhancementsSettingsForm(forms.Form):
         if criteria["fuel_type"]:
             criteria["engine"] = True
         terminology = self.cleaned_data.get("terminology") or TERMINOLOGY_VEHICLE
-        from .terminology import apply_terminology
-
-        apply_terminology(terminology)
+        # The wording follows on save of the settings row (terminology.sync_terminology).
         return {
             "automotive": {
                 "enabled": bool(self.cleaned_data.get("automotive_enabled")),

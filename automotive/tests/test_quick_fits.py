@@ -329,15 +329,3 @@ class IntakeAndLandingTests(VehicleFixtureMixin, TestCase):
         self.assertEqual(response.status_code, 302)
         product = Product.objects.get(name="Camry Pads")
         self.assertEqual(product.automotive_fitments.get().generation, self.xv50)
-
-    def test_staff_entry_lands_on_the_browser_in_parts_mode(self):
-        with automotive_config():
-            self.assertRedirects(
-                self.client.get(reverse("staff_entry")), reverse("automotive:browse"),
-                fetch_redirect_response=False,
-            )
-        with automotive_config(enabled=False):
-            self.assertRedirects(
-                self.client.get(reverse("staff_entry")), reverse("common:workspace_dashboard"),
-                fetch_redirect_response=False,
-            )

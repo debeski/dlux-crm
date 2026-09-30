@@ -219,8 +219,7 @@ class ProductsLayoutOptionCardTests(TestCase):
         self.assertNotIn("switch_pos.products_layout", ids_plain)
 
     def test_global_default_is_a_crm_options_section(self):
+        options = _import_options_or_skip(self)
         import catalog.dlux_options  # noqa: F401
-        from common.crm_options import crm_sections
 
-        sections = {section["key"]: section for section in crm_sections()}
-        self.assertEqual(sections["products_layout"]["namespace"], "switch_pos.products_layout")
+        self.assertEqual(options._SETTINGS_REGISTRY["switch_pos.products_layout"]["group"], "switch_pos.crm_options")

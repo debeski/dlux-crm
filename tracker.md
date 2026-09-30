@@ -46,7 +46,11 @@
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
   - [ ] Storefront polish: mobile `/shop/` search input collapses (placeholder hidden); landing hero kicker has low contrast.
 - **Completed Recently:**
-  - [x] CRM options tile: layout/public catalog/POS tiles merged into `common/crm_options.py` sections; namespaces unchanged (2026-09-29).
+  - [x] Workspace: *Open the till* / *Browse by vehicle* quick actions + `pos_today` / `vehicle_browser` tiles while enabled (2026-09-30).
+  - [x] Removed POS *Open the till on login* and the parts-mode `/staff/` landing (never applied: DLux login goes to its Home); landing = DLux Home (store/per-user; per-group coming in dlux); real-login test `common.tests.test_login_landing` (2026-09-30).
+  - [x] Machine wording synced on `SystemSettings` post_save (wizard/import safe); dlux pinned 1.10.0b1 — re-pin to 1.10.0 stable before tagging v0.9.0.
+  - [x] Dependent settings: POS and Optional-enhancements dependents greyed/disabled with dlux tooltip instead of hidden; stored values kept while off (2026-09-29).
+  - [x] CRM options tile on dlux 1.10.0b1 settings groups (`register_app_settings_group` + `group=`); layout/public catalog/POS as sections, namespaces unchanged; `common/crm_options.py` retired to `.xclude/` (2026-09-30).
   - [x] Test data (2026-09-29): PINV-000003 "Libya Heavy Parts Co." — 21 machines/7 Arabic types, 13 shared engines, 35 products (EAN-13 `624…`, size variants with own codes, low/out-of-stock cases, Fleetguard supplier-label extra code).
   - [x] POS phase 1: till `/staff/sales/pos/`, `sales.pos.complete_sale` (idempotent `PosSale`), card method, discount cap, receipts, `ProductBarcode`; dev POS on; all demo data soft-deleted (2026-09-29).
   - [x] Heavy machinery: `EquipmentType`, shared engines + engine-only/all-years fitments (`automotive.0003`), `equipment_type`/`model_year` criteria, machine wording switch via tracked translation overrides; heavy demo data on PINV-000002; dev set to "equipment" wording (2026-09-29).
@@ -68,7 +72,8 @@
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-09-29: 341/341 app tests (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
+- 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
+- 2026-09-29: 344/344 app tests after v0.8.4 merge + dependent settings; earlier 341/341 (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 - 2026-09-29: v0.8.4 storefront i18n — CI set 249/249 (SQLite, throwaway `sales-deck-shots` container), migrations clean, manifest validator OK for v0.8.4.

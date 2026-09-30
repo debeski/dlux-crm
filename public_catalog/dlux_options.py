@@ -1,12 +1,14 @@
-from common.crm_options import register_crm_section
+from dlux.options import register_app_settings
+
+from common.dlux_options import CRM_OPTIONS_GROUP
 from common.i18n import lazy_t
 
 from .settings import PUBLIC_CATALOG_DEFAULTS, PUBLIC_CATALOG_NS
 
 
-register_crm_section(
-    key="public_catalog",
+register_app_settings(
     namespace=PUBLIC_CATALOG_NS,
+    group=CRM_OPTIONS_GROUP,
     title=lazy_t("options_public_catalog", "Public catalog"),
     description=lazy_t(
         "options_public_catalog_desc",

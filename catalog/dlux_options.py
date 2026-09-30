@@ -5,14 +5,14 @@ Auto-imported at startup by dlux's option autodiscovery (`<app>.dlux_options`).
 Two surfaces:
   * A per-user picker **card** (`register_card`) — every user who can view
     products chooses their own layout; persisted to their profile preferences.
-  * A section of the superuser **CRM options** tile (`common.crm_options`) that
+  * A section of the superuser **CRM options** tile (`common.dlux_options`) that
     sets the shop-wide *default* layout, saved to
     `SystemSettings.extra_config['app']['switch_pos.products_layout']`. The
     per-user pick overrides it; otherwise everyone gets this default.
 """
-from dlux.options import register_card
+from dlux.options import register_app_settings, register_card
 
-from common.crm_options import register_crm_section
+from common.dlux_options import CRM_OPTIONS_GROUP
 from common.i18n import lazy_t
 
 from .product_layouts import (
@@ -73,9 +73,9 @@ register_card(
 )
 
 
-register_crm_section(
-    key="products_layout",
+register_app_settings(
     namespace=PRODUCTS_LAYOUT_NS,
+    group=CRM_OPTIONS_GROUP,
     title=lazy_t("options_products_layout", "Products layout"),
     description=lazy_t(
         "options_products_layout_default_desc",

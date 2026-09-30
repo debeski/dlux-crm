@@ -7,6 +7,7 @@ from crispy_forms.layout import Div, Layout, Row
 from dlux.forms import build_settings_toggle_field
 
 from common.i18n import lazy_t
+from common.settings_forms import dependent_block, lock_dependents
 
 from .pos_settings import POS_METHODS, normalize_pos_config
 
@@ -42,15 +43,6 @@ class PointOfSaleSettingsForm(forms.Form):
         ),
         label=lazy_t("pos_settings_receipt", "Receipt"),
     )
-    open_on_login = forms.BooleanField(
-        required=False,
-        label=lazy_t("pos_settings_open_on_login", "Open the till on login"),
-        help_text=lazy_t(
-            "pos_settings_open_on_login_help",
-            "Users who can sell land on the till instead of the dashboard.",
-        ),
-    )
-
     def __init__(self, *args, current_value=None, **kwargs):
         kwargs.pop("request", None)
         kwargs.pop("namespace", None)
@@ -60,26 +52,28 @@ class PointOfSaleSettingsForm(forms.Form):
         initial.setdefault("pos_enabled", config["enabled"])
         initial.setdefault("max_discount_percent", config["max_discount_percent"])
         initial.setdefault("receipt_size", config["receipt_size"])
-        initial.setdefault("open_on_login", config["open_on_login"])
         for method, field_name in METHOD_FIELDS.items():
             initial.setdefault(field_name, config["methods"][method])
         kwargs["initial"] = initial
         super().__init__(*args, **kwargs)
+        lock_dependents(self, "pos_enabled", [*METHOD_FIELDS.values(), "max_discount_percent", "receipt_size"])
 
         self.helper = FormHelper()
         self.helper.form_tag = False
         self.helper.layout = Layout(
             Row(build_settings_toggle_field(self, "pos_enabled", css_class="col-12"), css_class="g-3"),
-            Row(
-                *[build_settings_toggle_field(self, name, css_class="col-12 col-lg-4") for name in METHOD_FIELDS.values()],
-                css_class="g-3 mt-1",
+            dependent_block(
+                self, "pos_enabled",
+                Row(
+                    *[build_settings_toggle_field(self, name, css_class="col-12 col-lg-4") for name in METHOD_FIELDS.values()],
+                    css_class="g-3 mt-1",
+                ),
+                Row(
+                    Div("max_discount_percent", css_class="col-12 col-lg-6"),
+                    Div("receipt_size", css_class="col-12 col-lg-6"),
+                    css_class="g-3 mt-1",
+                ),
             ),
-            Row(
-                Div("max_discount_percent", css_class="col-12 col-lg-6"),
-                Div("receipt_size", css_class="col-12 col-lg-6"),
-                css_class="g-3 mt-1",
-            ),
-            Row(build_settings_toggle_field(self, "open_on_login", css_class="col-12"), css_class="g-3 mt-1"),
         )
 
     def clean(self):
@@ -95,5 +89,4 @@ class PointOfSaleSettingsForm(forms.Form):
             "methods": {method: bool(data.get(name)) for method, name in METHOD_FIELDS.items()},
             "max_discount_percent": str(data.get("max_discount_percent") or "0"),
             "receipt_size": data.get("receipt_size") or "80",
-            "open_on_login": bool(data.get("open_on_login")),
         })

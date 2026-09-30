@@ -1,13 +1,15 @@
-from common.crm_options import register_crm_section
+from dlux.options import register_app_settings
+
+from common.dlux_options import CRM_OPTIONS_GROUP
 from common.i18n import lazy_t
 
 from .pos_options_forms import PointOfSaleSettingsForm
 from .pos_settings import POS_DEFAULTS, POS_NS
 
 
-register_crm_section(
-    key="point_of_sale",
+register_app_settings(
     namespace=POS_NS,
+    group=CRM_OPTIONS_GROUP,
     title=lazy_t("pos_settings_title", "Point of sale"),
     description=lazy_t(
         "pos_settings_desc",

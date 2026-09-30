@@ -1,6 +1,6 @@
 # Switch POS — Architecture
 
-A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.9.4)**.
+A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.10.0b1)**.
 It is a single Django/DLux project with a public catalog surface and an authenticated
 staff workflow. DjangoLux provides users, permissions, sidebar/titlebar/navbar UI,
 dynamic modals, audit trail, soft-delete, reports, backups and notifications — this
@@ -263,18 +263,31 @@ wiring.
 
 ### CRM options tile
 
-dlux draws one Options tile per `register_app_settings` call, and a tile saves
-one `extra_config['app']` namespace. The CRM's store-wide settings are small, so
-`common/crm_options.py` registers a single **CRM options** tile
-(`switch_pos.crm_options`, order 50) and apps add *sections* to it with
-`register_crm_section(key, namespace, title, fields=… | form_class=…)`:
-*Products layout* (`catalog`), *Public catalog* (`public_catalog`) and *Point of
-sale* (`sales`). `CrmOptionsForm` renders each section's own form (prefixed by
-its key) under a dlux-style `<h6>` heading, validates all of them together, and
-saves each section to its **own** namespace — so readers such as
-`get_pos_config()` are unchanged and nothing is migrated. The tile's own
-namespace stores nothing. *Optional enhancements* (store types) stay a separate
-tile after it.
+The store-wide settings are one **CRM options** tile on the Options page — a
+DjangoLux settings group (dlux ≥ 1.10.0b1). `common/dlux_options.py` registers
+it with `register_app_settings_group(id=CRM_OPTIONS_GROUP)`
+(`switch_pos.crm_options`, order 50), and each app registers its settings with
+`register_app_settings(..., group=CRM_OPTIONS_GROUP)`: *Products layout*
+(`catalog`), *Public catalog* (`public_catalog`) and *Point of sale* (`sales`).
+DjangoLux draws them as sections of one modal under its own section headings,
+validates them together and saves every namespace in **one** write of the
+settings row, so readers such as `get_pos_config()` are unchanged. The same
+registrations appear as sections of the first-run setup wizard's *Project
+settings* step. *Optional enhancements* (store types) stay a separate tile.
+
+A settings form's `to_app_config()` must only *return* its value: the setup
+wizard saves the whole settings row once, so anything a form saves on its own
+is overwritten. Side effects that must follow a saved value hang off the row's
+`post_save` instead — the machine wording does
+(`automotive.terminology.sync_terminology`).
+
+Settings that depend on a master toggle follow dlux's rule that a disabled
+master locks its dependents rather than hiding them: `common/settings_forms.py`
+wraps them in `dependent_block(form, master, …)` (greyed, with dlux's
+`settings_dependent_disabled` tooltip) and `lock_dependents()` disables the
+fields server-side while the master is off, so a save keeps their stored
+values. `common/js/dependent_settings.js` (loaded from
+`templates/dlux/includes/custom_scripts.html`) follows the toggle live.
 
 ## Money & currency
 

@@ -5,10 +5,18 @@ from django.urls import reverse
 
 from dlux.utils import get_app_system_config
 
-from common.crm_options import CRM_OPTIONS_NS
+from dlux.options import app_settings_form_prefix
+
+from common.dlux_options import CRM_OPTIONS_GROUP
 
 
 User = get_user_model()
+
+
+def field(name):
+    """The posted name of a section field: "<section>-<field>" -> dlux's prefixed name."""
+    section, _, rest = name.partition("-")
+    return f"{app_settings_form_prefix('switch_pos.' + section)}-{rest}"
 
 
 class CrmOptionsTileTests(TestCase):
@@ -24,7 +32,7 @@ class CrmOptionsTileTests(TestCase):
         settings.save(update_fields=["is_configured"])
         self.admin = User.objects.create_superuser("crm-admin", "crm@example.com", "x")
         self.client.force_login(self.admin)
-        self.url = reverse("dlux_app_settings_modal", args=[CRM_OPTIONS_NS])
+        self.url = reverse("dlux_app_settings_group_modal", args=[CRM_OPTIONS_GROUP])
         # Saved settings are cached; the test's rollback does not reach the cache.
         self.addCleanup(cache.clear)
 
@@ -48,15 +56,18 @@ class CrmOptionsTileTests(TestCase):
             "point_of_sale-receipt_size": "58",
         }
         data.update(overrides)
-        return self.client.post(self.url, data)
+        return self.client.post(self.url, {field(name): value for name, value in data.items()})
 
-    def test_one_tile_replaces_the_three_store_tiles(self):
-        from dlux.options import get_visible_app_settings
+    def test_one_tile_holds_the_three_store_sections(self):
+        from dlux.options import get_visible_app_settings_tiles
 
-        namespaces = [item["namespace"] for item in get_visible_app_settings(self.request())]
-        self.assertIn(CRM_OPTIONS_NS, namespaces)
+        tiles = {tile["id"]: tile for tile in get_visible_app_settings_tiles(self.request())}
+        self.assertEqual(
+            [section["namespace"] for section in tiles[CRM_OPTIONS_GROUP]["sections"]],
+            ["switch_pos.products_layout", "switch_pos.public_catalog", "switch_pos.point_of_sale"],
+        )
         for old in ("switch_pos.products_layout", "switch_pos.public_catalog", "switch_pos.point_of_sale"):
-            self.assertNotIn(old, namespaces)
+            self.assertNotIn(old, tiles)
 
     def test_each_section_saves_its_own_namespace(self):
         from public_catalog.settings import set_public_catalog_config
@@ -71,7 +82,7 @@ class CrmOptionsTileTests(TestCase):
         self.assertTrue(public["shop_enabled"], "keys the tile does not edit are kept")
         pos = get_app_system_config("switch_pos.point_of_sale")
         self.assertEqual((pos["enabled"], pos["receipt_size"], pos["max_discount_percent"]), (True, "58", "15"))
-        self.assertIsNone(get_app_system_config(CRM_OPTIONS_NS))
+        self.assertIsNone(get_app_system_config(CRM_OPTIONS_GROUP))
 
     def test_an_invalid_section_saves_nothing(self):
         response = self.post(**{"point_of_sale-max_discount_percent": "150"})
@@ -81,5 +92,22 @@ class CrmOptionsTileTests(TestCase):
     def test_modal_shows_every_section_heading(self):
         html = self.client.get(self.url).json()["html"]
         for name in ("products_layout-default_layout", "public_catalog-shop_title", "point_of_sale-receipt_size"):
-            self.assertIn(f'name="{name}"', html)
+            self.assertIn(f'name="{field(name)}"', html)
+        self.assertIn("data-dlux-unsaved-guard", html)
         self.assertEqual(html.count("fw-bold my-3"), 3)
+
+    def test_pos_settings_lock_while_the_till_is_off_and_keep_their_values(self):
+        self.post()
+        html = self.client.get(self.url).json()["html"]
+        self.assertNotIn("dlux-dependent-settings is-disabled", html)
+        response = self.post(**{
+            "point_of_sale-pos_enabled": "", "point_of_sale-method_cash": "",
+            "point_of_sale-max_discount_percent": "", "point_of_sale-receipt_size": "",
+        })
+        self.assertTrue(response.json().get("success"), response.json().get("html", "")[:500])
+        pos = get_app_system_config("switch_pos.point_of_sale")
+        self.assertEqual((pos["enabled"], pos["max_discount_percent"], pos["receipt_size"]), (False, "15", "58"))
+        self.assertTrue(pos["methods"]["cash"])
+        html = self.client.get(self.url).json()["html"]
+        self.assertIn("dlux-dependent-settings is-disabled", html)
+        self.assertIn(f'data-settings-depends-on="{field("point_of_sale-pos_enabled")}"', html)

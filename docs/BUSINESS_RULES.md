@@ -161,6 +161,13 @@ views. A sales rep therefore sees their own sales/payment/customer tiles, a
 courier sees only assigned delivery work, and a manager/superuser sees the whole
 store.
 
+The optional enhancements add to it only while they are on and the user can use
+them: the **till** puts *Open the till* first in Quick Actions and a *Point of
+Sale* tile with today's till sales (total and count of `PosSale` invoices the
+user may see); **automotive** adds *Browse by vehicle* to Quick Actions and a
+tile with the number of vehicle (machine) models and of active products fitted
+to at least one. Both follow the store's vehicle/machine wording.
+
 Users may hide, reorder, and resize tiles. Those layout preferences are stored
 per user in DjangoLux's reserved app-preferences namespace:
 `Profile.preferences["app"]["switch_pos.workspace_dashboard.v1"]`. Browser
@@ -284,8 +291,10 @@ by a superuser from the **Optional enhancements** System Settings card.
   sidebar builder, and only while the persisted enhancement switch is on. Turning
   the enhancement off removes them from discovery and rendering even if they were
   previously saved in the sidebar; the individual make/model/generation/engine/trim
-  routes remain internal hub destinations. While automotive is on, `/staff/` lands
-  a user who can use the browser on it instead of the Workspace dashboard.
+  routes remain internal hub destinations. To open the browser after login, set
+  DjangoLux's Home (store-wide, or per user when allowed) to
+  `/staff/automotive/browse/`; enabling automotive does not change where anyone
+  lands.
 - The Product Item card shows its compatible vehicles using enabled criteria
   only. Managers edit several ranges in one save; exact duplicates are rejected
   and matching overlapping ranges require explicit confirmation.
@@ -391,7 +400,9 @@ section of the **CRM options** settings tile (off by default).
   page (localhost or HTTPS).
 - Receipts: none, thermal 58 mm / 80 mm, or A4 (settings), printed from the
   browser.
-- With **Open the till on login**, users who can sell land on the till.
+- Where users land after login is DjangoLux's Home setting (store-wide, or per
+  user when allowed); set it to `/staff/sales/pos/` for a counter that opens on
+  the till. Enabling the till does not change where anyone lands.
 - **Extra barcodes** (`catalog.ProductBarcode`) are edited in the product form
   whether or not the till is on; a code already used by another item is refused.
 

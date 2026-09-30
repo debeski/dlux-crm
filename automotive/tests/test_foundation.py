@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
 from django.test import RequestFactory, TestCase
@@ -103,6 +104,26 @@ class OptionalEnhancementsConfigTests(TestCase):
         self.assertTrue(stored["automotive"]["enabled"])
         self.assertTrue(stored["automotive"]["criteria"]["engine"])
         self.assertFalse(stored["automotive"]["criteria"]["fuel_type"])
+
+    def test_switching_off_keeps_wording_and_criteria(self):
+        import automotive.dlux_options  # noqa: F401
+        from dlux.options import write_app_system_config
+        from dlux.views.options import app_settings_modal_view
+
+        write_app_system_config(OPTIONAL_ENHANCEMENTS_NS, {"automotive": {
+            "enabled": True, "terminology": "equipment", "criteria": {"engine": True, "trim": False},
+        }})
+        self.addCleanup(cache.clear)
+        user = User.objects.create_superuser("enhancements-off", "off@example.com", "x")
+        request = RequestFactory().post("/options/app-settings/", data={})
+        request.user = user
+        response = app_settings_modal_view(request, OPTIONAL_ENHANCEMENTS_NS)
+        self.assertTrue(json.loads(response.content)["success"])
+        stored = get_automotive_config()
+        self.assertFalse(stored["enabled"])
+        self.assertEqual(stored["terminology"], "equipment")
+        self.assertTrue(stored["criteria"]["engine"])
+        self.assertFalse(stored["criteria"]["trim"])
 
     def test_non_superuser_cannot_save_settings(self):
         import automotive.dlux_options  # noqa: F401

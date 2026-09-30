@@ -206,3 +206,57 @@ class WorkspaceDashboardTests(TestCase):
         self.assertIn("fetch(url", js)
         self.assertLess(js.index("const url = appPrefUrl();"), js.index("window.updateAppPreference"))
         self.assertNotIn("data-dashboard-reset", js)
+
+
+class WorkspaceEnhancementTilesTests(TestCase):
+    """The till and vehicle/machine browser get tiles and quick actions only while on."""
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        ExchangeRate.objects.create(rate=Decimal("6.50"))
+        self.addCleanup(cache.clear)
+        self.user = User.objects.create_superuser("enhanced-admin", "enhanced@example.com", "x")
+
+    def enable(self, pos, automotive):
+        from django.core.cache import cache
+        from dlux.options import write_app_system_config
+
+        write_app_system_config("switch_pos.point_of_sale", {"enabled": pos})
+        write_app_system_config("switch_pos.optional_enhancements", {"automotive": {"enabled": automotive}})
+        cache.clear()
+
+    def quick_urls(self, tiles):
+        return [action["url"] for action in tiles["quick_actions"]["actions"]]
+
+    def test_tiles_and_actions_appear_only_while_enabled(self):
+        self.enable(pos=False, automotive=False)
+        tiles = _tiles(_ctx(self.user))
+        self.assertNotIn("pos_today", tiles)
+        self.assertNotIn("vehicle_browser", tiles)
+        self.assertNotIn(reverse("sales:pos_till"), self.quick_urls(tiles))
+
+        self.enable(pos=True, automotive=True)
+        tiles = _tiles(_ctx(self.user))
+        self.assertEqual(tiles["pos_today"]["url"], reverse("sales:pos_till"))
+        self.assertEqual(tiles["vehicle_browser"]["url"], reverse("automotive:browse"))
+        self.assertEqual(self.quick_urls(tiles)[:2], [reverse("sales:pos_till"), reverse("automotive:browse")])
+
+    def test_counts_cover_todays_till_sales_and_fitted_parts_only(self):
+        from automotive.models import ProductFitment, VehicleMake, VehicleModel
+        from sales.models import PosSale
+
+        self.enable(pos=True, automotive=True)
+        model = VehicleModel.objects.create(make=VehicleMake.objects.create(name="Caterpillar"), name="320D")
+        fitted = Product.objects.create(name="Filter")
+        Product.objects.create(name="Grease")
+        ProductFitment.objects.create(product=fitted, vehicle_model=model)
+        invoice = Invoice.objects.create(customer_name="Walk-in", total_lyd=Decimal("150.00"))
+        PosSale.objects.create(key="k-1", invoice=invoice)
+        Invoice.objects.create(customer_name="Office", total_lyd=Decimal("999.00"))
+
+        tiles = _tiles(_ctx(self.user))
+        self.assertEqual(tiles["pos_today"]["value"], "150.00")
+        self.assertTrue(tiles["pos_today"]["meta"].startswith("1 "))
+        self.assertEqual(tiles["vehicle_browser"]["value"], "1")
+        self.assertTrue(tiles["vehicle_browser"]["meta"].startswith("1 "))

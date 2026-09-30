@@ -11,6 +11,14 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.9.0 dependency baseline
+
+v0.9.0 is developed against `django-lux[updater]==1.10.0b1` (settings groups,
+project settings in first-run setup, unsaved-changes prompt on project tiles).
+Same Composer floor as 1.9.4 (`>=1.5.3b1`) and no dlux migrations since 1.9.4.
+**Do not tag v0.9.0 on a beta:** re-pin to the 1.10.0 stable wheel and hash
+first.
+
 ## v0.8.3 dependency baseline
 
 This release pins `django-lux[updater]==1.9.4`. The maintenance operations
