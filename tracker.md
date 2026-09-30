@@ -31,6 +31,7 @@
 - Local reused SQLite has obsolete `sales_invoice.attachment`; fresh migrated databases are correct.
 ### Incomplete Tasks: [Max 20 lines]
 - **Priority 1 — run it:**
+  - [ ] Exchange rates through the Composer relay: merged to `main` 2026-09-30 (unpushed, unreleased). To finish on a stack: Composer 1.6.0b1 (beta channel) + DjangoLux 1.10.0b4, `python manage.py dlux_relay finance.cbl_rates_page finance.ean_rates_page` all on offer, then remove `egress` from the `celery` service in `compose.yml` and confirm `refresh_market_rates` still fills the cache. The dev stack's branch `automotive-parts-first` has uncommitted work that overlaps `CHANGELOG.md`, so it must pick this up by merging `main` itself.
   - [ ] Click through the running stack at http://localhost:84: row-menu modals, the invoice editor, a purchase invoice, the layout toggle. All 17 lists are verified to RENDER the ribbon server-side; none has been driven by hand.
   - [ ] Confirm the ribbon's Arabic/RTL rendering, `ui_view`/`ui_edit` row labels in Arabic, and the new year dropdown on Invoices/Payments/Expenses.
   - [ ] Verify `show_scan=True` still renders a scanner button on the purchase-invoice/expense attachment: ScanLink is opt-in since dlux 1.8.0.
