@@ -5,8 +5,9 @@
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'automotive/css/browser.css' %}">
-<link rel="stylesheet" href="{% static 'catalog/css/product_card.css' %}">
+<link rel="stylesheet" href="{% dlux_static 'automotive/css/browser.css' %}">
+<link rel="stylesheet" href="{% dlux_static 'catalog/css/product_card.css' %}">
+<link rel="stylesheet" href="{% dlux_static 'automotive/css/fits_picker.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -14,11 +15,22 @@
     {% dlux_ribbon %}
 
     <div class="vehicle-browser-search card border-0 shadow-sm mb-4">
-        <div class="card-body">
+        <div class="card-body d-flex flex-column gap-3">
+            <div class="fits-picker vehicle-jump" data-fits-picker data-fits-mode="jump"
+                 data-search-url="{{ vehicle_search_url }}" data-browse-url="{% url 'automotive:browse' %}"
+                 data-str-no-results="{{ DLUX_STRINGS.fits_no_results|default:'No matching vehicle.' }}">
+                <label class="form-label fw-semibold mb-1" for="vehicle-jump-input">{{ DLUX_STRINGS.vehicle_jump_label|default:"Find a vehicle" }}</label>
+                <div class="fits-picker__search">
+                    <i class="bi bi-car-front fits-picker__icon" aria-hidden="true"></i>
+                    <input id="vehicle-jump-input" type="search" class="form-control form-control-lg" data-fits-search autocomplete="off"
+                           placeholder="{{ DLUX_STRINGS.vehicle_jump_placeholder|default:'camry 2014, xv50, hilux 2.8…' }}">
+                    <div class="fits-picker__results list-group shadow-sm" data-fits-results role="listbox" hidden></div>
+                </div>
+            </div>
             <form method="get" class="d-flex flex-column flex-md-row gap-2" role="search">
                 <div class="input-group flex-grow-1">
                     <span class="input-group-text bg-transparent"><i class="bi bi-upc-scan"></i></span>
-                    <input class="form-control" type="search" name="q" value="{{ search_query }}" placeholder="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search SKU, barcode, or product name' }}" aria-label="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search SKU, barcode, or product name' }}">
+                    <input class="form-control" type="search" name="q" value="{{ search_query }}" placeholder="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search part number, SKU, barcode, or product name' }}" aria-label="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search part number, SKU, barcode, or product name' }}">
                 </div>
                 <button class="btn btn-primary rounded-pill px-4" type="submit">{{ DLUX_STRINGS.ui_search_products|default:"Search products" }}</button>
                 {% if search_query %}<a class="btn btn-outline-secondary rounded-pill" href="{% url 'automotive:browse' %}">{{ DLUX_STRINGS.ui_browse_vehicle_instead|default:"Choose a vehicle" }}</a>{% endif %}
@@ -39,6 +51,11 @@
     {% if next_step == "make" %}
     <section class="vehicle-step" aria-labelledby="make-heading">
         <div class="vehicle-step-heading"><span class="vehicle-step-number">1</span><div><h2 id="make-heading">{{ DLUX_STRINGS.vehicle_choose_make|default:"Choose a make" }}</h2><p>{{ DLUX_STRINGS.vehicle_choose_make_help|default:"Start with the vehicle manufacturer." }}</p></div></div>
+        {% if type_options %}
+        <div class="vehicle-choice-row mb-3" aria-label="{{ DLUX_STRINGS.optional_criterion_equipment_type|default:'Machine type' }}">
+            {% for option in type_options %}<a href="{% if option.selected %}{% url 'automotive:browse' %}{% else %}{{ option.url }}{% endif %}" class="vehicle-filter-chip {% if option.selected %}active{% endif %}"><span>{{ option.label }}</span><small>{{ option.count }}</small></a>{% endfor %}
+        </div>
+        {% endif %}
         <div class="vehicle-choice-grid">
             {% for option in make_options %}<a class="vehicle-choice" href="{{ option.url }}"><span>{{ option.label }}</span><small>{{ option.count }} {{ DLUX_STRINGS.ui_products_count|default:"products" }}</small></a>
             {% empty %}<div class="vehicle-empty">{{ DLUX_STRINGS.vehicle_no_fitment_data|default:"No active vehicle compatibility data is available yet." }}</div>{% endfor %}
@@ -83,7 +100,10 @@
     <section class="vehicle-results mt-4" aria-labelledby="results-heading">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <div><h2 id="results-heading" class="h4 mb-1">{{ DLUX_STRINGS.vehicle_compatible_products|default:"Compatible products" }}</h2><p class="text-muted small mb-0">{{ product_count }} {{ DLUX_STRINGS.ui_products_count|default:"products" }}{% if result_limited %} · {{ DLUX_STRINGS.vehicle_first_100|default:"showing the first 100" }}{% endif %}</p></div>
-            {% if not search_query %}<a class="btn btn-outline-secondary rounded-pill" href="{{ change_vehicle_url }}"><i class="bi bi-arrow-repeat me-1"></i>{{ DLUX_STRINGS.ui_change_vehicle|default:"Change vehicle" }}</a>{% endif %}
+            <div class="d-flex flex-wrap gap-2">
+                {% if add_part_url %}<button type="button" class="btn btn-primary rounded-pill" data-dynamic-modal="{{ add_part_url }}" data-modal-title="{{ DLUX_STRINGS.vehicle_add_part|default:'Add part for this vehicle' }}"><i class="bi bi-plus-lg me-1"></i>{{ DLUX_STRINGS.vehicle_add_part|default:"Add part for this vehicle" }}</button>{% endif %}
+                {% if not search_query %}<a class="btn btn-outline-secondary rounded-pill" href="{{ change_vehicle_url }}"><i class="bi bi-arrow-repeat me-1"></i>{{ DLUX_STRINGS.ui_change_vehicle|default:"Change vehicle" }}</a>{% endif %}
+            </div>
         </div>
 
         <div class="vehicle-product-grid">
@@ -110,4 +130,10 @@
     </section>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script src="{% dlux_static 'automotive/js/fits_picker.js' %}"></script>
+<script src="{% dlux_static 'catalog/js/price_sync.js' %}"></script>
 {% endblock %}

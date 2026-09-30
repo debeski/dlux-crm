@@ -16,11 +16,11 @@
 <section class="public-comingsoon">
     <div class="public-comingsoon__card">
         {% if APP_CONFIG.logo_url %}
-        <img class="public-comingsoon__logo" src="{{ APP_CONFIG.logo_url }}" alt="{{ APP_CONFIG.identity.display_name|default:'Switch' }}">
+        <img class="public-comingsoon__logo" src="{{ APP_CONFIG.logo_url }}" alt="{{ APP_CONFIG.identity.display_name }}">
         {% else %}
         <i class="bi bi-shop"></i>
         {% endif %}
-        <h1>{{ public_config.shop_title|default:"Switch Shop" }}</h1>
+        <h1>{{ public_config.shop_title|default:APP_CONFIG.identity.display_name }}</h1>
         <p>{{ public_config.shop_subtitle }}</p>
         <span class="public-comingsoon__badge">{{ DLUX_STRINGS.public_coming_soon|default:"Coming soon" }}</span>
     </div>

@@ -4,6 +4,8 @@ from copy import deepcopy
 OPTIONAL_ENHANCEMENTS_NS = "switch_pos.optional_enhancements"
 
 AUTOMOTIVE_CRITERIA = (
+    "equipment_type",
+    "model_year",
     "generation_chassis",
     "engine",
     "fuel_type",
@@ -12,9 +14,14 @@ AUTOMOTIVE_CRITERIA = (
     "position",
 )
 
+TERMINOLOGY_VEHICLE = "vehicle"
+TERMINOLOGY_EQUIPMENT = "equipment"
+TERMINOLOGIES = (TERMINOLOGY_VEHICLE, TERMINOLOGY_EQUIPMENT)
+
 OPTIONAL_ENHANCEMENTS_DEFAULTS = {
     "automotive": {
         "enabled": False,
+        "terminology": TERMINOLOGY_VEHICLE,
         "criteria": {criterion: True for criterion in AUTOMOTIVE_CRITERIA},
     },
 }
@@ -30,6 +37,8 @@ def normalize_optional_enhancements(value):
 
     normalized_automotive = normalized["automotive"]
     normalized_automotive["enabled"] = automotive.get("enabled") is True
+    if automotive.get("terminology") in TERMINOLOGIES:
+        normalized_automotive["terminology"] = automotive["terminology"]
     for criterion in AUTOMOTIVE_CRITERIA:
         if criterion in criteria:
             normalized_automotive["criteria"][criterion] = criteria[criterion] is True

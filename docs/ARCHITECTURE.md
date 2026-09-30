@@ -1,6 +1,6 @@
 # Switch POS — Architecture
 
-A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.9.4)**.
+A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.10.0)**.
 It is a single Django/DLux project with a public catalog surface and an authenticated
 staff workflow. DjangoLux provides users, permissions, sidebar/titlebar/navbar UI,
 dynamic modals, audit trail, soft-delete, reports, backups and notifications — this
@@ -42,6 +42,35 @@ of fitment rows so selecting a qualifier still includes blank broad/all rows.
 Only the final Product query carries live category, stock and price data; result
 size therefore does not create per-card compatibility queries. Query parameters
 are the browser state, making Back, refresh and shared vehicle paths deterministic.
+`automotive.fits` is the quick-entry layer: vehicle search, chip parsing and
+validation (through `ProductFitment.clean`), additive/replace application, and
+part-number sync. `automotive.product_form.AutomotiveProductExtension` grafts the
+*Fits vehicles*, part brand and part-number fields onto `catalog.ProductForm`
+without touching the Product model: it is attached in `ProductForm.__init__`
+only while automotive is on, validates in `clean()`, and saves in `_save_m2m()`,
+which DjangoLux's modal save calls after the Product row exists. `PartProfile`
+(one-to-one) and `ProductPartNumber` (many, with an indexed normalized column)
+are the extension tables. The picker is one widget
+(`automotive/widgets/fits_picker.html` + `automotive/js/fits_picker.js`) reused
+by the Product modal, the bulk *Assign vehicles* modal, purchase-invoice lines and
+the browser's *Find a vehicle* jump; it loads its own static and re-binds on
+`dlux:modal-content-loaded`.
+Heavy equipment reuses the same tables: `EquipmentType` groups models,
+`VehicleEngine.vehicle_model` may be blank for a shared engine linked to many
+models through `fitted_models`, and `ProductFitment.vehicle_model`/years may be
+blank (engine-only rows, all years). `VehicleBrowser._expanded_rows()` repeats an
+engine-only row once per fitted active model, so every later step counts and
+filters it like a model row. `automotive.terminology` derives the machine
+wording from the project's own strings and stores it in
+`SystemSettings.translations_override`.
+
+`sales.pos` holds the till's lookup and `complete_sale` service; it builds an
+invoice with the editor's own pricing helper, then reuses `issue_invoice` and
+`Payment`, so the till adds no parallel sales model — only `PosSale` (retry key,
+cash given, change). Settings live in the `switch_pos.point_of_sale` app config
+(`sales.pos_settings`, card in `sales/dlux_options.py`). Phase 1 keeps the cart
+in the browser (localStorage) and sends it once at checkout; the till page,
+lookup, checkout, receipt and vehicle panel are under `/staff/sales/pos/`.
 
 `common/` is a plain Python package (not a Django app, no models). It holds
 `ScopedListView`, `RibbonPageMixin` and the generic
@@ -207,8 +236,8 @@ The Products page renders three ways. The effective layout resolves
   (a scalar; same app-preference store as the workspace dashboard).
 - **Global admin default** — a superuser setting saved to
   `SystemSettings.extra_config['app']['switch_pos.products_layout']['default_layout']`,
-  registered with dlux 1.4.4's `register_app_settings` (a settings tile in the
-  Options admin grid) and read via `dlux.utils.get_app_system_config`.
+  edited in the *Products layout* section of the **CRM options** tile (see
+  below) and read via `dlux.utils.get_app_system_config`.
 
 `ProductListView` branches on the resolved value:
 
@@ -227,11 +256,38 @@ Per-user switching has two surfaces sharing one component
 then reloads only after a successful save): an inline header toggle and a
 `/staff/sys/options` card registered with `dlux.options.register_card`
 (`catalog/dlux_options.py`, gated on `catalog.view_product`). The global default
-is the superuser settings tile above (`register_app_settings`). The shared
+is the *Products layout* section of the **CRM options** tile. The shared
 `templates/common/scoped_list.html` exposes a `{% block list_body %}` so alternate
 layouts can replace the table body while keeping the header, filter and modal-CRUD
-wiring. **Requires dlux ≥ 1.4.4** (`register_app_settings` + `get_app_system_config`);
-registrations import defensively so an older runtime still gets the per-user card.
+wiring.
+
+### CRM options tile
+
+The store-wide settings are one **CRM options** tile on the Options page — a
+DjangoLux settings group (dlux ≥ 1.10.0). `common/dlux_options.py` registers
+it with `register_app_settings_group(id=CRM_OPTIONS_GROUP)`
+(`switch_pos.crm_options`, order 50), and each app registers its settings with
+`register_app_settings(..., group=CRM_OPTIONS_GROUP)`: *Products layout*
+(`catalog`), *Public catalog* (`public_catalog`) and *Point of sale* (`sales`).
+DjangoLux draws them as sections of one modal under its own section headings,
+validates them together and saves every namespace in **one** write of the
+settings row, so readers such as `get_pos_config()` are unchanged. The same
+registrations appear as sections of the first-run setup wizard's *Project
+settings* step. *Optional enhancements* (store types) stay a separate tile.
+
+A settings form's `to_app_config()` must only *return* its value: the setup
+wizard saves the whole settings row once, so anything a form saves on its own
+is overwritten. Side effects that must follow a saved value hang off the row's
+`post_save` instead — the machine wording does
+(`automotive.terminology.sync_terminology`).
+
+Settings that depend on a master toggle follow dlux's rule that a disabled
+master locks its dependents rather than hiding them: `common/settings_forms.py`
+wraps them in `dependent_block(form, master, …)` (greyed, with dlux's
+`settings_dependent_disabled` tooltip) and `lock_dependents()` disables the
+fields server-side while the master is off, so a save keeps their stored
+values. `common/js/dependent_settings.js` (loaded from
+`templates/dlux/includes/custom_scripts.html`) follows the toggle live.
 
 ## Money & currency
 

@@ -22,6 +22,8 @@ from automotive.models import (
 
 User = get_user_model()
 CRITERIA = {
+    "equipment_type": True,
+    "model_year": True,
     "generation_chassis": True,
     "engine": True,
     "fuel_type": True,

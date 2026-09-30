@@ -169,9 +169,9 @@ through the setup wizard and Options instead of committing a customer's brand.
 | `/shop/` | Public catalog |
 | `/shop/items/<slug>/` | Public item page |
 | `/contact/modal/` | Public contact dynamic modal endpoint |
-| `/staff/` | Staff entry redirect |
+| `/staff/` | Staff entry redirect (to the Workspace dashboard) |
 | `/staff/accounts/login/` | Staff login |
-| `/staff/workspace/` | Workspace dashboard (DLux Home URL) |
+| `/staff/workspace/` | Workspace dashboard (default DLux Home URL; set Home to `/staff/sales/pos/` or `/staff/automotive/browse/` to open the till or the vehicle browser after login) |
 | `/staff/sales/dashboard/` | Sales Overview |
 | `/staff/sales/invoices/` | Invoices |
 | `/staff/sales/new/` | New invoice editor |
@@ -191,6 +191,16 @@ through the setup wizard and Options instead of committing a customer's brand.
 | `/staff/finance/staff-ledger/` | Staff ledger entries |
 | `/staff/sales/report/` | Sales report (XLSX export from here; owner-only) |
 | `/staff/sales/financial/` | Fiscal-year financial report with expenses/net profit |
+
+## Point of sale hardware
+
+- **Barcode scanners**: any USB or Bluetooth scanner that types like a keyboard
+  works with the till; no driver or setup.
+- **Receipt printers**: choose the paper width in the Point of sale settings
+  and print from the browser; set the printer's margins to none.
+- **Phone camera scanning** needs a secure page. It works on `localhost` and
+  over HTTPS; on the store network the guided certificate install (POS phase 2)
+  is what enables it for phones.
 
 ## Scheduled tasks (Celery Beat)
 

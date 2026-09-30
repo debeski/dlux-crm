@@ -2,12 +2,30 @@ import django_filters
 from django.db.models import Q
 
 from .models import (
+    EquipmentType,
     VehicleEngine,
     VehicleGeneration,
     VehicleMake,
     VehicleModel,
     VehicleTrim,
 )
+
+
+class EquipmentTypeFilter(django_filters.FilterSet):
+    keyword = django_filters.CharFilter(method="filter_keyword", label="")
+
+    advanced_config = {
+        "fields": [{"name": "keyword", "placeholder_key": "search_placeholder"}],
+        "advanced_fields": [["is_active"]],
+        "clear_preserve_keys": ["sort", "page"],
+    }
+
+    class Meta:
+        model = EquipmentType
+        fields = ["keyword", "is_active"]
+
+    def filter_keyword(self, queryset, name, value):
+        return queryset.filter(name__icontains=value) if value else queryset
 
 
 class VehicleMakeFilter(django_filters.FilterSet):
@@ -38,12 +56,22 @@ class VehicleModelFilter(django_filters.FilterSet):
 
     class Meta:
         model = VehicleModel
-        fields = ["keyword", "make", "is_active"]
+        fields = ["keyword", "make", "equipment_type", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .settings import get_automotive_config
+
+        if not get_automotive_config()["criteria"].get("equipment_type"):
+            self.filters.pop("equipment_type", None)
 
     def filter_keyword(self, queryset, name, value):
         if not value:
             return queryset
-        return queryset.filter(Q(name__icontains=value) | Q(make__name__icontains=value))
+        return queryset.filter(
+            Q(name__icontains=value) | Q(make__name__icontains=value)
+            | Q(equipment_type__name__icontains=value)
+        )
 
 
 class VehicleGenerationFilter(django_filters.FilterSet):
@@ -96,9 +124,10 @@ class VehicleEngineFilter(django_filters.FilterSet):
         return queryset.filter(
             Q(display_name__icontains=value)
             | Q(engine_code__icontains=value)
+            | Q(manufacturer__icontains=value)
             | Q(vehicle_model__name__icontains=value)
             | Q(vehicle_model__make__name__icontains=value)
-        )
+        ).distinct()
 
 
 class VehicleTrimFilter(django_filters.FilterSet):

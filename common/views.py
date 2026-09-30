@@ -25,7 +25,7 @@ from dlux.utils import get_user_scope, is_scope_enabled
 
 from common.access import apply_ownership
 from common.formatting import format_money
-from common.forms import translate_choice_fields
+from common.forms import translate_filter_choice_fields
 
 
 def _money(value):
@@ -220,7 +220,7 @@ class ScopedListView(RibbonMixin, LoginRequiredMixin, PermissionRequiredMixin, S
         # The Ribbon derives the whole filter band from the FilterSet, but it
         # does not touch the choices *inside* a field, so the option labels
         # (status/method/… -> Arabic/English) are still localized here.
-        translate_choice_fields(filterset.form, self.request)
+        translate_filter_choice_fields(filterset.form, self.request)
         return filterset
 
     def get_ribbon_actions(self):
@@ -390,8 +390,32 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             )
         }
 
+    def _till_open(self):
+        from sales.pos_settings import pos_enabled
+        from sales.pos_views import POS_PERMS
+
+        return pos_enabled() and self.request.user.has_perms(POS_PERMS)
+
+    def _browser_open(self):
+        from automotive.settings import automotive_enabled
+        from automotive.views import VehicleBrowserView
+
+        return automotive_enabled() and self.request.user.has_perms(VehicleBrowserView.permission_required)
+
     def _build_quick_actions(self):
         user = self.request.user
+        # Optional enhancements lead when on: they are the counter's daily start.
+        actions = []
+        if self._till_open():
+            actions.append({
+                "label": self._s("ui_open_till", "Open the till"), "icon": "bi bi-upc-scan",
+                "url": reverse("sales:pos_till"),
+            })
+        if self._browser_open():
+            actions.append({
+                "label": self._s("ui_browse_by_vehicle", "Browse by vehicle"), "icon": "bi bi-car-front-fill",
+                "url": reverse("automotive:browse"),
+            })
         candidates = [
             (("sales.add_invoice",), "ui_new_invoice", "New Invoice", "bi bi-receipt", "sales:invoice_create"),
             (
@@ -405,7 +429,6 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             (("sales.view_sales_report",), "ui_sales_report", "Sales Report", "bi bi-graph-up", "sales:report"),
             (("sales.view_financial_report",), "page_financial_report", "Financial", "bi bi-cash-stack", "sales:financial_report"),
         ]
-        actions = []
         for perms, key, fallback, icon, url_name in candidates:
             if all(user.has_perm(perm) for perm in perms):
                 actions.append({
@@ -656,6 +679,42 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             ))
         return tiles
 
+    def _enhancement_tiles(self, today):
+        """Tiles for the optional till and vehicle/machine browser, only while on."""
+        tiles = []
+        if self._till_open():
+            from sales.views import _visible_invoices
+
+            sales = _visible_invoices(self.request.user).filter(
+                pos_sale__isnull=False, pos_sale__created_at__date=today,
+            )
+            tiles.append(_tile(
+                "pos_today", self._s("pos_till_title", "Point of Sale"), "bi bi-upc-scan",
+                value=_money(sales.aggregate(t=Sum("total_lyd"))["t"] or Decimal("0.00")), unit="LYD",
+                meta=f"{_count(sales.count())} {self._s('pos_sales_today', 'till sales today')}",
+                url=reverse("sales:pos_till"), tone="green",
+                footer=self._s("ui_open_till", "Open the till"),
+            ))
+        if self._browser_open():
+            from automotive.models import VehicleModel
+            from catalog.models import Product
+
+            user = self.request.user
+            machines = scope_filtered_queryset(VehicleModel.objects.all(), user).count()
+            fitted = scope_filtered_queryset(
+                Product.objects.filter(
+                    is_active=True, automotive_fitments__isnull=False, automotive_fitments__deleted_at__isnull=True,
+                ),
+                user,
+            ).distinct().count()
+            tiles.append(_tile(
+                "vehicle_browser", self._s("models_vehiclemodel", "Vehicle Models"), "bi bi-car-front-fill",
+                value=_count(machines), meta=f"{_count(fitted)} {self._s('ui_parts_fitted', 'parts fitted')}",
+                url=reverse("automotive:browse"), tone="cyan",
+                footer=self._s("ui_browse_by_vehicle", "Browse by vehicle"),
+            ))
+        return tiles
+
     def _finance_tiles(self):
         from finance.models import CashDeposit, Expense, StaffAccount, StaffLedgerEntry
         from finance.services import (
@@ -753,6 +812,7 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
         month_start = today.replace(day=1)
 
         tiles = []
+        tiles.extend(self._enhancement_tiles(today))
         tiles.extend(self._finance_tiles())
         tiles.extend(self._sales_tiles(today, month_start))
         tiles.extend(self._delivery_tiles())

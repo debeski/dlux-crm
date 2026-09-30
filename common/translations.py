@@ -12,6 +12,8 @@ DjangoLux. Three families:
 """
 DLUX_STRINGS = {
     "en": {
+        "options_crm": "CRM options",
+        "options_crm_desc": "Store-wide settings for the products list, the public shop and the till.",
         # ---- generic table headers (label_<column>) ----
         "label_rate": "Rate (LYD/USD)",
         "label_source": "Source",
@@ -214,7 +216,7 @@ DLUX_STRINGS = {
         # dashboard
         "ui_dashboard": "Workspace",
         "ui_workspace": "Workspace",
-        "ui_workspace_subtitle": "Switch operations",
+        "ui_workspace_subtitle": "Live operating surface across sales, stock, finance and delivery.",
         "ui_customize": "Customize",
         "ui_tiles": "Tiles",
         "ui_open": "Open",
@@ -297,8 +299,12 @@ DLUX_STRINGS = {
         "pr_print_save": "Print / Save as PDF",
         "pr_no": "#",
         "pr_description": "Description",
+        "method_card": "Card",
+        "choice_card": "Card",
     },
     "ar": {
+        "options_crm": "خيارات CRM",
+        "options_crm_desc": "إعدادات عامة للمتجر: عرض الأصناف، والمتجر العام، ونقطة البيع.",
         # ---- generic table headers ----
         "label_rate": "السعر (دينار/دولار)",
         "label_source": "المصدر",
@@ -501,7 +507,7 @@ DLUX_STRINGS = {
         # dashboard
         "ui_dashboard": "مساحة العمل",
         "ui_workspace": "مساحة العمل",
-        "ui_workspace_subtitle": "عمليات Switch",
+        "ui_workspace_subtitle": "لوحة تشغيل مباشرة للمبيعات والمخزون والمالية والتوصيل.",
         "ui_customize": "تخصيص",
         "ui_tiles": "البطاقات",
         "ui_open": "فتح",
@@ -584,5 +590,7 @@ DLUX_STRINGS = {
         "pr_print_save": "طباعة / حفظ PDF",
         "pr_no": "#",
         "pr_description": "الوصف",
+        "method_card": "بطاقة",
+        "choice_card": "بطاقة",
     },
 }

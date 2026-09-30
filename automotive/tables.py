@@ -4,11 +4,18 @@ from dlux.tables import DluxTable
 from common.i18n import t
 from common.tables import ModalRowActionsMixin
 
-from .models import VehicleEngine, VehicleGeneration, VehicleMake, VehicleModel, VehicleTrim
+from .models import EquipmentType, VehicleEngine, VehicleGeneration, VehicleMake, VehicleModel, VehicleTrim
 
 
 class AutomotiveReferenceTable(ModalRowActionsMixin, DluxTable):
     row_delete_action = False
+
+
+class EquipmentTypeTable(AutomotiveReferenceTable):
+    class Meta(DluxTable.Meta):
+        model = EquipmentType
+        fields = ("name", "is_active", "created_at")
+        dlux_actions = True
 
 
 class VehicleMakeTable(AutomotiveReferenceTable):
@@ -21,7 +28,7 @@ class VehicleMakeTable(AutomotiveReferenceTable):
 class VehicleModelTable(AutomotiveReferenceTable):
     class Meta(DluxTable.Meta):
         model = VehicleModel
-        fields = ("make", "name", "is_active", "created_at")
+        fields = ("make", "equipment_type", "name", "is_active", "created_at")
         dlux_actions = True
 
 
@@ -38,10 +45,16 @@ class VehicleEngineTable(AutomotiveReferenceTable):
     class Meta(DluxTable.Meta):
         model = VehicleEngine
         fields = (
-            "vehicle_model", "generation", "display_name", "engine_code",
+            "vehicle_model", "generation", "manufacturer", "display_name", "engine_code",
             "displacement", "fuel_type", "is_active",
         )
         dlux_actions = True
+
+    def render_vehicle_model(self, record, value):
+        if record.vehicle_model_id:
+            return str(value)
+        count = record.fitted_models.count()
+        return t("engine_shared_models", "Shared · {count} models").format(count=count)
 
     def render_fuel_type(self, record):
         return t(f"fuel_{record.fuel_type}", record.get_fuel_type_display()) if record.fuel_type else "—"

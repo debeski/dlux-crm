@@ -37,6 +37,8 @@
   - [ ] Verify `show_scan=True` still renders a scanner button on the purchase-invoice/expense attachment: ScanLink is opt-in since dlux 1.8.0.
   - [ ] Verify the packaged smtp-relay reads `SystemSettings.email_config` — the deployment's unset SMTP credentials may be fixable through the UI now.
 - **Priority 2 — decisions and follow-ups:**
+  - [ ] Decide store-type architecture for Optional enhancements (parts-fitment pack with vehicle/machine flavours vs future pharmacy/cafe packs).
+  - [ ] POS phase 2 (P1 committed `80c7d96`; till polish + CRM options committed `e430ab0`): P2 phone paired as scanner (server cart per user+till, 1s polling), parked sales, guided cert install (Caddy internal CA on the PC's static IP, QR setup page); P3 shifts/Z-report, returns. Heavy-equipment serial ranges deferred.
   - [ ] Automotive Phases 0/4: obtain the retailer workbook, confirm controlled values/out-of-stock behavior, then build reviewed XLSX import, audit and pilot tooling.
   - [ ] Design ribbon tab strips (Invoice status — `_status_counts` already feeds `get_ribbon_tab_counts`; StockMovement type; PurchaseInvoice status; Product category).
   - [ ] Ask upstream for a detail-modal hook: `get_modal_context()` is merged before `auto_detail_fields` is set, the only reason `templates/dlux/helpers/dynamic_modal_detail.html` is forked.
@@ -45,7 +47,16 @@
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
   - [ ] Storefront polish: mobile `/shop/` search input collapses (placeholder hidden); landing hero kicker has low contrast.
 - **Completed Recently:**
-  - [x] v0.8.4 (untagged): public storefront labels, modals, contact form/links and untouched homepage seed copy follow the visitor language (`public_*` / `hp_seed_*` keys) (2026-09-29).
+  - [x] Workspace: *Open the till* / *Browse by vehicle* quick actions + `pos_today` / `vehicle_browser` tiles while enabled (2026-09-30).
+  - [x] Removed POS *Open the till on login* and the parts-mode `/staff/` landing (never applied: DLux login goes to its Home); landing = DLux Home (store/per-user; per-group coming in dlux); real-login test `common.tests.test_login_landing` (2026-09-30).
+  - [x] Machine wording synced on `SystemSettings` post_save (wizard/import safe); dlux pinned 1.10.0 stable (2026-09-30); relay rates need Composer 1.6.0.
+  - [x] Dependent settings: POS and Optional-enhancements dependents greyed/disabled with dlux tooltip instead of hidden; stored values kept while off (2026-09-29).
+  - [x] CRM options tile on dlux 1.10.0b1 settings groups (`register_app_settings_group` + `group=`); layout/public catalog/POS as sections, namespaces unchanged; `common/crm_options.py` retired to `.xclude/` (2026-09-30).
+  - [x] Test data (2026-09-29): PINV-000003 "Libya Heavy Parts Co." — 21 machines/7 Arabic types, 13 shared engines, 35 products (EAN-13 `624…`, size variants with own codes, low/out-of-stock cases, Fleetguard supplier-label extra code).
+  - [x] POS phase 1: till `/staff/sales/pos/`, `sales.pos.complete_sale` (idempotent `PosSale`), card method, discount cap, receipts, `ProductBarcode`; dev POS on; all demo data soft-deleted (2026-09-29).
+  - [x] Heavy machinery: `EquipmentType`, shared engines + engine-only/all-years fitments (`automotive.0003`), `equipment_type`/`model_year` criteria, machine wording switch via tracked translation overrides; heavy demo data on PINV-000002; dev set to "equipment" wording (2026-09-29).
+  - [x] v0.9.0 (untagged) parts-first automotive UX: Fits picker in Product modal, Same cars as…/Assign vehicles, `PartProfile`/`ProductPartNumber` extension (Product unchanged), browser Find a vehicle + Add part, purchase-line fits, `/staff/` → browser, Vehicle/Year product filters (2026-09-28).
+  - [x] v0.8.4 (untagged, merged into this branch): public storefront labels, modals, contact form/links and untouched homepage seed copy follow the visitor language (`public_*` / `hp_seed_*` keys) (2026-09-29).
   - [x] Generated app READMEs now recommend the Dlux Ribbon instead of the deprecated `advanced_filter_helper`; active code has no helper or `AUDIT_FIELD_NAMES` dependency (merged 2026-09-26).
   - [x] v0.8.1 version/manifest/changelog aligned and DjangoLux pinned exactly to 1.9.2 for patch-release validation (2026-09-23).
   - [x] DjangoLux runtime pin advanced exactly from 1.8.13 to 1.9.1 for the v0.8.0 release candidate (2026-09-23).
@@ -61,19 +72,17 @@
   - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
-  - [x] Date filters: Invoice/Payment/Expense on `DatedFilterSet` (year + range); `date_from` -> `date_gte`, old bookmarks lose their filter — user's call (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
+- 2026-09-30: v0.9.0 release check — 358/358 incl. automotive + scaffold on the 1.10.0 image; manifest validated for tag v0.9.0.
+- 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
+- 2026-09-29: 344/344 app tests after v0.8.4 merge + dependent settings; earlier 341/341 (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
+- 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
+- 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 - 2026-09-29: v0.8.4 storefront i18n — CI set 249/249 (SQLite, throwaway `sales-deck-shots` container), migrations clean, manifest validator OK for v0.8.4.
 - 2026-09-26: dlux 1.9.4 — CI test set 248/248 (SQLite), check/migration drift clean, 17 enabled ribbon lists render; hashed 1.9.4 wheel from PyPI.
-- 2026-09-24: 285/285 tests, manifest validator, installed 1.9.3, pip check and runtime smoke pass on `sales-validation:0.8.2`; logs `.xclude/release-0.8.2/`. Fresh amd64 build cannot fetch gunicorn from PyPI; no publish/deploy.
-- 2026-09-23: Brand-neutral `config.json` parses, normalizes to 76 settings, contains no Switch/SwitchLibya/store-contact remnants, and scaffold tests pass 5/5.
-- 2026-09-23: 285/285 baseline; automotive 37/37 after gating sidebar discovery/rendering on the persisted enhancement state, with enabled/disabled and bilingual regressions.
-- 2026-09-23: Rebuilt live Docker stack 9/9 healthy; `/health/` 200 and installed django-lux 1.9.2 confirmed.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-09-29: `docs/ARCHITECTURE.md` describes storefront localization keys and homepage seed-copy fallback.
-- 2026-09-26: finance/catalog/sales app READMEs now direct new list pages to `RibbonMixin` and `{% dlux_ribbon %}`.
-- 2026-09-24: Architecture/Operations/Release docs describe 1.9.3, the official hash-pinned wheel, and Composer 1.5.2 maintenance requirements; changelog/manifest/version aligned at 0.8.2.
-- 2026-09-11: `docs/BUSINESS_RULES.md` Inventory valuation covers sale value, expected profit and margin.
+- 2026-09-29: ARCHITECTURE (CRM options tile, storefront localization), BUSINESS_RULES (POS grid, payment balancing, ZXing, CRM options).
+- 2026-09-28: BUSINESS_RULES/ARCHITECTURE/PERMISSIONS/AUTOMOTIVE_FITMENT_PLAN (Phase 3.5) describe quick Fits entry, part identity and parts-mode navigation.
 
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:
@@ -82,6 +91,6 @@
 ### Global Rulesets:
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
-- v0.8.3 is released; the running sales stack was not redeployed. On PostgreSQL, 2 tests assume fresh IDs (`test_grid_layout_renders_cards`, purchase-invoice numbering); CI's SQLite set passes. Retailer Phase 0/4 remain open.
+- v0.9.0 lives on branch `automotive-parts-first` (worktree `../automotive-parts-first`; branding + Arabic UI fixes committed); the dev stack runs FROM that folder (own copies of `.secrets/`, `media/`). Demo parts: supplier "Demo Parts Supply", invoice PINV-000001 (30 products, 92 fitments). Dev DB holds a 10-make/127-generation vehicle seed; user's Camry "7th" and Accord "4th"/"5th" rows carry placeholder chassis/years. v0.8.3 is released. On PostgreSQL, 2 tests assume fresh IDs (`test_grid_layout_renders_cards`, purchase-invoice numbering); CI's SQLite set passes. Retailer Phase 0/4 remain open.
 ### References and Links:
 - Dlux source: `../../pkg-django-lux`; release guide: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`.

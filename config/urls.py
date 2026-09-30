@@ -15,6 +15,8 @@ from automotive.views import (
 
 
 def staff_entry(request):
+    # Where a user lands after login is DjangoLux's Home setting (store-wide, or
+    # per user when allowed); /staff/ itself only opens the dashboard.
     if request.user.is_authenticated:
         return redirect("common:workspace_dashboard")
     return redirect("login")

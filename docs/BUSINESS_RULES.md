@@ -161,6 +161,13 @@ views. A sales rep therefore sees their own sales/payment/customer tiles, a
 courier sees only assigned delivery work, and a manager/superuser sees the whole
 store.
 
+The optional enhancements add to it only while they are on and the user can use
+them: the **till** puts *Open the till* first in Quick Actions and a *Point of
+Sale* tile with today's till sales (total and count of `PosSale` invoices the
+user may see); **automotive** adds *Browse by vehicle* to Quick Actions and a
+tile with the number of vehicle (machine) models and of active products fitted
+to at least one. Both follow the store's vehicle/machine wording.
+
 Users may hide, reorder, and resize tiles. Those layout preferences are stored
 per user in DjangoLux's reserved app-preferences namespace:
 `Profile.preferences["app"]["switch_pos.workspace_dashboard.v1"]`. Browser
@@ -280,11 +287,14 @@ by a superuser from the **Optional enhancements** System Settings card.
 - The settings modal stages changes until Save. **Manage vehicle data** is
   disabled when Automotive Compatibility is not yet persistently enabled, so
   checking an unsaved switch cannot lead to a feature-gated 404.
-- The automotive hub is the single route exposed to the sidebar builder, and
-  only while the persisted enhancement switch is on. Turning the enhancement
-  off removes it from discovery and rendering even if it was previously saved
-  in the sidebar; the individual make/model/generation/engine/trim routes remain
-  internal hub destinations.
+- The automotive hub and **Browse by Vehicle** are the only routes exposed to the
+  sidebar builder, and only while the persisted enhancement switch is on. Turning
+  the enhancement off removes them from discovery and rendering even if they were
+  previously saved in the sidebar; the individual make/model/generation/engine/trim
+  routes remain internal hub destinations. To open the browser after login, set
+  DjangoLux's Home (store-wide, or per user when allowed) to
+  `/staff/automotive/browse/`; enabling automotive does not change where anyone
+  lands.
 - The Product Item card shows its compatible vehicles using enabled criteria
   only. Managers edit several ranges in one save; exact duplicates are rejected
   and matching overlapping ranges require explicit confirmation.
@@ -300,8 +310,101 @@ by a superuser from the **Optional enhancements** System Settings card.
   out-of-stock items, and open the existing Product Item card. Out-of-stock items
   are currently shown by default; the retailer pilot must confirm whether that
   should become a user-controlled or store-wide filter.
-- Direct browser search accepts Product name, SKU or barcode without requiring a
-  vehicle path. The XLSX fitment intake remains a later plan phase.
+- Direct browser search accepts Product name, SKU, barcode, OEM/cross-reference
+  number or part brand without requiring a vehicle path. The XLSX fitment intake
+  remains a later plan phase.
+- **Quick Fits entry.** The Product add/edit modal carries a *Fits vehicles*
+  search-and-tag picker right after name/category. Typing `camry 2014`, a chassis
+  code (`xv50`) or an engine (`hilux 2.8`) suggests model-year, generation and
+  engine matches; a typed year or `2010-2012` range becomes the row's years, a
+  generation brings its own span. A model with no generations needs a typed year.
+  Tags for existing rows are kept untouched (their engine/position/notes are
+  edited in the full editor, linked as *Advanced*); removing a tag retires that
+  row, new tags create rows. Exact duplicates collapse; overlap confirmation stays
+  a rule of the full editor only.
+- **Same cars as…** copies another product's compatibility as new tags,
+  including its engine/trim/transmission/position values.
+- **Assign vehicles** (Products ribbon) adds the same tags to several products in
+  one save. It is additive: existing compatibility is never removed.
+- **Purchase invoice lines** carry a collapsed *Fits vehicles* picker; on posting,
+  its tags are added to the created or reused Product (additive, same transaction
+  as the stock-in).
+- **Vehicle-first add.** The browser's *Find a vehicle* search reaches any active
+  make/model/year, including one no product fits yet, and its results offer *Add
+  part for this vehicle*, opening the Product modal with that vehicle tagged.
+  The name is suggested as `<category> – <vehicle>` when left blank.
+- **Part identity** lives beside the Product: `PartProfile` holds the part brand,
+  `ProductPartNumber` holds OEM and cross-reference numbers. Numbers are
+  comma-separated in the form and matched by an uppercase alphanumeric form, so
+  `04465-33450` and `0446533450` are the same number. Product keyword search
+  matches them (3+ significant characters).
+- The Products list adds **Vehicle** and **Vehicle year** filters while automotive
+  is on; both must match the *same* fitment row.
+- **Heavy machinery and equipment.** A store can choose *Machines & equipment*
+  wording (Optional enhancements → What the store serves). The switch writes
+  machine wording (آلية/آليات, "Machine") as DLux translation overrides and
+  withdraws only the overrides it wrote, so an admin's own wording survives.
+- **Machine type** (excavator, loader, generator…) is an optional criterion on
+  each model. The browser shows types as chips over the make grid; untyped
+  models stay reachable without a type.
+- **Shared engines.** An engine with no model is shared: it has a manufacturer
+  (Perkins, Cat, Cummins…) and a list of fitted models. A part tagged to a
+  shared engine alone fits every machine that engine is fitted to — it appears
+  in the browser, the Vehicle filter and search for each of them. A part tagged
+  to a model *and* a shared engine is valid only when that engine is fitted to
+  the model.
+- **Years are optional.** A fitment with no years fits all years. Turning the
+  *Model year* criterion off hides year inputs and the browser's year step, and
+  is refused while any fitment still carries years. With the criterion on, the
+  year step is skipped for a model whose fitments have no years.
+
+## Point of sale (نقطة البيع)
+
+An optional till for quick walk-in sales, switched on in the *Point of sale*
+section of the **CRM options** settings tile (off by default).
+
+- A till sale is an ordinary walk-in invoice: created, issued (stock out, with
+  the usual shortage check) and paid in one transaction. Reports, the stock
+  ledger and cash deposits treat it like any other sale. A shortage or any
+  refusal rolls the whole sale back.
+- Every sale carries a till-generated key (`PosSale.key`); resubmitting the same
+  key returns the same invoice, so a double tap or a dropped connection cannot
+  sell twice.
+- Payment: cash, card (the store's own card machine) and bank transfer, as
+  enabled in settings, and split across them. Non-cash amounts may not exceed
+  what is left to pay; cash covers the rest and the change is recorded on the
+  `PosSale` (with the cash given) and printed on the receipt.
+  The payment dialog opens with the total in the chosen method. Amounts the
+  cashier types stay as typed; what is left to pay flows into the chosen method
+  or else cash, never into another card or transfer field. Quick-amount buttons
+  fill the field last focused (cash: the amount due and round-ups; card or
+  transfer: the amount due).
+- Discounts: a lowered line price and a sale discount both count. Their total,
+  against the list price, may not exceed the seller limit (settings, default
+  10%) unless the user holds `sales.pos_unlimited_discount`.
+- Scanning: the always-focused box resolves an extra barcode (per product or
+  per variant), the product barcode, the SKU or a normalized part number as an
+  exact hit and adds it; anything else searches names and part numbers. Keys a
+  hardware scanner types while focus is elsewhere are routed to the box. An
+  unknown code offers **Add a new item with this barcode**; after saving, the
+  till adds it to the still-open cart.
+- Before any search the till shows the **Most sold** grid: best sellers of the
+  last 90 days, topped up with the newest items, leaving out tracked items
+  with no stock (search still finds them). Search hits open in a dropdown
+  over it; clicking elsewhere folds the dropdown and focusing the box reopens
+  it. Picking a vehicle fills the grid with what fits it until **Back to most
+  sold**.
+- Camera scanning uses the browser's built-in barcode reader where available
+  and otherwise the bundled ZXing reader (`sales/static/sales/pos/vendor/`,
+  Apache-2.0, loaded on first use, e.g. iPhone Safari). Either needs a secure
+  page (localhost or HTTPS).
+- Receipts: none, thermal 58 mm / 80 mm, or A4 (settings), printed from the
+  browser.
+- Where users land after login is DjangoLux's Home setting (store-wide, or per
+  user when allowed); set it to `/staff/sales/pos/` for a counter that opens on
+  the till. Enabling the till does not change where anyone lands.
+- **Extra barcodes** (`catalog.ProductBarcode`) are edited in the product form
+  whether or not the till is on; a code already used by another item is refused.
 
 ## Sales invoice variant selection
 

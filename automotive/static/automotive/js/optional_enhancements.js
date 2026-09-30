@@ -2,10 +2,12 @@
   function bindOptionalEnhancements(root = document) {
     root.querySelectorAll("#optional-enhancements-form:not([data-enhancements-bound])").forEach((form) => {
       form.dataset.enhancementsBound = "1";
-      const master = form.querySelector("#id_automotive_enabled");
+      // Field names carry a prefix inside dlux's setup wizard and grouped tiles.
+      const field = (name) => form.querySelector(`[name="${name}"], [name$="-${name}"]`);
+      const master = field("automotive_enabled");
       const criteria = form.querySelector("#automotive-criteria-fields");
-      const engine = form.querySelector("#id_criterion_engine");
-      const fuel = form.querySelector("#id_criterion_fuel_type");
+      const engine = field("criterion_engine");
+      const fuel = field("criterion_fuel_type");
       const preview = form.querySelector("[data-automotive-workflow-preview]");
       const previewOutput = form.querySelector("[data-automotive-workflow-output]");
       const manage = form.querySelector("[data-automotive-manage]");
@@ -35,15 +37,16 @@
           if (label) steps.push(label);
         });
         steps.push(preview.dataset.endLabel);
-        previewOutput.textContent = steps.filter(Boolean).join(" → ");
+        const arrow = getComputedStyle(previewOutput).direction === "rtl" ? " ← " : " → ";
+        previewOutput.textContent = steps.filter(Boolean).join(arrow);
       };
-      const syncVisibility = () => {
-        criteria.hidden = !master.checked;
+      // Greying the criteria out while the master is off is common/js/dependent_settings.js.
+      const syncMaster = () => {
         syncManage();
         syncPreview();
       };
-      master.addEventListener("change", syncVisibility);
-      syncVisibility();
+      master.addEventListener("change", syncMaster);
+      syncMaster();
 
       if (engine && fuel) {
         fuel.addEventListener("change", () => {

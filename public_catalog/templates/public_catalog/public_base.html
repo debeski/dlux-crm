@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% if public_config.shop_subtitle %}<meta name="description" content="{{ public_config.shop_subtitle }}">{% endif %}
-    <title>{% block public_title %}{{ public_config.shop_title|default:"Switch Shop" }}{% endblock %}</title>
+    <title>{% block public_title %}{{ public_config.shop_title|default:APP_CONFIG.identity.display_name }}{% endblock %}</title>
     {% if CURRENT_DIR == 'rtl' %}
     <link rel="stylesheet" href="{% static 'bootstrap/bootstrap.rtl.min.css' %}">
     {% else %}
@@ -33,18 +33,18 @@
     <header class="public-nav">
         <a class="public-brand" href="{% url 'public_catalog:landing' %}">
             {% if APP_CONFIG.logo_url %}
-            <img src="{{ APP_CONFIG.logo_url }}" alt="{{ APP_CONFIG.identity.display_name|default:'Switch' }}">
+            <img src="{{ APP_CONFIG.logo_url }}" alt="{{ APP_CONFIG.identity.display_name }}">
             {% else %}
             <span class="public-brand__mark"><i class="bi bi-shield-lock"></i></span>
             {% endif %}
-            <span class="public-brand__text">{{ APP_CONFIG.identity.display_name|default:"Switch" }}</span>
+            <span class="public-brand__text">{{ APP_CONFIG.identity.display_name }}</span>
         </a>
         <div class="public-nav__actions">
             <nav aria-label="Public navigation">
                 <a href="{% url 'public_catalog:shop' %}">{{ DLUX_STRINGS.public_nav_shop|default:'Shop' }}</a>
                 <button type="button"
                         data-dynamic-modal="{% url 'public_catalog:contact_modal' %}"
-                        data-modal-title="{{ DLUX_STRINGS.hp_contact_title|default:'Contact Switch' }}"
+                        data-modal-title="{{ DLUX_STRINGS.hp_contact_title|default:'Contact us' }}"
                         data-public-modal-size="fullscreen">
                     {{ DLUX_STRINGS.hp_contact|default:'Contact' }}
                 </button>
@@ -63,7 +63,7 @@
     {% block public_content %}{% endblock %}
     {% if not public_bare %}
     <footer class="public-footer">
-        <span>{{ APP_CONFIG.identity.display_name|default:"Switch" }}</span>
+        <span>{{ APP_CONFIG.identity.display_name }}</span>
         <span>{{ DLUX_STRINGS.public_footer_tagline|default:'Smart locks · access control · installation' }}</span>
     </footer>
     {% endif %}

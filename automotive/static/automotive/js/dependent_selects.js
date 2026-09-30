@@ -58,6 +58,9 @@
                 if (!select) return;
                 const keep = reset ? "" : select.value;
                 refill(select, pair[1].filter(function (item) {
+                    if (item.shared) {
+                        return !modelId || (item.model_ids || []).map(String).indexOf(modelId) !== -1;
+                    }
                     if (String(item.model_id) !== modelId) return false;
                     if (!activeGeneration) return !item.generation_id;
                     return !item.generation_id || String(item.generation_id) === activeGeneration;

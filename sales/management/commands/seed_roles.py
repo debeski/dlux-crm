@@ -24,6 +24,7 @@ from django.core.management.base import BaseCommand
 
 # Sells only their own work (no view_all_* → row-scoped to themselves).
 REP_PERMS = [
+    "sales.use_pos",
     "sales.view_invoice",
     "sales.add_invoice",
     "sales.change_invoice",      # edit own drafts before issuing
@@ -42,6 +43,9 @@ REP_PERMS = [
     "automotive.view_vehicleengine",
     "automotive.view_vehicletrim",
     "automotive.view_productfitment",
+    "automotive.view_partprofile",
+    "automotive.view_productpartnumber",
+    "automotive.view_equipmenttype",
     # Hand over the cash they collected (an admin/manager confirms it)
     "finance.view_cashdeposit",
     "finance.add_cashdeposit",
@@ -62,6 +66,8 @@ COURIER_PERMS = [
 
 # Sees and assigns everyone's work; the view_all_* grants lift row-scoping.
 MANAGER_PERMS = [
+    # Point of sale — the till, and discounts beyond the seller limit
+    "sales.use_pos", "sales.pos_unlimited_discount", "sales.view_possale",
     # Invoices — full lifecycle + cross-rep visibility + reassignment
     "sales.view_invoice", "sales.add_invoice", "sales.change_invoice",
     "sales.delete_invoice", "sales.issue_invoice", "sales.cancel_invoice",
@@ -82,6 +88,7 @@ MANAGER_PERMS = [
     "catalog.view_category", "catalog.add_category", "catalog.change_category",
     "catalog.view_supplier", "catalog.add_supplier", "catalog.change_supplier",
     # Optional automotive extension — shared lookup and fitment management
+    "automotive.view_equipmenttype", "automotive.add_equipmenttype", "automotive.change_equipmenttype",
     "automotive.view_vehiclemake", "automotive.add_vehiclemake", "automotive.change_vehiclemake",
     "automotive.view_vehiclemodel", "automotive.add_vehiclemodel", "automotive.change_vehiclemodel",
     "automotive.view_vehiclegeneration", "automotive.add_vehiclegeneration", "automotive.change_vehiclegeneration",
@@ -89,6 +96,9 @@ MANAGER_PERMS = [
     "automotive.view_vehicletrim", "automotive.add_vehicletrim", "automotive.change_vehicletrim",
     "automotive.view_productfitment", "automotive.add_productfitment", "automotive.change_productfitment",
     "automotive.delete_productfitment",
+    "automotive.view_partprofile", "automotive.add_partprofile", "automotive.change_partprofile",
+    "automotive.view_productpartnumber", "automotive.add_productpartnumber",
+    "automotive.change_productpartnumber", "automotive.delete_productpartnumber",
     # Inventory: purchase invoices, stock movements, physical counts + valuation
     "catalog.view_purchaseinvoice", "catalog.add_purchaseinvoice",
     "catalog.change_purchaseinvoice",

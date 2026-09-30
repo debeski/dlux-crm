@@ -1,0 +1,4 @@
+<details class="fits-cell mt-1"{% if fits_field.errors %} open{% endif %}>
+    <summary class="small text-primary"><i class="bi bi-car-front me-1"></i>{{ DLUX_STRINGS.ui_fits_vehicles|default:"Fits vehicles" }} (<span data-fits-count>0</span>)</summary>
+    <div class="pt-2{% if fits_field.errors %} field-invalid{% endif %}">{{ fits_field }}{{ fits_field.errors }}</div>
+</details>

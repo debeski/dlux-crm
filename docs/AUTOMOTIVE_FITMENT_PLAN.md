@@ -456,6 +456,36 @@ vehicle.
 
 ---
 
+## Phase 3.5 — Parts-First Entry (delivered in v0.9.0)
+
+A parts-only store adds parts daily; the Phase 2 editor (card → Manage → full-page
+formset) was too many steps per vehicle. Delivered without Product schema changes:
+
+- One *Fits vehicles* search-and-tag picker (`automotive.fits`) inside the Product
+  modal, with generation-year spans, typed years/ranges and engine-code matches.
+- *Same cars as…* copy, *Assign vehicles* bulk modal (additive), purchase-invoice
+  line tags (additive), and *Add part for this vehicle* from the browser.
+- `PartProfile` (brand) and `ProductPartNumber` (OEM/cross-reference, normalized)
+  as extension tables searched by the Products list and the browser.
+- Parts-mode navigation: Browse by Vehicle joins the workspace sidebar group and
+  the Products list gains Vehicle/Year filters. Landing on the browser after
+  login is DjangoLux's Home setting (`/staff/automotive/browse/`), not an
+  automotive redirect.
+
+The full editor remains the place for engine/trim/transmission/position/notes on
+existing rows and for confirming intentional overlaps.
+
+## Phase 3.6 — Heavy Machinery and Equipment (delivered in v0.9.0)
+
+The first retailer sells heavy-machinery parts, where parts fit engines across
+makes and years rarely identify a machine. Delivered on the same tables:
+machine types, shared engines with fitted-model lists and engine-only
+compatibility, optional years (blank = all years) with a *Model year* criterion,
+and a *Machines & equipment* wording switch. Serial-number ranges (Caterpillar
+serial prefixes) are the next candidate criterion.
+
+---
+
 ## Phase 4 — Bulk Migration, Audit, and Retailer Pilot
 
 ### Goal

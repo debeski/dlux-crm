@@ -11,6 +11,8 @@ from django.views.generic import DetailView, TemplateView
 from dlux.translations import get_current_language_code, get_strings
 from dlux.utils import build_config_groups, get_system_config
 
+from common.identity import store_name
+
 from .forms import PublicContactForm
 from .homepage import get_homepage_config, resolve_homepage, resolve_sections
 from .models import PublicCatalogListing, PublicContactMessage
@@ -318,7 +320,7 @@ def _send_contact_email(message):
     ])
     try:
         send_mail(
-            subject=f"[Switch public catalog] {subject}",
+            subject=f"[{store_name() or 'Public catalog'}] {subject}",
             message=body,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[recipient],

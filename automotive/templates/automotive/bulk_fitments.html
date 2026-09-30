@@ -1,0 +1,11 @@
+{% load crispy_forms_tags %}
+<form method="post" action="{% url 'automotive:bulk_fitments' %}" id="bulk-fitments-form" novalidate>
+    {% csrf_token %}
+    <p class="text-muted small">{{ DLUX_STRINGS.fits_bulk_help|default:"Pick the products, then the vehicles they all fit. Existing compatibility is kept." }}</p>
+    {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    {% crispy form %}
+    <div class="d-flex justify-content-end gap-2" data-dlux-modal-footer>
+        <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">{{ DLUX_STRINGS.ui_cancel|default:"Cancel" }}</button>
+        <button type="submit" form="bulk-fitments-form" class="btn btn-primary rounded-pill px-4"><i class="bi bi-car-front me-1"></i>{{ DLUX_STRINGS.fits_bulk_apply|default:"Add vehicles" }}</button>
+    </div>
+</form>

@@ -43,10 +43,10 @@
         <div class="top">
             <div class="brand">
                 {% if APP_CONFIG.logo_url %}
-                <img src="{{ APP_CONFIG.logo_url }}" alt="{{ APP_CONFIG.identity.display_name|default:'Switch' }}" class="brand-logo">
+                <img src="{{ APP_CONFIG.logo_url }}" alt="{{ APP_CONFIG.identity.display_name }}" class="brand-logo">
                 {% endif %}
                 <div>
-                    <h1>{{ APP_CONFIG.identity.display_name|default:"Switch" }}</h1>
+                    <h1>{{ APP_CONFIG.identity.display_name }}</h1>
                     <p>{{ DLUX_STRINGS.pr_tagline }}</p>
                 </div>
             </div>
@@ -116,7 +116,7 @@
         </div>
 
         {% if invoice.notes %}<div class="foot"><strong>{{ DLUX_STRINGS.pr_notes }}:</strong> {{ invoice.notes|linebreaksbr }}</div>{% endif %}
-        <div class="foot">{{ APP_CONFIG.identity.display_name|default:"Switch" }}</div>
+        <div class="foot">{{ APP_CONFIG.identity.display_name }}</div>
     </div>
 </body>
 </html>

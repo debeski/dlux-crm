@@ -83,6 +83,29 @@ def translate_choice_fields(form, request=None):
         field.widget.choices = translate_choices(list(source), strings)
 
 
+def translate_filter_choice_fields(form, request=None):
+    """`translate_choice_fields` for a FilterSet form the Ribbon renders.
+
+    The Ribbon runs `set_field_attrs` after the view, and its `set_first_choice`
+    rebuilds a select's options from `field.choices`, discarding labels written
+    only to the widget. Here the translated labels go on the field itself; the
+    empty option is dropped first because django-filter's field re-adds it, and
+    the Ribbon then replaces its label with the filter's placeholder.
+    """
+    translate_choice_fields(form, request)
+    strings = get_strings(get_current_language_code(request))
+    for field in form.fields.values():
+        if isinstance(field, forms.ModelChoiceField) or not getattr(field, "choices", None):
+            continue
+        if not hasattr(field, "empty_label"):
+            continue
+        field.choices = [
+            (value, label)
+            for value, label in translate_choices(list(field.choices), strings)
+            if value not in ("", None)
+        ]
+
+
 @lru_cache(maxsize=1)
 def _own_generic_help_keys():
     """Generic ``help_<field>`` keys declared by this project's own apps.

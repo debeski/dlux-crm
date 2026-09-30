@@ -1,0 +1,32 @@
+{% load dlux_tags %}<!DOCTYPE html>
+<html lang="{{ doc_lang }}" dir="{% if is_rtl %}rtl{% else %}ltr{% endif %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ invoice.number }}</title>
+    <link rel="stylesheet" href="{% dlux_static 'sales/pos/css/receipt.css' %}">
+</head>
+<body class="receipt receipt--{{ size }}">
+    <header class="receipt__head">
+        {% if APP_CONFIG.logo_url %}<img src="{{ APP_CONFIG.logo_url }}" alt="" class="receipt__logo">{% endif %}
+        <h1>{{ APP_CONFIG.identity.display_name }}</h1>
+        <p>{{ invoice.number }} · {{ invoice.issued_at|default:invoice.created_at|date:"Y-m-d H:i" }}</p>
+        {% if invoice.customer_name %}<p>{{ invoice.customer_name }}{% if invoice.customer_phone %} · {{ invoice.customer_phone }}{% endif %}</p>{% endif %}
+    </header>
+    <table class="receipt__items">
+        {% for item in items %}
+        <tr><td colspan="2" class="receipt__desc">{{ item.description }}</td></tr>
+        <tr><td>{{ item.quantity|floatformat:"-2" }} × {{ item.unit_price_lyd|floatformat:2 }}</td><td class="receipt__num">{{ item.line_total_lyd|floatformat:2 }}</td></tr>
+        {% endfor %}
+    </table>
+    <table class="receipt__totals">
+        <tr><td>{{ DLUX_STRINGS.pos_subtotal|default:"Subtotal" }}</td><td class="receipt__num">{{ invoice.subtotal_lyd|floatformat:2 }}</td></tr>
+        {% if invoice.discount_amount %}<tr><td>{{ DLUX_STRINGS.pos_discount|default:"Discount" }}</td><td class="receipt__num">−{{ invoice.discount_amount|floatformat:2 }}</td></tr>{% endif %}
+        <tr class="receipt__grand"><td>{{ DLUX_STRINGS.pos_total|default:"Total" }}</td><td class="receipt__num">{{ invoice.total_lyd|floatformat:2 }} LYD</td></tr>
+        {% for payment in payments %}<tr><td>{{ payment.method_label }}</td><td class="receipt__num">{{ payment.amount|floatformat:2 }}</td></tr>{% endfor %}
+        {% if sale.tendered_lyd %}<tr><td>{{ DLUX_STRINGS.pos_cash_given|default:"Cash given" }}</td><td class="receipt__num">{{ sale.tendered_lyd|floatformat:2 }}</td></tr>{% endif %}
+        {% if sale.change_lyd %}<tr><td>{{ DLUX_STRINGS.pos_change|default:"Change" }}</td><td class="receipt__num">{{ sale.change_lyd|floatformat:2 }}</td></tr>{% endif %}
+    </table>
+    <p class="receipt__thanks">{{ DLUX_STRINGS.pos_thanks|default:"Thank you" }}</p>
+</body>
+</html>

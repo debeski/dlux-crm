@@ -44,8 +44,27 @@ class SupplierFilter(django_filters.FilterSet):
         )
 
 
+def _vehicle_models(request):
+    from automotive.models import VehicleModel
+    from common.views import scope_filtered_queryset
+
+    queryset = VehicleModel.objects.filter(is_active=True, make__is_active=True).select_related("make")
+    user = getattr(request, "user", None)
+    if user is not None:
+        queryset = scope_filtered_queryset(queryset, user)
+    return queryset.order_by("make__name", "name")
+
+
 class ProductFilter(django_filters.FilterSet):
     keyword = django_filters.CharFilter(method="filter_keyword", label="")
+    vehicle_model = django_filters.ModelChoiceFilter(
+        queryset=_vehicle_models, method="filter_vehicle", label="Vehicle",
+    )
+    vehicle_year = django_filters.NumberFilter(method="filter_vehicle", label="Vehicle year")
+
+    #: Vehicle filters join the front row only while automotive compatibility
+    #: is enabled (see ProductListView.ribbon_primary).
+    vehicle_fields = ("vehicle_model", "vehicle_year")
 
     advanced_config = {
         "fields": [
@@ -60,12 +79,53 @@ class ProductFilter(django_filters.FilterSet):
         model = Product
         fields = ["keyword", "category", "unit", "color", "is_active"]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from automotive.settings import automotive_enabled
+        from common.i18n import t
+
+        if not automotive_enabled():
+            for name in self.vehicle_fields:
+                self.filters.pop(name, None)
+                self.form.fields.pop(name, None)
+            return
+        self.form.fields["vehicle_model"].label = t("label_vehicle", "Vehicle")
+        self.form.fields["vehicle_year"].label = t("label_vehicle_year", "Vehicle year")
+
+    def filter_vehicle(self, queryset, name, value):
+        """Model and year must match the *same* fitment row, so one method
+        applies both once, on whichever of the two filters runs first."""
+        if getattr(self, "_vehicle_applied", False):
+            return queryset
+        data = self.form.cleaned_data
+        vehicle_model, year = data.get("vehicle_model"), data.get("vehicle_year")
+        if not vehicle_model and not year:
+            return queryset
+        self._vehicle_applied = True
+        from automotive.models import VehicleEngine
+
+        # One filter() call keeps every condition on the same fitment row.
+        condition = Q(automotive_fitments__deleted_at__isnull=True)
+        if vehicle_model:
+            shared = VehicleEngine.objects.filter(vehicle_model__isnull=True, fitted_models=vehicle_model)
+            condition &= Q(automotive_fitments__vehicle_model=vehicle_model) | Q(
+                automotive_fitments__vehicle_model__isnull=True,
+                automotive_fitments__engine__in=shared.values("pk"),
+            )
+        if year:
+            condition &= Q(automotive_fitments__year_from__isnull=True) | Q(
+                automotive_fitments__year_from__lte=int(year),
+                automotive_fitments__year_to__gte=int(year),
+            )
+        return queryset.filter(condition).distinct()
+
     def filter_keyword(self, queryset, name, value):
         if not value:
             return queryset
         query = (
             Q(name__icontains=value) | Q(sku__icontains=value) | Q(barcode__icontains=value)
             | Q(size__icontains=value)
+            | Q(extra_barcodes__code=value.strip(), extra_barcodes__deleted_at__isnull=True)
         )
         from automotive.settings import get_automotive_config
 
@@ -85,11 +145,17 @@ class ProductFilter(django_filters.FilterSet):
                 query |= (
                     Q(automotive_fitments__engine__display_name__icontains=value)
                     | Q(automotive_fitments__engine__engine_code__icontains=value)
+                    | Q(automotive_fitments__engine__manufacturer__icontains=value)
                 )
+            if criteria.get("equipment_type"):
+                query |= Q(automotive_fitments__vehicle_model__equipment_type__name__icontains=value)
             if criteria["fuel_type"]:
                 query |= Q(automotive_fitments__engine__fuel_type__icontains=value)
             if criteria["trim"]:
                 query |= Q(automotive_fitments__trim__name__icontains=value)
+            from automotive.fits import part_number_q
+
+            query |= part_number_q(value)
         return queryset.filter(query).distinct()
 
 
