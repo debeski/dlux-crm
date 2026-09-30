@@ -1,12 +1,16 @@
 {
   "schema_version": 1,
   "version": "0.9.0",
-  "summary": "Makes the automotive mode parts-first: tag vehicles while adding a part, search by part number, and add parts straight from a vehicle.",
+  "summary": "Parts-first automotive and heavy-machinery mode, an optional point-of-sale till with barcode scanning, and store settings in one CRM options tile, on DjangoLux 1.10.",
   "highlights": [
-    "Fits vehicles search-and-tag picker in the product form: type camry 2014, xv50 or hilux 2.8.",
-    "Same cars as… copy, bulk Assign vehicles, and vehicle tags on purchase-invoice lines.",
-    "Part brand plus OEM and cross-reference numbers, searchable in Products and Browse by Vehicle.",
-    "Find a vehicle and Add part for this vehicle in the browser; /staff/ opens the browser in parts mode."
+    "Tag vehicles or machines while adding a part; search by part number; copy or bulk-assign fitments.",
+    "Heavy machinery: machine types, shared engines, and optional machine wording across the app.",
+    "Optional till: scan or search, most-sold grid, discounts, split cash/card/transfer, receipts.",
+    "Extra barcodes per item or size; the phone camera scans on iPhone too.",
+    "CRM options tile groups the products layout, public shop and till settings.",
+    "Exchange rates fetched through the Composer relay; the public shop follows the visitor's language.",
+    "Workspace quick actions and tiles for the till and the vehicle browser while they are on.",
+    "Requires DjangoLux 1.10.0; Composer 1.6.0 for relay-fetched exchange rates."
   ],
   "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.9.0"
 }

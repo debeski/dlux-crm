@@ -35,7 +35,7 @@ jobs:
         run: python manage.py check --settings=config.settings_dev_sqlite
 
       - name: Run tests
-        run: python manage.py test finance catalog sales common public_catalog tests --settings=config.settings_dev_sqlite
+        run: python manage.py test finance catalog sales common public_catalog automotive tests --settings=config.settings_dev_sqlite
 
   docker-build:
     runs-on: ubuntu-latest
