@@ -15,6 +15,11 @@ from django.utils import timezone
 
 from .models import ExchangeRate, current_rate_cache_key
 
+try:
+    from dlux import relay  # DjangoLux 1.10.0b4+: outbound calls through the Composer agent
+except ImportError:  # an older DjangoLux: fetch directly, as before
+    relay = None
+
 logger = logging.getLogger(__name__)
 
 # --- Official (CBL) rate scraping -------------------------------------------
@@ -42,6 +47,10 @@ _CBL_MARKERS = {
 # eanlibya.com publishes a single daily *black-market* (parallel) USD price with a
 # trend arrow. Same server-side scrape + cache pattern as the CBL official rate.
 EAN_URL = "https://www.eanlibya.com/exchangerate/"
+
+# Declared in relay/operations.json (approved with `composer relay approve`).
+CBL_OPERATION = "finance.cbl_rates_page"
+EAN_OPERATION = "finance.ean_rates_page"
 EAN_RATE_CACHE_KEYS = {
     ExchangeRate.CURRENCY_USD: "finance:ean_black_market_usd_rate",
     ExchangeRate.CURRENCY_EUR: "finance:ean_black_market_eur_rate",
@@ -121,6 +130,26 @@ def quantize_lyd(amount):
     return Decimal(amount or 0).quantize(LYD_QUANT, rounding=ROUND_HALF_UP)
 
 
+def _fetch_page(url, operation, timeout):
+    """The page's HTML, through the Composer relay when the agent offers ``operation``.
+
+    Neither web nor celery has internet access in a generated stack, so the relay is
+    how these sites are reached there. Without it (an older DjangoLux or Composer,
+    tests, a laptop) the page is fetched directly, and a web request, which cannot
+    write the relay channel, falls back to that too. Raises on failure; callers
+    treat that as "rate unavailable".
+    """
+    if relay is not None and relay.available(operation):
+        try:
+            return relay.fetch(operation, timeout=timeout)
+        except relay.RelayError as exc:
+            if exc.code != "writer":
+                raise
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (switch-pos)"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", "replace")
+
+
 def _cbl_number(row_html, label):
     """Pull the number that follows an Arabic label (e.g. ``المتوسط: </span>6.4117``).
 
@@ -139,9 +168,7 @@ def fetch_cbl_rate(currency=ExchangeRate.CURRENCY_USD, timeout=15):
     Never raises — callers treat ``None`` as "official rate unavailable".
     """
     try:
-        req = urllib.request.Request(CBL_URL, headers={"User-Agent": "Mozilla/5.0 (switch-pos)"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            html = resp.read().decode("utf-8", "replace")
+        html = _fetch_page(CBL_URL, CBL_OPERATION, timeout)
     except Exception:
         logger.warning("CBL official-rate fetch failed", exc_info=True)
         return None
@@ -216,9 +243,7 @@ def fetch_ean_rate(currency=ExchangeRate.CURRENCY_USD, timeout=15):
     Never raises.
     """
     try:
-        req = urllib.request.Request(EAN_URL, headers={"User-Agent": "Mozilla/5.0 (switch-pos)"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            html = resp.read().decode("utf-8", "replace")
+        html = _fetch_page(EAN_URL, EAN_OPERATION, timeout)
     except Exception:
         logger.warning("EAN black-market rate fetch failed", exc_info=True)
         return None

@@ -1,0 +1,7 @@
+{
+  "operations": {
+    "finance.cbl_rates_page": "sha256:3756a7f5949e5544195fca726c718b72df0427badda22df5fcbcd452070d0159",
+    "finance.ean_rates_page": "sha256:1e1ab8da19b5ad8053722d057c18cf8ecac40d5e0dc7a83101044ece26da66d7"
+  },
+  "schema_version": 1
+}
