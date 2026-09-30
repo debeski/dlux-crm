@@ -219,11 +219,10 @@ services:
       redis:
         condition: service_healthy
     networks:
+      # No egress: the rate-scrape task (finance.tasks.refresh_market_rates) reaches
+      # cbl.gov.ly / eanlibya.com through the Composer agent's egress relay
+      # (relay/operations.json). web reads the scraped rates from the shared Redis cache.
       - internal
-      # Public egress so the periodic rate-scrape task (finance.tasks.refresh_market_rates)
-      # can reach cbl.gov.ly / eanlibya.com. web stays internal-only and reads the
-      # scraped rates from the shared Redis cache.
-      - egress
 
   # DjangoLux Composer agent start
   docker-socket-proxy:

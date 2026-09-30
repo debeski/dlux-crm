@@ -1,16 +1,9 @@
 {
   "schema_version": 1,
-  "version": "0.9.0",
-  "summary": "Parts-first automotive and heavy-machinery mode, an optional point-of-sale till with barcode scanning, and store settings in one CRM options tile, on DjangoLux 1.10.",
+  "version": "0.10.0",
+  "summary": "Work in progress: EUR as an optional pricing currency, and exchange rates fetched without internet access on the worker.",
   "highlights": [
-    "Tag vehicles or machines while adding a part; search by part number; copy or bulk-assign fitments.",
-    "Heavy machinery: machine types, shared engines, and optional machine wording across the app.",
-    "Optional till: scan or search, most-sold grid, discounts, split cash/card/transfer, receipts.",
-    "Extra barcodes per item or size; the phone camera scans on iPhone too.",
-    "CRM options tile groups the products layout, public shop and till settings.",
-    "Exchange rates fetched through the Composer relay; the public shop follows the visitor's language.",
-    "Workspace quick actions and tiles for the till and the vehicle browser while they are on.",
-    "Requires DjangoLux 1.10.0; Composer 1.6.0 for relay-fetched exchange rates."
+    "Celery no longer needs internet access: exchange rates come through the Composer 1.6.0 egress relay."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.9.0"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.10.0"
 }

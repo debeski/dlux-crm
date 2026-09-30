@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.10.0
+- **Celery Off Egress**: `compose.yml` moves `celery` to the `internal` network only. The rate-scrape task (`finance.tasks.refresh_market_rates`) already reaches cbl.gov.ly and eanlibya.com through the Composer agent's egress relay (`relay/operations.json`), so the worker no longer needs internet access; web keeps reading the scraped rates from the shared Redis cache. Needs Composer 1.6.0.
+
 ## v0.9.0
 - **Quick Fits Picker In The Product Modal**: `automotive.product_form.AutomotiveProductExtension` adds a *Fits vehicles* search-and-tag field (`FitsPickerWidget`, `automotive/js/fits_picker.js`) to `catalog.ProductForm` while automotive is on, placed right after name/category. `/staff/automotive/vehicles/search/` (`automotive.fits.search_vehicles`) matches make/model/generation/chassis/engine tokens and reads a typed year or `2010-2012` range; generations bring their own span. Existing rows stay as `{id}` tags (removing one soft-deletes it), new tags are validated through `ProductFitment.clean` and saved in `ProductForm._save_m2m` after the Product row. Keyboard entry: type, Enter, repeat.
 - **Copy And Bulk Compatibility**: *Same cars as…* (`/staff/automotive/fits/source/`) copies another product's fitments, engine/trim/transmission/position included, as new tags. The Products ribbon gains **Assign vehicles** (`BulkFitmentView`, `/staff/automotive/fits/bulk/`), a DjangoLux modal with a searchable product list that adds the same vehicles to many products without removing existing rows.
