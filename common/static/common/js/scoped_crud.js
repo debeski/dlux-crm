@@ -59,10 +59,13 @@
             method: "POST",
             headers: {
                 "X-Requested-With": "XMLHttpRequest",
-                "X-CSRFToken": getCookie("csrftoken"),
+                "X-CSRFToken": getCookie(cfg.getAttribute("data-csrf-cookie") || "csrftoken"),
             },
         })
-            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (r) {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.json().catch(function () { return {}; });
+            })
             .then(function (res) {
                 if (res && res.error) {
                     window.alert(res.error);
@@ -70,7 +73,7 @@
                 }
                 window.location.reload();
             })
-            .catch(function () { window.location.reload(); });
+            .catch(function (err) { window.alert(err.message); });
     }
 
     // Attach on `document` (bubble phase) so we run before the window-level dlux

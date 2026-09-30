@@ -61,4 +61,4 @@ services:
       - static:/app/staticfiles:rw
       - ./media/:/app/media/:rw
       - ./logs/:/app/logs:rw
-      - dlux_runtime:/opt/dlux-runtime:ro
+      - dlux_runtime:/opt/dlux-runtime:rw
