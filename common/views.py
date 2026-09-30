@@ -9,6 +9,7 @@ thin and consistent.
 """
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import FieldDoesNotExist
 from django.db.models import Sum
@@ -350,6 +351,7 @@ class ScopedListView(RibbonMixin, LoginRequiredMixin, PermissionRequiredMixin, S
                 # Consumed by scoped_crud.js to open form-only edit/view/delete modals.
                 "modal_base_url": self.get_modal_base_url(),
                 "modal_delete_url": self.get_modal_delete_url(),
+                "csrf_cookie_name": settings.CSRF_COOKIE_NAME,
                 "extra_scripts": [*self.base_scripts, *self.extra_scripts],
                 "extra_styles": [*self.base_styles, *self.extra_styles],
             }
