@@ -49,7 +49,7 @@
 - **Completed Recently:**
   - [x] Workspace: *Open the till* / *Browse by vehicle* quick actions + `pos_today` / `vehicle_browser` tiles while enabled (2026-09-30).
   - [x] Removed POS *Open the till on login* and the parts-mode `/staff/` landing (never applied: DLux login goes to its Home); landing = DLux Home (store/per-user; per-group coming in dlux); real-login test `common.tests.test_login_landing` (2026-09-30).
-  - [x] Machine wording synced on `SystemSettings` post_save (wizard/import safe); dlux pinned 1.10.0b1 — re-pin to 1.10.0 stable before tagging v0.9.0.
+  - [x] Machine wording synced on `SystemSettings` post_save (wizard/import safe); dlux pinned 1.10.0 stable (2026-09-30); relay rates need Composer 1.6.0.
   - [x] Dependent settings: POS and Optional-enhancements dependents greyed/disabled with dlux tooltip instead of hidden; stored values kept while off (2026-09-29).
   - [x] CRM options tile on dlux 1.10.0b1 settings groups (`register_app_settings_group` + `group=`); layout/public catalog/POS as sections, namespaces unchanged; `common/crm_options.py` retired to `.xclude/` (2026-09-30).
   - [x] Test data (2026-09-29): PINV-000003 "Libya Heavy Parts Co." — 21 machines/7 Arabic types, 13 shared engines, 35 products (EAN-13 `624…`, size variants with own codes, low/out-of-stock cases, Fleetguard supplier-label extra code).

@@ -13,11 +13,14 @@ and the image smoke test. Keeping them equal is enforced by
 
 ## v0.9.0 dependency baseline
 
-v0.9.0 is developed against `django-lux[updater]==1.10.0b1` (settings groups,
-project settings in first-run setup, unsaved-changes prompt on project tiles).
-Same Composer floor as 1.9.4 (`>=1.5.3b1`) and no dlux migrations since 1.9.4.
-**Do not tag v0.9.0 on a beta:** re-pin to the 1.10.0 stable wheel and hash
-first.
+v0.9.0 pins `django-lux[updater]==1.10.0` (hash-pinned wheel): settings
+groups, project settings in first-run setup, the unsaved-changes prompt on
+project tiles, and the egress relay. DjangoLux's manifest floor is Composer
+`>=1.5.3b1` with no dlux migrations since 1.9.4, but fetching exchange rates
+through the relay (celery without internet access) needs **Composer 1.6.0** —
+update Composer before this release. 1.10.0 removes `AUDIT_FIELD_NAMES`, the
+in-container update executor, the `archive_file` names and
+`advanced_filter_helper`; the sales CRM uses none of them.
 
 ## v0.8.3 dependency baseline
 

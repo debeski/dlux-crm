@@ -1,6 +1,6 @@
 # Switch POS — Architecture
 
-A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.10.0b1)**.
+A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.10.0)**.
 It is a single Django/DLux project with a public catalog surface and an authenticated
 staff workflow. DjangoLux provides users, permissions, sidebar/titlebar/navbar UI,
 dynamic modals, audit trail, soft-delete, reports, backups and notifications — this
@@ -264,7 +264,7 @@ wiring.
 ### CRM options tile
 
 The store-wide settings are one **CRM options** tile on the Options page — a
-DjangoLux settings group (dlux ≥ 1.10.0b1). `common/dlux_options.py` registers
+DjangoLux settings group (dlux ≥ 1.10.0). `common/dlux_options.py` registers
 it with `register_app_settings_group(id=CRM_OPTIONS_GROUP)`
 (`switch_pos.crm_options`, order 50), and each app registers its settings with
 `register_app_settings(..., group=CRM_OPTIONS_GROUP)`: *Products layout*
