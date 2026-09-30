@@ -285,3 +285,69 @@ class EanRateScraperTests(SimpleTestCase):
             data = services.fetch_ean_eur_rate()
         self.assertEqual(data["rate"], "9.71")
         self.assertEqual(data["trend"], "up")
+
+
+class RateFetchRoutingTests(SimpleTestCase):
+    """The rate pages are fetched through the Composer relay when the agent offers it."""
+
+    class RelayError(Exception):
+        def __init__(self, code):
+            super().__init__(code)
+            self.code = code
+
+    def relay(self, *, available=True, fetch=None):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            available=mock.Mock(return_value=available),
+            fetch=fetch or mock.Mock(return_value=_CBL_SAMPLE),
+            RelayError=self.RelayError,
+        )
+
+    def direct(self):
+        fake = mock.Mock()
+        fake.read.return_value = _CBL_SAMPLE.encode("utf-8")
+        fake.__enter__ = lambda s: s
+        fake.__exit__ = lambda *a: False
+        return mock.patch("urllib.request.urlopen", return_value=fake)
+
+    def test_uses_the_relay_and_never_the_network_when_the_agent_offers_it(self):
+        relay = self.relay()
+        with mock.patch.object(services, "relay", relay), mock.patch("urllib.request.urlopen") as urlopen:
+            data = services.fetch_cbl_usd_rate(timeout=9)
+        self.assertEqual(data["average"], "6.4117")
+        relay.available.assert_called_once_with(services.CBL_OPERATION)
+        relay.fetch.assert_called_once_with(services.CBL_OPERATION, timeout=9)
+        urlopen.assert_not_called()
+
+    def test_ean_uses_its_own_operation(self):
+        relay = self.relay(fetch=mock.Mock(return_value=_EAN_SAMPLE))
+        with mock.patch.object(services, "relay", relay), mock.patch("urllib.request.urlopen") as urlopen:
+            data = services.fetch_ean_usd_rate()
+        self.assertEqual(data["rate"], "8.50")
+        self.assertEqual(relay.fetch.call_args.args[0], services.EAN_OPERATION)
+        urlopen.assert_not_called()
+
+    def test_fetches_directly_when_the_agent_does_not_offer_the_operation(self):
+        relay = self.relay(available=False)
+        with mock.patch.object(services, "relay", relay), self.direct():
+            data = services.fetch_cbl_usd_rate()
+        self.assertEqual(data["average"], "6.4117")
+        relay.fetch.assert_not_called()
+
+    def test_fetches_directly_with_an_older_djangolux_that_has_no_relay(self):
+        with mock.patch.object(services, "relay", None), self.direct():
+            self.assertEqual(services.fetch_cbl_usd_rate()["average"], "6.4117")
+
+    def test_a_web_request_cannot_write_the_channel_and_falls_back_to_a_direct_fetch(self):
+        relay = self.relay(fetch=mock.Mock(side_effect=self.RelayError("writer")))
+        with mock.patch.object(services, "relay", relay), self.direct():
+            self.assertEqual(services.fetch_cbl_usd_rate()["average"], "6.4117")
+
+    def test_a_relay_failure_means_rate_unavailable_not_a_second_attempt_around_it(self):
+        for code in ("timeout", "blocked", "provider", "network"):
+            with self.subTest(code=code):
+                relay = self.relay(fetch=mock.Mock(side_effect=self.RelayError(code)))
+                with mock.patch.object(services, "relay", relay), mock.patch("urllib.request.urlopen") as urlopen:
+                    self.assertIsNone(services.fetch_cbl_usd_rate())
+                urlopen.assert_not_called()
