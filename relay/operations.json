@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "operations": [
+    {
+      "name": "finance.cbl_rates_page",
+      "url": "https://cbl.gov.ly/currency-exchange-rates/",
+      "headers": {"User-Agent": "Mozilla/5.0 (switch-pos)"},
+      "response": {"type": "text", "max_bytes": 524288},
+      "timeout": 15,
+      "rate": {"per_minute": 10}
+    },
+    {
+      "name": "finance.ean_rates_page",
+      "url": "https://www.eanlibya.com/exchangerate/",
+      "headers": {"User-Agent": "Mozilla/5.0 (switch-pos)"},
+      "response": {"type": "text", "max_bytes": 524288},
+      "timeout": 15,
+      "rate": {"per_minute": 10}
+    }
+  ]
+}
