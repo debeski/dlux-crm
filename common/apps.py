@@ -21,3 +21,12 @@ class CommonConfig(AppConfig):
         from .access import apply_ownership
 
         register_modal_queryset_filter(apply_ownership)
+
+        # Store wording (machine vs vehicle, EUR vs USD) follows every save of the
+        # settings row and every migrate; apps register their axes in their own ready().
+        from django.db.models.signals import post_migrate, post_save
+
+        from .wording import refresh_wording, sync_wording
+
+        post_save.connect(sync_wording, sender="dlux.SystemSettings", dispatch_uid="common_sync_wording")
+        post_migrate.connect(refresh_wording, sender=self, dispatch_uid="common_refresh_wording")

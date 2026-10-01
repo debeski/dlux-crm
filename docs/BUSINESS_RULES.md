@@ -2,24 +2,34 @@
 
 ## Currency
 
-- Switch imports from China and thinks in **USD**; it sells locally in **LYD**.
-- LYD prices follow the **black-market** USD rate (higher than the official rate),
-  which the admin sets globally.
+- A store keeps its costs and prices in one **pricing currency** — **USD**
+  (the default) or **EUR** — and sells locally in **LYD**. The choice is the
+  *Pricing currency* section of **CRM options**, and it applies everywhere:
+  form fields, tables, cards, printouts, the opening-stock workbook and labels
+  («دولار» / «يورو»). The `*_usd` columns keep their names and hold amounts in
+  the pricing currency.
+- LYD prices follow the store's own rate for the pricing currency (usually the
+  **black-market** rate, higher than the official one), set globally by an admin.
 - Manual USD and EUR rates live in `finance.ExchangeRate` as separate
   **append-only histories**; the newest row for each currency is its live rate.
-  Existing catalog cost, pricing and invoice conversion remain USD-based. EUR is
-  available as a reference/manual conversion currency and does not silently
-  reinterpret any stored USD amount.
-- The dashboard also shows cached official and black-market USD and EUR rates
-  scraped from CBL and EANLibya. Scraped rates are references only; invoices
-  freeze the manually maintained USD rate.
+- **Switching** the pricing currency converts every product cost and selling
+  price and every service price at the store's cross rate (via LYD), so selling
+  prices in LYD do not move; markup is a ratio and stays. The settings show a
+  preview and require a confirmation tick, and refuse the switch until both a
+  USD and a EUR rate exist. Draft sales invoices move to the new currency with
+  the catalog (their LYD lines unchanged); issued sales invoices and purchase
+  invoices keep the currency they were made in.
+- The Workspace exchange card and the Sales Overview always show **both**
+  currencies: the store's rate (the pricing currency marked), the official CBL
+  and black-market EANLibya rates scraped by Celery, and how long ago each was
+  set or fetched. Scraped rates are references only.
 
-## Pricing model — hybrid (USD base + optional LYD override)
+## Pricing model — hybrid (pricing-currency base + optional LYD override)
 
 Decided with the owner. For each `Product`:
 
-1. Cost is stored in USD (`cost_usd`). A `markup_percent` (or an explicit
-   `price_usd`) yields the **USD selling price** (`effective_price_usd`).
+1. Cost is stored in the pricing currency (`cost_usd`). A `markup_percent` (or an explicit
+   `price_usd`) yields the **selling price** in the pricing currency (`effective_price_usd`).
    `Product.save()` **persists** this derived `price_usd` when only cost + markup
    were entered, so the stored record (and its detail view) never shows 0.
 2. The **LYD selling price** is derived live: `effective_price_usd × current_rate`.
@@ -29,12 +39,12 @@ Decided with the owner. For each `Product`:
    Left blank, the item sells at the live rate (the default).
 
 The create/edit form keeps these fields in step as you type (`catalog/js/price_sync.js`):
-editing markup recomputes the USD price, editing the USD price recomputes the markup,
-editing cost recomputes the USD price (markup held) while the manual LYD override is
+editing markup recomputes the foreign price, editing the foreign price recomputes the markup,
+editing cost recomputes the foreign price (markup held) while the manual LYD override is
 blank, and the live LYD price is shown as the manual-LYD field's **placeholder**.
 Typing a value into that field turns it into a real fixed override (and back-fills
 USD + markup to match); while that override is present, changing the cost keeps the
-LYD price fixed and recalculates the implied USD price + markup from the new cost.
+LYD price fixed and recalculates the implied foreign price + markup from the new cost.
 The detail view adds a computed **"Selling Price (LYD)"** row (via
 `get_modal_context`) so it matches the list.
 
@@ -43,8 +53,11 @@ The detail view adds a computed **"Selling Price (LYD)"** row (via
 
 ## Frozen rate per invoice
 
-When an invoice is created it captures the current rate into `Invoice.exchange_rate`,
-and every line stores its own frozen `unit_price_lyd`. **Later rate changes never
+When an invoice is created it records the pricing currency in `Invoice.currency`
+and captures that currency's current rate into `Invoice.exchange_rate`, and every
+line stores its own frozen `unit_price_lyd`. Purchase invoices do the same
+(`PurchaseInvoice.currency`); invoice pages and printouts show the document's own
+currency, not the store's current one. **Later rate changes never
 rewrite a past invoice's totals.** This is correct accounting and matches the owner's
 expectation that an issued invoice is final.
 
@@ -192,12 +205,12 @@ at once, one per row:
 
 1. Each row is either a **new** item (type a name) or an **existing** one (pick
    it from the datalist — product details and pricing autofill). Fields: name,
-   category, unit, barcode, optional color and size/spec, import cost (USD),
-   markup %, selling price (USD), optional manual LYD price, and **quantity in
+   category, unit, barcode, optional color and size/spec, import cost and
+   markup %, selling price (both in the pricing currency; headers read USD or EUR), optional manual LYD price, and **quantity in
    storage**. Purchase shop and date are intentionally omitted (irrelevant for an
    opening balance).
    Pricing cells use the same row-scoped live sync as the Product form: markup,
-   USD selling price, cost, and manual LYD override stay consistent inside that
+   foreign selling price, cost, and manual LYD override stay consistent inside that
    row without changing any neighbouring row. Selecting an existing product
    overwrites untouched row defaults (`0.00`, default unit) with that product's
    current values, but preserves fields the user already edited by hand.
@@ -232,7 +245,7 @@ inbound-stock document that Opening Stock was never meant to be:
    `Supplier` record and snapshots supplier name/phone/address onto the invoice.
 2. The line grid reuses the Opening Stock product behavior. Each row is a new or
    existing `Product`; selecting an existing item autofills category, unit,
-   barcode, import cost, markup, USD selling price, and manual LYD price. If the
+   barcode, import cost, markup, foreign selling price, and manual LYD price. If the
    product has exactly one variant, its color/size may autofill; if it has
    several, color/size stay explicit so the buyer can choose the correct bucket.
    Edits to cost/markup/USD/manual-LYD use the same row-scoped price-sync rules
@@ -444,7 +457,7 @@ by `view_inventory_valuation`.
 
 The same page answers **what the stock would bring in if it all sold**: each
 item's sale value is `stock_qty` × `Product.selling_price_lyd` (the manual LYD
-override when set, else the USD price at the live rate), and its expected
+override when set, else the foreign price at the live rate), and its expected
 profit is sale value − cost value in LYD. The totals add a margin, profit as a
 percentage of sale value. These are today's shelf prices, not a forecast:
 invoice discounts and future rate moves are not applied.

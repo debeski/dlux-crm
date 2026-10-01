@@ -1,8 +1,13 @@
 {
   "schema_version": 1,
   "version": "0.10.0",
-  "summary": "Work in progress: EUR as an optional pricing currency, and exchange rates fetched without internet access on the worker.",
+  "summary": "Choose USD or EUR as the store's pricing currency, with existing prices converted and every screen, label and printout following it; both currencies on the exchange card.",
   "highlights": [
+    "Pricing currency (USD or EUR) in CRM options; USD stays the default.",
+    "Switching converts product and service prices at your USD/EUR rates; LYD prices stay the same.",
+    "Invoices and purchase invoices keep the currency they were made in.",
+    "Fields, tables, cards, printouts and the opening-stock workbook follow the chosen currency, in English and Arabic.",
+    "The exchange card shows USD and EUR: store, official and market rates, and how fresh each is.",
     "Celery no longer needs internet access: exchange rates come through the Composer 1.6.0 egress relay."
   ],
   "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.10.0"

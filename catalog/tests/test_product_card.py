@@ -14,6 +14,11 @@ User = get_user_model()
 
 class ProductCardTests(TestCase):
     def setUp(self):
+        from dlux.models import SystemSettings
+
+        settings = SystemSettings.load()
+        settings.is_configured = True
+        settings.save(update_fields=["is_configured"])
         self.user = User.objects.create_superuser("cardadmin", "card@example.com", "x")
         self.client.force_login(self.user)
         self.product = Product.objects.create(

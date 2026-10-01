@@ -43,6 +43,7 @@ class CrmOptionsTileTests(TestCase):
 
     def post(self, **overrides):
         data = {
+            "pricing-currency": "USD",
             "products_layout-default_layout": "grid",
             "public_catalog-shop_title": "Heavy Parts",
             "public_catalog-shop_subtitle": "",
@@ -64,7 +65,7 @@ class CrmOptionsTileTests(TestCase):
         tiles = {tile["id"]: tile for tile in get_visible_app_settings_tiles(self.request())}
         self.assertEqual(
             [section["namespace"] for section in tiles[CRM_OPTIONS_GROUP]["sections"]],
-            ["switch_pos.products_layout", "switch_pos.public_catalog", "switch_pos.point_of_sale"],
+            ["switch_pos.pricing", "switch_pos.products_layout", "switch_pos.public_catalog", "switch_pos.point_of_sale"],
         )
         for old in ("switch_pos.products_layout", "switch_pos.public_catalog", "switch_pos.point_of_sale"):
             self.assertNotIn(old, tiles)
@@ -91,10 +92,10 @@ class CrmOptionsTileTests(TestCase):
 
     def test_modal_shows_every_section_heading(self):
         html = self.client.get(self.url).json()["html"]
-        for name in ("products_layout-default_layout", "public_catalog-shop_title", "point_of_sale-receipt_size"):
+        for name in ("pricing-currency", "products_layout-default_layout", "public_catalog-shop_title", "point_of_sale-receipt_size"):
             self.assertIn(f'name="{field(name)}"', html)
         self.assertIn("data-dlux-unsaved-guard", html)
-        self.assertEqual(html.count("fw-bold my-3"), 3)
+        self.assertEqual(html.count("fw-bold my-3"), 4)
 
     def test_pos_settings_lock_while_the_till_is_off_and_keep_their_values(self):
         self.post()

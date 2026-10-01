@@ -99,9 +99,27 @@
                 {% endfor %}
             </div>
             {% elif tile.kind == "rate" %}
-            <div class="tile-metric rate-metric">
-                <div class="metric-value">{{ tile.value }}{% if tile.unit %}<span>{{ tile.unit }}</span>{% endif %}</div>
-                <div class="metric-meta">{{ tile.meta }}</div>
+            <div class="rate-board">
+                <div class="rate-row rate-head" aria-hidden="true">
+                    <span></span>
+                    <small>{{ DLUX_STRINGS.rate_card_store|default:"Store" }}</small>
+                    <small>{{ DLUX_STRINGS.rate_card_official|default:"Official (CBL)" }}</small>
+                    <small>{{ DLUX_STRINGS.rate_card_market|default:"Market (EAN)" }}</small>
+                </div>
+                {% for row in tile.items %}
+                <div class="rate-row{% if row.is_pricing %} is-pricing{% endif %}">
+                    <span class="rate-code">
+                        <strong>{{ row.code }}</strong>
+                        {% if row.is_pricing %}<em>{{ DLUX_STRINGS.rate_card_pricing|default:"Pricing" }}</em>{% endif %}
+                    </span>
+                    <span class="rate-cell"><b>{{ row.store|default:"—" }}</b><small>{{ row.store_age }}</small></span>
+                    <span class="rate-cell"><b>{{ row.official|default:"—" }}</b><small>{{ row.official_age }}</small></span>
+                    <span class="rate-cell">
+                        <b>{{ row.market|default:"—" }}{% if row.market_trend == "up" %}<i class="bi bi-arrow-up-short text-danger"></i>{% elif row.market_trend == "down" %}<i class="bi bi-arrow-down-short text-success"></i>{% endif %}</b>
+                        <small>{{ row.market_age }}</small>
+                    </span>
+                </div>
+                {% endfor %}
                 {% if tile.footer %}<div class="rate-gap">{{ tile.footer }}</div>{% endif %}
             </div>
             {% else %}

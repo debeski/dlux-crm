@@ -25,7 +25,7 @@
         <h1 class="h3 mb-0">{{ DLUX_STRINGS.ui_new_purchase_invoice|default:"New Purchase Invoice" }}</h1>
         <span class="badge rounded-pill text-bg-light border">
             <i class="bi bi-currency-exchange me-1"></i>
-            {{ DLUX_STRINGS.ui_rate|default:"Rate" }}: 1 USD = {{ current_rate }} LYD
+            {{ DLUX_STRINGS.ui_rate|default:"Rate" }}: 1 {{ invoice.currency|default:PRICING_CURRENCY }} = {{ current_rate }} LYD
         </span>
     </div>
 

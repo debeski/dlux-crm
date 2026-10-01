@@ -1,5 +1,10 @@
 """
-Currency conversion helpers — the single source of truth for USD <-> LYD math.
+Currency conversion helpers — the single source of truth for pricing-currency <-> LYD math.
+
+The pricing currency is the store's setting (``finance.currency``: USD or EUR).
+``usd_to_lyd`` / ``lyd_to_usd`` keep their historic names but convert with the
+pricing currency's rate, just as the ``*_usd`` columns hold pricing-currency
+amounts; pass ``currency=`` to ``get_current_rate`` for a specific one.
 
 Reuse these everywhere instead of multiplying by a rate inline; it keeps rounding
 consistent and means there is exactly one place that decides what "the current
@@ -13,6 +18,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.core.cache import cache
 from django.utils import timezone
 
+from .currency import pricing_currency
 from .models import ExchangeRate, current_rate_cache_key
 
 try:
@@ -69,13 +75,13 @@ LYD_QUANT = Decimal("0.01")
 USD_QUANT = Decimal("0.01")
 
 
-def get_current_rate(currency=ExchangeRate.CURRENCY_USD):
-    """Return the live currency->LYD rate (USD by default).
+def get_current_rate(currency=None):
+    """Return the live currency->LYD rate (the pricing currency by default).
 
     Cached to keep product-list price computations from issuing one query per row.
     Returns ``DEFAULT_RATE`` if no rate has ever been configured.
     """
-    currency = str(currency).upper()
+    currency = str(currency or pricing_currency()).upper()
     if currency not in dict(ExchangeRate.CURRENCY_CHOICES):
         raise ValueError(f"Unsupported currency: {currency}")
     cache_key = current_rate_cache_key(currency)
@@ -93,14 +99,14 @@ def get_current_rate(currency=ExchangeRate.CURRENCY_USD):
     return rate
 
 
-def has_configured_rate(currency=ExchangeRate.CURRENCY_USD):
+def has_configured_rate(currency=None):
     """True once an admin has entered at least one real exchange rate."""
-    currency = str(currency).upper()
+    currency = str(currency or pricing_currency()).upper()
     return ExchangeRate.objects.filter(currency=currency).exists()
 
 
 def usd_to_lyd(amount_usd, rate=None):
-    """Convert a USD amount to LYD, rounded to 2 dp. ``None`` -> ``None``."""
+    """Convert a pricing-currency amount to LYD, rounded to 2 dp. ``None`` -> ``None``."""
     if amount_usd is None:
         return None
     rate = get_current_rate() if rate is None else Decimal(rate)
@@ -108,7 +114,7 @@ def usd_to_lyd(amount_usd, rate=None):
 
 
 def lyd_to_usd(amount_lyd, rate=None):
-    """Convert an LYD amount back to USD, rounded to 2 dp. ``None`` -> ``None``."""
+    """Convert an LYD amount to the pricing currency, rounded to 2 dp. ``None`` -> ``None``."""
     if amount_lyd is None:
         return None
     rate = get_current_rate() if rate is None else Decimal(rate)
@@ -301,3 +307,48 @@ def get_ean_black_market_rate(refresh_if_missing=True, timeout=8, currency=Excha
         if data:
             cache.set(EAN_RATE_CACHE_KEYS[currency], data, RATE_CACHE_TTL)
     return data
+
+
+def _fetched_at(info):
+    from datetime import datetime
+
+    try:
+        return datetime.fromisoformat(str(info.get("fetched_at"))) if info else None
+    except ValueError:
+        return None
+
+
+def rate_overview():
+    """Both currencies side by side, for the exchange-rate cards.
+
+    One row per currency (USD, EUR): the store's own rate and when it was set,
+    the cached CBL official and EAN market rates and when they were fetched, and
+    the gap from the store rate to the market (else official) rate. Cache-only —
+    web has no internet access; Celery refreshes the scraped rates.
+    """
+    from .currency import PRICING_CURRENCIES
+
+    current = pricing_currency()
+    rows = []
+    for code in PRICING_CURRENCIES:
+        latest = ExchangeRate.objects.filter(currency=code).order_by("-created_at").first()
+        cbl = get_cbl_official_rate(refresh_if_missing=False, currency=code) or {}
+        ean = get_ean_black_market_rate(refresh_if_missing=False, currency=code) or {}
+        store = latest.rate if latest else None
+        official = Decimal(str(cbl["average"])) if cbl.get("average") else None
+        market = Decimal(str(ean["rate"])) if ean.get("rate") else None
+        reference = market if market is not None else official
+        rows.append({
+            "code": code,
+            "is_pricing": code == current,
+            "store": store,
+            "store_at": latest.created_at if latest else None,
+            "official": official,
+            "official_at": _fetched_at(cbl),
+            "official_date": cbl.get("date"),
+            "market": market,
+            "market_at": _fetched_at(ean),
+            "market_trend": ean.get("trend"),
+            "gap": store - reference if store is not None and reference is not None else None,
+        })
+    return rows

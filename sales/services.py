@@ -67,7 +67,7 @@ def issue_invoice(invoice, user):
     if shortages:
         raise ValidationError(_("Insufficient stock to issue: ") + "; ".join(shortages))
 
-    invoice.exchange_rate_obj = ExchangeRate.objects.order_by("-created_at").first()
+    invoice.exchange_rate_obj = ExchangeRate.objects.filter(currency=invoice.currency).order_by("-created_at").first()
 
     for item in invoice.items.select_related("product", "variant"):
         if item.kind == item.KIND_PRODUCT and item.product_id and item.product.track_stock:

@@ -5,6 +5,8 @@ from zipfile import BadZipFile, ZipFile
 
 from django.core.exceptions import ValidationError
 
+from finance.currency import pricing_currency
+
 from .forms import OpeningStockLineForm
 from .models import Category, Product
 
@@ -64,6 +66,18 @@ _HEADER_ALIASES = {
     "quantity in storage": "quantity",
     "in storage": "quantity",
 }
+
+
+# The same headers in EUR, for a store that prices in EUR (either is accepted).
+_HEADER_ALIASES.update({
+    alias.replace("usd", "eur"): key for alias, key in list(_HEADER_ALIASES.items()) if "usd" in alias
+})
+
+
+def import_columns(currency=None):
+    """``IMPORT_COLUMNS`` with the money headers in the store's pricing currency."""
+    currency = currency or pricing_currency()
+    return tuple((key, label.replace("USD", currency), required) for key, label, required in IMPORT_COLUMNS)
 
 
 class OpeningStockImportError(ValidationError):
@@ -144,9 +158,9 @@ def _changes(product, cleaned):
         ("Category", product.category_id, getattr(cleaned.get("category"), "pk", None)),
         ("Unit", product.unit, cleaned.get("unit")),
         ("Barcode", product.barcode or "", cleaned.get("barcode") or ""),
-        ("Cost (USD)", product.cost_usd, cleaned.get("cost_usd") or Decimal("0")),
+        (f"Cost ({pricing_currency()})", product.cost_usd, cleaned.get("cost_usd") or Decimal("0")),
         ("Markup %", product.markup_percent, cleaned.get("markup_percent") or Decimal("0")),
-        ("Price (USD)", product.price_usd, cleaned.get("price_usd") or Decimal("0")),
+        (f"Price ({pricing_currency()})", product.price_usd, cleaned.get("price_usd") or Decimal("0")),
         ("Manual LYD", product.price_lyd_override, cleaned.get("price_lyd_override")),
     )
     return [label for label, old, new in comparisons if old != new]
@@ -210,7 +224,7 @@ def validate_workbook(upload):
             if key in seen_headers:
                 raise OpeningStockImportError(f"The '{raw}' column appears more than once.")
             seen_headers.add(key)
-    missing = [label for key, label, required in IMPORT_COLUMNS if required and key not in seen_headers]
+    missing = [label for key, label, required in import_columns() if required and key not in seen_headers]
     if missing:
         raise OpeningStockImportError("Missing required columns: " + ", ".join(missing) + ".")
 

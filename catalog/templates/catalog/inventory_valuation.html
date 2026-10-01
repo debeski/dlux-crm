@@ -11,7 +11,7 @@
             <div class="dlux-table-shell h-100 p-3">
                 <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_valuation_cost_value|default:"Stock Value at Cost" }}</div>
                 <div class="h4 mb-0">{{ total_lyd|floatformat:2 }} <span class="fs-6 text-muted">LYD</span></div>
-                <div class="small text-muted">{{ total_usd|floatformat:2 }} USD</div>
+                <div class="small text-muted">{{ total_usd|floatformat:2 }} {{ PRICING_CURRENCY }}</div>
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">

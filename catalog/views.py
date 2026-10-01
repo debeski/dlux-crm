@@ -21,6 +21,7 @@ from dlux.utils import log_user_action
 
 from common.editors import sync_party
 from common.views import RibbonPageMixin, ScopedListView, scope_filtered_queryset
+from finance.currency import pricing_currency
 from finance.services import get_current_rate, quantize_lyd, usd_to_lyd
 
 from .filters import (
@@ -34,7 +35,7 @@ from .models import (
     product_color_hex,
 )
 from .opening_stock_import import (
-    IMPORT_COLUMNS, OpeningStockImportError, restore_rows, validate_workbook,
+    OpeningStockImportError, import_columns, restore_rows, validate_workbook,
 )
 from .product_layouts import (
     PRODUCTS_LAYOUT_GRID, PRODUCTS_LAYOUT_LIGHT, PRODUCTS_LAYOUT_NS, PRODUCTS_LAYOUTS,
@@ -518,13 +519,14 @@ class InventoryValuationView(RibbonPageMixin, LoginRequiredMixin, PermissionRequ
         return self._rate
 
     def get_ribbon_action_specs(self):
-        """The live USD → LYD rate every figure on the page is priced at."""
+        """The live pricing-currency → LYD rate every figure on the page is priced at."""
         strings = self.get_page_strings()
         return [{
             "html": format_html(
                 '<span class="badge rounded-pill text-bg-light border">'
-                '<i class="bi bi-currency-exchange me-1"></i>{}: 1 USD = {} LYD</span>',
+                '<i class="bi bi-currency-exchange me-1"></i>{}: 1 {} = {} LYD</span>',
                 strings.get("ui_rate", "Rate"),
+                pricing_currency(),
                 self.get_rate(),
             ),
         }]
@@ -593,7 +595,7 @@ class OpeningStockEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
             "current_rate": get_current_rate(),
             "product_map_json": self._product_map(),
             "products": Product.objects.order_by("name"),
-            "import_columns": IMPORT_COLUMNS,
+            "import_columns": import_columns(),
         }
 
     @staticmethod
@@ -788,7 +790,7 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
         with transaction.atomic():
             invoice = form.save(commit=False)
             if invoice.exchange_rate is None:
-                invoice.exchange_rate = get_current_rate()
+                invoice.exchange_rate = get_current_rate(invoice.currency)
             invoice.status = PurchaseInvoice.STATUS_POSTED
             self._sync_supplier(invoice)
             invoice.save()

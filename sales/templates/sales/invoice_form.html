@@ -14,7 +14,7 @@
         </h1>
         <span class="badge rounded-pill text-bg-light border">
             <i class="bi bi-currency-exchange me-1"></i>
-            {{ DLUX_STRINGS.ui_rate }}: 1 USD = {{ current_rate }} LYD
+            {{ DLUX_STRINGS.ui_rate }}: 1 {{ invoice.currency|default:PRICING_CURRENCY }} = {{ current_rate }} LYD
             {% if not has_rate %}<span class="text-danger">{{ DLUX_STRINGS.ui_no_rate_set }}</span>{% endif %}
         </span>
     </div>

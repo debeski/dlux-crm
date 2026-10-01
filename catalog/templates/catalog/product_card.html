@@ -40,13 +40,13 @@
         <div class="col-6 col-lg-3">
             <div class="product-card-stat">
                 <span>{{ DLUX_STRINGS.label_product_price_usd|default:"Price (USD)" }}</span>
-                <strong>{{ product.price_usd|floatformat:2 }} USD</strong>
+                <strong>{{ product.price_usd|floatformat:2 }} {{ PRICING_CURRENCY }}</strong>
             </div>
         </div>
         <div class="col-6 col-lg-3">
             <div class="product-card-stat">
                 <span>{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</span>
-                <strong>{{ product.cost_usd|floatformat:2 }} USD</strong>
+                <strong>{{ product.cost_usd|floatformat:2 }} {{ PRICING_CURRENCY }}</strong>
             </div>
         </div>
     </div>
