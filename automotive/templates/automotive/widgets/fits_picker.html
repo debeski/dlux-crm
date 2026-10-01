@@ -1,4 +1,5 @@
-{% load dlux_tags %}<link rel="stylesheet" href="{% dlux_static 'automotive/css/fits_picker.css' %}">
+{% load asset_tags %}
+{% load dlux_tags %}<link rel="stylesheet" href="{% asset 'automotive/css/fits_picker.css' %}">
 <div class="fits-picker" data-fits-picker
      data-search-url="{{ widget.search_url }}"
      data-copy-url="{{ widget.copy_url }}"
@@ -28,4 +29,4 @@
     </div>
     {% endif %}
 </div>
-<script src="{% dlux_static 'automotive/js/fits_picker.js' %}"></script>
+<script src="{% asset 'automotive/js/fits_picker.js' %}"></script>

@@ -1,13 +1,14 @@
 {% extends "dlux/base.html" %}
+{% load asset_tags %}
 {% load static dlux_tags %}
 
 {% block title %}{{ DLUX_STRINGS.page_vehicle_browser|default:"Browse by Vehicle" }}{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% dlux_static 'automotive/css/browser.css' %}">
-<link rel="stylesheet" href="{% dlux_static 'catalog/css/product_card.css' %}">
-<link rel="stylesheet" href="{% dlux_static 'automotive/css/fits_picker.css' %}">
+<link rel="stylesheet" href="{% asset 'automotive/css/browser.css' %}">
+<link rel="stylesheet" href="{% asset 'catalog/css/product_card.css' %}">
+<link rel="stylesheet" href="{% asset 'automotive/css/fits_picker.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -134,6 +135,6 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% dlux_static 'automotive/js/fits_picker.js' %}"></script>
-<script src="{% dlux_static 'catalog/js/price_sync.js' %}"></script>
+<script src="{% asset 'automotive/js/fits_picker.js' %}"></script>
+<script src="{% asset 'catalog/js/price_sync.js' %}"></script>
 {% endblock %}

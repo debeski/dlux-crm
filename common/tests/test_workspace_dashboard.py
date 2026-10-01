@@ -64,8 +64,8 @@ class WorkspaceDashboardTests(TestCase):
         self.assertIn("data-workspace-dashboard", html)
         self.assertIn("data-dashboard-grid", html)
         self.assertIn("data-dashboard-customize", html)
-        self.assertIn("common/css/workspace_dashboard.css?v=20260710d", html)
-        self.assertIn("common/js/workspace_dashboard.js?v=20260713a", html)
+        self.assertRegex(html, r"common/css/workspace_dashboard\.css\?v=[0-9a-f]{12}")
+        self.assertRegex(html, r"common/js/workspace_dashboard\.js\?v=[0-9a-f]{12}")
         self.assertIn(WORKSPACE_PREF_NAMESPACE, html)
         self.assertIn('data-app-pref-url-template="/staff/sys/api/preferences/app/__namespace__/"', html)
         self.assertIn('data-widget-id="quick_actions"', html)
@@ -260,3 +260,18 @@ class WorkspaceEnhancementTilesTests(TestCase):
         self.assertTrue(tiles["pos_today"]["meta"].startswith("1 "))
         self.assertEqual(tiles["vehicle_browser"]["value"], "1")
         self.assertTrue(tiles["vehicle_browser"]["meta"].startswith("1 "))
+
+
+class AssetVersionTests(TestCase):
+    def test_asset_url_changes_with_the_file_contents(self):
+        from unittest.mock import patch
+
+        from common.templatetags import asset_tags
+
+        first = asset_tags.asset("common/css/workspace_dashboard.css")
+        self.assertRegex(first, r"^/static/common/css/workspace_dashboard\.css\?v=[0-9a-f]{12}$")
+        with patch.object(asset_tags.hashlib, "sha256") as sha:
+            sha.return_value.hexdigest.return_value = "f" * 64
+            asset_tags._HASHES.clear()
+            self.assertNotEqual(asset_tags.asset("common/css/workspace_dashboard.css"), first)
+        asset_tags._HASHES.clear()

@@ -1,10 +1,11 @@
 {% extends "dlux/form_base.html" %}
+{% load asset_tags %}
 {% load static %}
 {% load crispy_forms_tags %}
 
 {% block title %}{% if is_edit %}{{ DLUX_STRINGS.ui_edit_invoice }}{% else %}{{ DLUX_STRINGS.ui_new_invoice }}{% endif %}{% endblock %}
 
-{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% static 'sales/css/invoice_editor.css' %}?v=20260711a">{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% asset 'sales/css/invoice_editor.css' %}">{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -114,7 +115,7 @@
 {% block scripts %}
 {{ block.super }}
 <script id="catalog-map" type="application/json">{{ catalog_map_json|safe }}</script>
-<script src="{% static 'sales/js/invoice_editor.js' %}?v=20260711a" nonce="{{ request.csp_nonce }}" defer></script>
+<script src="{% asset 'sales/js/invoice_editor.js' %}" nonce="{{ request.csp_nonce }}" defer></script>
 <script nonce="{{ request.csp_nonce }}">
 (function () {
     const nameInput = document.querySelector('[data-customer-input]');

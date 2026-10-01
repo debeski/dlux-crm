@@ -289,6 +289,14 @@ fields server-side while the master is off, so a save keeps their stored
 values. `common/js/dependent_settings.js` (loaded from
 `templates/dlux/includes/custom_scripts.html`) follows the toggle live.
 
+## Static assets
+
+Project CSS and JS are linked with `{% load asset_tags %}{% asset 'app/css/file.css' %}`,
+which appends a short hash of the file's contents. Caddy serves `/static/` as
+`immutable` for a year, so the URL must change whenever the file does; hand-written
+`?v=` stamps were forgotten, and `{% dlux_static %}` only changes with the DjangoLux
+release. Keep `dlux_static` for DjangoLux's own files.
+
 ## Money & currency
 
 `finance/services.py` is the **single source of conversion math**:

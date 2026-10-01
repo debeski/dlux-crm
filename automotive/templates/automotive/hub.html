@@ -1,11 +1,12 @@
 {% extends "dlux/base.html" %}
+{% load asset_tags %}
 {% load static dlux_tags %}
 
 {% block title %}{{ DLUX_STRINGS.page_automotive_data|default:"Automotive Compatibility" }}{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'automotive/css/hub.css' %}">
+<link rel="stylesheet" href="{% asset 'automotive/css/hub.css' %}">
 {% endblock %}
 
 {% block content %}

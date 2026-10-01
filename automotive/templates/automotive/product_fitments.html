@@ -1,4 +1,5 @@
 {% extends "dlux/base.html" %}
+{% load asset_tags %}
 {% load static dlux_tags %}
 
 {% block title %}{{ DLUX_STRINGS.ui_manage_fitments|default:"Manage compatibility" }} — {{ product.name }}{% endblock %}
@@ -75,4 +76,4 @@
 </div>
 {% endblock %}
 
-{% block scripts %}{{ block.super }}<script src="{% static 'automotive/js/dependent_selects.js' %}" nonce="{{ request.csp_nonce }}"></script>{% endblock %}
+{% block scripts %}{{ block.super }}<script src="{% asset 'automotive/js/dependent_selects.js' %}" nonce="{{ request.csp_nonce }}"></script>{% endblock %}

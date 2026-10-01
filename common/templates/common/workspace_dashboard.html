@@ -1,11 +1,12 @@
 {% extends "dlux/base.html" %}
+{% load asset_tags %}
 {% load static %}
 
 {% block title %}{{ DLUX_STRINGS.ui_workspace|default:"Workspace" }}{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'common/css/workspace_dashboard.css' %}?v=20260710d">
+<link rel="stylesheet" href="{% asset 'common/css/workspace_dashboard.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -146,5 +147,5 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% static 'common/js/workspace_dashboard.js' %}?v=20260713a" nonce="{{ request.csp_nonce }}" defer></script>
+<script src="{% asset 'common/js/workspace_dashboard.js' %}" nonce="{{ request.csp_nonce }}" defer></script>
 {% endblock %}
