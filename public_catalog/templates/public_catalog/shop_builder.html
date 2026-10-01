@@ -1,4 +1,5 @@
 {% extends "dlux/base.html" %}
+{% load asset_tags %}
 {% load static %}
 {% load dlux_tags %}
 
@@ -6,7 +7,7 @@
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'public_catalog/css/shop_builder.css' %}?v=20260712a">
+<link rel="stylesheet" href="{% asset 'public_catalog/css/shop_builder.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -80,5 +81,5 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% static 'public_catalog/js/shop_builder.js' %}?v=20260714a" nonce="{{ request.csp_nonce }}" defer></script>
+<script src="{% asset 'public_catalog/js/shop_builder.js' %}" nonce="{{ request.csp_nonce }}" defer></script>
 {% endblock %}

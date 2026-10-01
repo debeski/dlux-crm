@@ -1,3 +1,4 @@
+{% load asset_tags %}
 {% load static %}
 <p class="text-muted small mb-3">
     {{ DLUX_STRINGS.options_products_layout_desc|default:"Choose how your Products page lists items: full table, a store-style card grid, or a minimal light table." }}
@@ -13,4 +14,4 @@
 {% else %}
 {% include "catalog/_products_layout_toggle.html" %}
 {% endif %}
-<script src="{% static 'catalog/js/products_layout.js' %}?v=20260711d" nonce="{{ request.csp_nonce }}" defer></script>
+<script src="{% asset 'catalog/js/products_layout.js' %}" nonce="{{ request.csp_nonce }}" defer></script>

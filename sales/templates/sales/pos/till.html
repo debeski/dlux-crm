@@ -1,16 +1,17 @@
 {% extends "dlux/base.html" %}
+{% load asset_tags %}
 {% load dlux_tags %}
 
 {% block title %}{{ DLUX_STRINGS.pos_till_title|default:"Point of Sale" }}{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
-<link rel="stylesheet" href="{% dlux_static 'sales/pos/css/main.css' %}">
+<link rel="stylesheet" href="{% asset 'sales/pos/css/main.css' %}">
 {% endblock %}
 
 {% block content %}
 <script type="application/json" id="pos-setup">{{ pos_setup|safe }}</script>
-<div class="pos" data-pos data-zxing="{% dlux_static 'sales/pos/vendor/zxing-library-0.23.0.min.js' %}">
+<div class="pos" data-pos data-zxing="{% asset 'sales/pos/vendor/zxing-library-0.23.0.min.js' %}">
     <section class="pos-catalog" aria-label="{{ DLUX_STRINGS.pos_catalog|default:'Find items' }}">
         <div class="pos-finder" data-pos-finder>
             <div class="pos-scan">
@@ -144,5 +145,5 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% dlux_static 'sales/pos/js/main.js' %}"></script>
+<script src="{% asset 'sales/pos/js/main.js' %}"></script>
 {% endblock %}

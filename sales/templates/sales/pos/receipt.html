@@ -1,10 +1,11 @@
+{% load asset_tags %}
 {% load dlux_tags %}<!DOCTYPE html>
 <html lang="{{ doc_lang }}" dir="{% if is_rtl %}rtl{% else %}ltr{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ invoice.number }}</title>
-    <link rel="stylesheet" href="{% dlux_static 'sales/pos/css/receipt.css' %}">
+    <link rel="stylesheet" href="{% asset 'sales/pos/css/receipt.css' %}">
 </head>
 <body class="receipt receipt--{{ size }}">
     <header class="receipt__head">
