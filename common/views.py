@@ -605,6 +605,8 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             ))
 
         if user.has_perm("catalog.view_inventory_valuation"):
+            from finance.currency import pricing_currency
+
             total_usd = Decimal("0.00")
             valued_products = scope_filtered_queryset(
                 Product.objects.filter(is_active=True, track_stock=True), user
@@ -614,7 +616,7 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             tiles.append(_tile(
                 "inventory_value", self._s("inventory_valuation", "Inventory Valuation"),
                 "bi bi-safe2", value=_money(usd_to_lyd(total_usd)), unit="LYD",
-                meta=f"{_money(total_usd)} USD", url=reverse("catalog:inventory_valuation"),
+                meta=f"{_money(total_usd)} {pricing_currency()}", url=reverse("catalog:inventory_valuation"),
                 tone="green",
             ))
 
@@ -679,6 +681,19 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             ))
         return tiles
 
+    def _age(self, moment):
+        """How long ago, compactly: "15 min ago" / «منذ 3 ساعة»; "" when unknown."""
+        if moment is None:
+            return ""
+        seconds = max(int((timezone.now() - moment).total_seconds()), 0)
+        if seconds < 3600:
+            amount = self._s("rate_card_minutes", "{n} min").format(n=max(seconds // 60, 1))
+        elif seconds < 86400:
+            amount = self._s("rate_card_hours", "{n} h").format(n=seconds // 3600)
+        else:
+            amount = self._s("rate_card_days", "{n} d").format(n=seconds // 86400)
+        return self._s("rate_card_ago", "{age} ago").format(age=amount)
+
     def _enhancement_tiles(self, today):
         """Tiles for the optional till and vehicle/machine browser, only while on."""
         tiles = []
@@ -717,34 +732,31 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
 
     def _finance_tiles(self):
         from finance.models import CashDeposit, Expense, StaffAccount, StaffLedgerEntry
-        from finance.services import (
-            get_cbl_official_rate, get_current_rate, get_ean_black_market_rate,
-            has_configured_rate,
-        )
+        from finance.services import has_configured_rate, rate_overview
 
         user = self.request.user
         tiles = []
-        current_rate = get_current_rate()
-        cbl = get_cbl_official_rate(refresh_if_missing=False)
-        ean = get_ean_black_market_rate(refresh_if_missing=False)
-        ref_rate = None
-        ref_label = self._s("ui_unavailable", "Unavailable")
-        if ean and ean.get("rate"):
-            ref_rate = Decimal(str(ean["rate"]))
-            ref_label = self._s("ui_black_market_rate", "Black Market (EAN)")
-        elif cbl and cbl.get("average"):
-            ref_rate = Decimal(str(cbl["average"]))
-            ref_label = self._s("ui_official_rate", "Official (CBL)")
-        gap = current_rate - ref_rate if ref_rate is not None else None
-
         if user.has_perm("finance.view_exchangerate") or user.has_perm("sales.view_invoice") or user.has_perm("catalog.view_product"):
+            # Both currencies, whatever the store prices in: what each costs in LYD
+            # here, officially and on the market, and how fresh each figure is.
+            rows = rate_overview()
+            for row in rows:
+                row["store_age"] = self._age(row["store_at"])
+                row["official_age"] = self._age(row["official_at"])
+                row["market_age"] = self._age(row["market_at"])
+                # Plain figures, like the rest of the tile text (no locale commas).
+                for key in ("store", "official", "market"):
+                    row[key] = f"{row[key]:.4f}".rstrip("0").rstrip(".") if row[key] is not None else None
+            pricing = next(row for row in rows if row["is_pricing"])
             tiles.append(_tile(
                 "exchange_rate", self._s("ui_exchange_rate", "Exchange Rate"),
-                "bi bi-currency-exchange", kind="rate", value=f"{current_rate}", unit="LYD/USD",
-                meta=f"{ref_label}{': ' + str(ref_rate) if ref_rate is not None else ''}",
+                "bi bi-currency-exchange", kind="rate", size="l", items=rows,
                 url=reverse("finance:exchange_rate_list") if user.has_perm("finance.view_exchangerate") else "",
                 tone="blue",
-                footer=f"{self._s('ui_rate_gap', 'Gap')}: {gap:+.2f}" if gap is not None else "",
+                footer=(
+                    f"{self._s('ui_rate_gap', 'Gap')} ({pricing['code']}): {pricing['gap']:+.2f}"
+                    if pricing["gap"] is not None else ""
+                ),
             ))
             if not has_configured_rate():
                 tiles.append(_tile(

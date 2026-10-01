@@ -1,5 +1,13 @@
 DLUX_STRINGS = {
     "en": {
+        "pricing_settings_title": "Pricing currency",
+        "pricing_settings_desc": "USD or EUR for costs and prices across the system; amounts in LYD are unaffected.",
+        "pricing_currency": "Pricing currency",
+        "pricing_currency_help": "The currency costs and prices are entered and shown in, everywhere. Invoices keep the currency they were made in.",
+        "pricing_convert_confirm": "Convert catalog prices when switching",
+        "pricing_convert_preview": "Switching converts {products} products and {services} services: 1 {current} = {factor} {other} at your rates (1 {current} = {current_rate} LYD, 1 {other} = {other_rate} LYD). Selling prices in LYD stay the same.",
+        "pricing_convert_needs_rates": "Set both a USD and a EUR exchange rate before switching, so prices can be converted.",
+        "pricing_convert_required": "Tick this to confirm converting the catalog prices to the new currency.",
         "app_finance": "Finance",
         "model_exchangerate": "Exchange Rate",
         "models_exchangerate": "Exchange Rates",
@@ -139,6 +147,14 @@ DLUX_STRINGS = {
         "perm_view_all_staffledgerentry": "Can view all staff ledger entries",
     },
     "ar": {
+        "pricing_settings_title": "عملة التسعير",
+        "pricing_settings_desc": "الدولار أو اليورو للتكاليف والأسعار في النظام كله؛ المبالغ بالدينار لا تتأثر.",
+        "pricing_currency": "عملة التسعير",
+        "pricing_currency_help": "العملة التي تُدخل وتُعرض بها التكاليف والأسعار في كل مكان. تحتفظ الفواتير بالعملة التي أُنشئت بها.",
+        "pricing_convert_confirm": "تحويل أسعار الأصناف عند التبديل",
+        "pricing_convert_preview": "التبديل يحوّل {products} صنفاً و{services} خدمة: 1 {current} = {factor} {other} حسب أسعارك (1 {current} = {current_rate} دينار، 1 {other} = {other_rate} دينار). أسعار البيع بالدينار لا تتغير.",
+        "pricing_convert_needs_rates": "حدّد سعر صرف للدولار وآخر لليورو قبل التبديل، حتى يمكن تحويل الأسعار.",
+        "pricing_convert_required": "فعّل هذا الخيار لتأكيد تحويل أسعار الأصناف إلى العملة الجديدة.",
         "app_finance": "المالية",
         "model_exchangerate": "سعر الصرف",
         "models_exchangerate": "أسعار الصرف",

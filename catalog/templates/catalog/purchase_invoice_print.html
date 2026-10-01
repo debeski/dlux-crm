@@ -70,8 +70,8 @@
             <div class="box" style="text-align:{% if is_rtl %}left{% else %}right{% endif %}">
                 <div class="label">{{ DLUX_STRINGS.pr_total|default:"Total" }}</div>
                 <div class="name">{{ invoice.total_lyd|floatformat:2 }} LYD</div>
-                <div>{{ invoice.total_usd|floatformat:2 }} USD</div>
-                <div class="rate-note">{{ DLUX_STRINGS.pr_rate }}: 1 USD = {{ invoice.exchange_rate }} LYD</div>
+                <div>{{ invoice.total_usd|floatformat:2 }} {{ invoice.currency }}</div>
+                <div class="rate-note">{{ DLUX_STRINGS.pr_rate }}: 1 {{ invoice.currency }} = {{ invoice.exchange_rate }} LYD</div>
             </div>
         </div>
 
@@ -81,9 +81,9 @@
                     <th>{{ DLUX_STRINGS.pr_no|default:"No." }}</th>
                     <th>{{ DLUX_STRINGS.pr_description|default:"Description" }}</th>
                     <th>{{ DLUX_STRINGS.label_unit|default:"Unit" }}</th>
-                    <th class="num">{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</th>
+                    <th class="num">{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }} ({{ invoice.currency }})</th>
                     <th class="num">{{ DLUX_STRINGS.ui_qty|default:"Qty" }}</th>
-                    <th class="num">{{ DLUX_STRINGS.ui_total_usd|default:"Total (USD)" }}</th>
+                    <th class="num">{{ DLUX_STRINGS.ui_doc_total|default:"Total" }} ({{ invoice.currency }})</th>
                     <th class="num">{{ DLUX_STRINGS.label_total_lyd|default:"Total (LYD)" }}</th>
                 </tr>
             </thead>
@@ -111,7 +111,7 @@
         </table>
 
         <div class="totals">
-            <div class="row"><span>{{ DLUX_STRINGS.ui_total_usd|default:"Total (USD)" }}</span><span>{{ invoice.total_usd|floatformat:2 }}</span></div>
+            <div class="row"><span>{{ DLUX_STRINGS.ui_doc_total|default:"Total" }} ({{ invoice.currency }})</span><span>{{ invoice.total_usd|floatformat:2 }}</span></div>
             <div class="row grand"><span>{{ DLUX_STRINGS.pr_total|default:"Total" }}</span><span>{{ invoice.total_lyd|floatformat:2 }} LYD</span></div>
         </div>
 

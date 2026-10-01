@@ -604,3 +604,48 @@
             0 20px 34px -26px rgba(15, 23, 42, .32);
     }
 }
+
+/* Exchange-rate board: one row per currency (USD, EUR). */
+.rate-board {
+    display: grid;
+    gap: .35rem;
+}
+
+.rate-row {
+    display: grid;
+    grid-template-columns: minmax(4.5rem, .8fr) repeat(3, minmax(0, 1fr));
+    gap: .5rem;
+    align-items: baseline;
+    padding: .35rem .5rem;
+    border-radius: .6rem;
+}
+
+.rate-row.is-pricing {
+    background: color-mix(in srgb, var(--tile-accent) 10%, transparent);
+}
+
+.rate-head small {
+    color: var(--ws-muted);
+    font-size: .75rem;
+}
+
+.rate-code strong {
+    display: block;
+    font-size: 1rem;
+}
+
+.rate-code em {
+    font-style: normal;
+    font-size: .7rem;
+    color: var(--tile-accent);
+}
+
+.rate-cell b {
+    display: block;
+    font-variant-numeric: tabular-nums;
+}
+
+.rate-cell small {
+    color: var(--ws-muted);
+    font-size: .72rem;
+}

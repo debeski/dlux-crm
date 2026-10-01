@@ -1,5 +1,9 @@
 DLUX_STRINGS = {
     "en": {
+        "label_invoiceitem_unit_price_usd": "Unit Price (USD)",
+        "label_invoiceitem_unit_cost_usd": "Unit Cost (USD)",
+        "label_invoice_exchange_rate": "Exchange Rate (LYD per unit)",
+        "label_invoice_currency": "Currency",
         "app_sales": "Sales",
         "ui_search_items": "Search items…",
         "ui_all_categories": "All categories",
@@ -196,6 +200,10 @@ DLUX_STRINGS = {
         "error_barcode_taken": "Already used by another item: {codes}",
     },
     "ar": {
+        "label_invoiceitem_unit_price_usd": "سعر الوحدة (دولار)",
+        "label_invoiceitem_unit_cost_usd": "تكلفة الوحدة (دولار)",
+        "label_invoice_exchange_rate": "سعر الصرف (دينار لكل وحدة)",
+        "label_invoice_currency": "العملة",
         "app_sales": "المبيعات",
         "ui_search_items": "ابحث عن صنف…",
         "ui_all_categories": "كل التصنيفات",

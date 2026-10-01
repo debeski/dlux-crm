@@ -76,7 +76,7 @@
             <div class="box" style="text-align:{% if is_rtl %}left{% else %}right{% endif %}">
                 <div class="label">{{ DLUX_STRINGS.pr_amount_due }}</div>
                 <div class="name">{{ invoice.balance_due|floatformat:2 }} LYD</div>
-                <div class="rate-note">{{ DLUX_STRINGS.pr_rate }}: 1 USD = {{ invoice.exchange_rate }} LYD</div>
+                <div class="rate-note">{{ DLUX_STRINGS.pr_rate }}: 1 {{ invoice.currency }} = {{ invoice.exchange_rate }} LYD</div>
             </div>
         </div>
 

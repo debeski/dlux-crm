@@ -23,13 +23,12 @@ from dlux.utils import log_user_action
 from common.access import apply_ownership, user_can_view_all
 from common.editors import DocumentEditorView, sync_party
 from common.views import RibbonPageMixin, ScopedListView, scope_filtered_queryset
-from finance.models import CashDeposit, ExchangeRate
+from finance.models import CashDeposit
 from finance.services import (
-    get_cbl_official_rate,
     get_current_rate,
-    get_ean_black_market_rate,
     has_configured_rate,
     quantize_lyd,
+    rate_overview,
 )
 
 from .filters import CustomerFilter, DeliveryFilter, InvoiceFilter, PaymentFilter
@@ -282,7 +281,7 @@ class _InvoiceEditorView(DocumentEditorView):
         # The rate is frozen onto the invoice, never typed: a draft saved today
         # and issued next week must still price at today's rate.
         if invoice.exchange_rate is None:
-            invoice.exchange_rate = get_current_rate()
+            invoice.exchange_rate = get_current_rate(invoice.currency)
 
     def apply_line_defaults(self, item, invoice):
         _apply_item_price(item, invoice)
@@ -532,44 +531,9 @@ class DashboardView(RibbonPageMixin, LoginRequiredMixin, TemplateView):
 
         ctx["current_rate"] = get_current_rate()
         ctx["has_rate"] = has_configured_rate()
-        ctx["latest_rate_row"] = ExchangeRate.objects.filter(
-            currency=ExchangeRate.CURRENCY_USD
-        ).order_by("-created_at").first()
-        ctx["has_eur_rate"] = has_configured_rate(ExchangeRate.CURRENCY_EUR)
-        if ctx["has_eur_rate"]:
-            ctx["current_eur_rate"] = get_current_rate(ExchangeRate.CURRENCY_EUR)
-        # External reference rates (scraped, cached) shown next to our custom rate:
-        # the official CBL rate and the eanlibya black-market rate. Read cache-only
-        # here — the web tier is network-isolated; the celery worker (which has
-        # egress) does the scraping and populates the shared Redis cache.
-        cbl = get_cbl_official_rate(refresh_if_missing=False)
-        ctx["cbl_official"] = cbl
-        if cbl and cbl.get("average"):
-            ctx["cbl_official_rate"] = Decimal(str(cbl["average"]))
-
-        ean = get_ean_black_market_rate(refresh_if_missing=False)
-        ctx["ean_market"] = ean
-        if ean and ean.get("rate"):
-            market = Decimal(str(ean["rate"]))
-            ctx["ean_market_rate"] = market
-            # Custom pricing tracks the black market, so the meaningful gap is
-            # custom vs black-market; fall back to the official rate if EAN is down.
-            ctx["rate_gap"] = ctx["current_rate"] - market
-        elif ctx.get("cbl_official_rate"):
-            ctx["rate_gap"] = ctx["current_rate"] - ctx["cbl_official_rate"]
-
-        cbl_eur = get_cbl_official_rate(
-            refresh_if_missing=False, currency=ExchangeRate.CURRENCY_EUR
-        )
-        ctx["cbl_eur"] = cbl_eur
-        if cbl_eur and cbl_eur.get("average"):
-            ctx["cbl_eur_rate"] = Decimal(str(cbl_eur["average"]))
-        ean_eur = get_ean_black_market_rate(
-            refresh_if_missing=False, currency=ExchangeRate.CURRENCY_EUR
-        )
-        ctx["ean_eur"] = ean_eur
-        if ean_eur and ean_eur.get("rate"):
-            ctx["ean_eur_rate"] = Decimal(str(ean_eur["rate"]))
+        # Both currencies: the store's rate and the cached CBL official and EAN
+        # market rates (web has no internet access; Celery refreshes them).
+        ctx["rate_rows"] = rate_overview()
         ctx["sales_today"] = today_qs.aggregate(t=Sum("total_lyd"))["t"] or Decimal("0")
         ctx["count_today"] = today_qs.count()
         ctx["sales_month"] = month_qs.aggregate(t=Sum("total_lyd"))["t"] or Decimal("0")

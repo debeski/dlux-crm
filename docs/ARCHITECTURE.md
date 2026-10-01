@@ -278,8 +278,8 @@ settings* step. *Optional enhancements* (store types) stay a separate tile.
 A settings form's `to_app_config()` must only *return* its value: the setup
 wizard saves the whole settings row once, so anything a form saves on its own
 is overwritten. Side effects that must follow a saved value hang off the row's
-`post_save` instead — the machine wording does
-(`automotive.terminology.sync_terminology`).
+`post_save` instead — the store wording does
+(`common.wording.sync_wording`).
 
 Settings that depend on a master toggle follow dlux's rule that a disabled
 master locks its dependents rather than hiding them: `common/settings_forms.py`
@@ -293,11 +293,33 @@ values. `common/js/dependent_settings.js` (loaded from
 
 `finance/services.py` is the **single source of conversion math**:
 
-- `get_current_rate(currency="USD")` — the live currency→LYD rate (newest
-  matching `ExchangeRate` row, cached independently for USD and EUR).
+- `get_current_rate(currency=None)` — the live currency→LYD rate (newest
+  matching `ExchangeRate` row, cached independently for USD and EUR); without a
+  currency it is the store's **pricing currency** (`finance.currency`).
 - `usd_to_lyd()` / `lyd_to_usd()` / `eur_to_lyd()` / `quantize_lyd()` —
-  explicit conversions with consistent 2-dp rounding. Catalog and invoice calls
-  omit the currency intentionally and therefore keep the USD default.
+  conversions with consistent 2-dp rounding. The `usd` names are historic: like
+  the `*_usd` columns they mean the pricing currency.
+- `rate_overview()` — both currencies' store, CBL and EAN rates with their
+  ages, for the Workspace exchange card and the Sales Overview.
+
+`finance/currency.py` holds the pricing currency (`switch_pos.pricing`, a CRM
+options section) and the switch: `convert_on_switch` on `SystemSettings`
+`pre_save` converts catalog prices and draft sales invoices inside a
+transaction before the new currency is written, so the tile, the setup wizard and
+configuration imports all convert, and a failed conversion keeps the old
+currency. `Invoice.currency` / `PurchaseInvoice.currency` default to the pricing
+currency (existing rows were migrated as USD).
+
+### Store wording
+
+`common/wording.py` writes store-dependent words into the DjangoLux translation
+override layer: apps register *axes* (`automotive.terminology`: vehicle ↔
+machine; `finance.wording`: USD ↔ EUR) and the engine generates all axes
+together on every `SystemSettings` save and after `migrate`. An override is
+treated as ours when it matches what some combination of modes generates;
+anything else is an admin's own and is left alone. Keys that name a currency on
+purpose (`currency_*`, `pricing_*`, `rate_card_*`, `choice_*`) keep their
+wording.
 
 Reuse these everywhere instead of multiplying by a rate inline.
 

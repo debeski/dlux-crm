@@ -41,3 +41,13 @@ def navbar_crumbs(request):
     match = getattr(request, "resolver_match", None)
     crumbs = ROUTE_CRUMBS.get(getattr(match, "view_name", "") or "")
     return {"dlux_navbar_crumbs": crumbs} if crumbs else {}
+
+
+def pricing_currency(request):
+    """``PRICING_CURRENCY``: the code (USD/EUR) catalog prices are kept in.
+
+    Documents show their own ``currency`` instead; this is for everything else.
+    """
+    from finance.currency import pricing_currency as current
+
+    return {"PRICING_CURRENCY": current()}

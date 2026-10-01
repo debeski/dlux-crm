@@ -190,7 +190,7 @@ class PurchaseInvoiceTable(DluxTable):
     number = tables.Column(verbose_name="Purchase Invoice No.")
     supplier = tables.Column(empty_values=(), verbose_name="Supplier", orderable=False)
     status = tables.Column(verbose_name="Status")
-    total_usd = tables.Column(verbose_name="Total (USD)")
+    total_usd = tables.Column(verbose_name="Foreign total")
     total_lyd = tables.Column(verbose_name="Total (LYD)")
 
     class Meta(DluxTable.Meta):
@@ -232,10 +232,12 @@ class PurchaseInvoiceTable(DluxTable):
         )
 
     def render_total_usd(self, record):
-        return f"{record.total_usd:,.2f}"
+        # Each purchase invoice keeps the currency it was made in.
+        return f"{record.total_usd:,.2f} {record.currency}"
 
     def render_total_lyd(self, record):
         return f"{record.total_lyd:,.2f}"
+
 
 
 class StockTakeTable(DluxTable):

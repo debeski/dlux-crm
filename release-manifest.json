@@ -1,16 +1,14 @@
 {
   "schema_version": 1,
-  "version": "0.9.0",
-  "summary": "Parts-first automotive and heavy-machinery mode, an optional point-of-sale till with barcode scanning, and store settings in one CRM options tile, on DjangoLux 1.10.",
+  "version": "0.10.0",
+  "summary": "Choose USD or EUR as the store's pricing currency, with existing prices converted and every screen, label and printout following it; both currencies on the exchange card.",
   "highlights": [
-    "Tag vehicles or machines while adding a part; search by part number; copy or bulk-assign fitments.",
-    "Heavy machinery: machine types, shared engines, and optional machine wording across the app.",
-    "Optional till: scan or search, most-sold grid, discounts, split cash/card/transfer, receipts.",
-    "Extra barcodes per item or size; the phone camera scans on iPhone too.",
-    "CRM options tile groups the products layout, public shop and till settings.",
-    "Exchange rates fetched through the Composer relay; the public shop follows the visitor's language.",
-    "Workspace quick actions and tiles for the till and the vehicle browser while they are on.",
-    "Requires DjangoLux 1.10.0; Composer 1.6.0 for relay-fetched exchange rates."
+    "Pricing currency (USD or EUR) in CRM options; USD stays the default.",
+    "Switching converts product and service prices at your USD/EUR rates; LYD prices stay the same.",
+    "Invoices and purchase invoices keep the currency they were made in.",
+    "Fields, tables, cards, printouts and the opening-stock workbook follow the chosen currency, in English and Arabic.",
+    "The exchange card shows USD and EUR: store, official and market rates, and how fresh each is.",
+    "Celery no longer needs internet access: exchange rates come through the Composer 1.6.0 egress relay."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.9.0"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.10.0"
 }

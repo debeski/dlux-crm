@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from dlux.models import ScopedModel
 
+from finance.currency import CURRENCY_CHOICES, pricing_currency
 from finance.services import get_current_rate, quantize_lyd
 
 TWO_PLACES = Decimal("0.01")
@@ -90,9 +91,12 @@ class Invoice(ScopedModel):
     )
     invoice_date = models.DateField(default=timezone.localdate, verbose_name="Invoice Date")
 
-    # Frozen rate this invoice is bound to.
+    # The pricing currency (USD/EUR) this invoice was made in, and its frozen rate.
+    currency = models.CharField(
+        max_length=3, choices=CURRENCY_CHOICES, default=pricing_currency, verbose_name="Currency",
+    )
     exchange_rate = models.DecimalField(
-        max_digits=12, decimal_places=4, verbose_name="Exchange Rate (LYD/USD)"
+        max_digits=12, decimal_places=4, verbose_name="Exchange Rate (LYD per unit)"
     )
     exchange_rate_obj = models.ForeignKey(
         "finance.ExchangeRate", null=True, blank=True, on_delete=models.SET_NULL,

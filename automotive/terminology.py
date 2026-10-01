@@ -1,20 +1,14 @@
-"""Vehicle ↔ machine/equipment wording for the compatibility screens.
+"""Vehicle ↔ machine/equipment wording, as a ``common.wording`` axis.
 
-The words are applied as DLux translation overrides (the same layer an admin
-edits in System Settings), so every screen — including DLux's own model labels
-and breadcrumbs — follows the store's choice on the next request. Only keys
-whose override is absent or still equal to the generated wording are touched,
-so an admin's hand-written override always survives a switch.
-
-The overrides follow the mode stored on the settings row each time that row is
-saved (``sync_terminology`` on ``post_save``), not the form that changed it: a
-setup-wizard or import save writes the whole row, and a separate save from the
-form would be overwritten by it.
+Machine wording rewrites "vehicle"/"car" across the app when the store serves
+heavy machinery. ``common.wording`` writes it into the translation override
+layer and keeps it in step with the mode saved in Optional enhancements.
 """
 import re
-import threading
 
-from .settings import TERMINOLOGY_EQUIPMENT
+from common.wording import register_wording
+
+from .settings import TERMINOLOGY_EQUIPMENT, TERMINOLOGY_VEHICLE
 
 _EN = (
     (r"\bAutomotive\b", "Equipment"),
@@ -60,10 +54,7 @@ _EXAMPLES = {
 }
 
 
-_saving = threading.local()
-
-
-def _to_equipment(text, lang):
+def _rewrite(text, lang, mode):
     if lang == "ar":
         for old, new in _AR:
             text = text.replace(old, new)
@@ -71,63 +62,6 @@ def _to_equipment(text, lang):
     for pattern, new in _EN:
         text = re.sub(pattern, new, text)
     return text
-
-
-def _source_strings():
-    from automotive.translations import DLUX_STRINGS as automotive
-    from catalog.translations import DLUX_STRINGS as catalog
-    from common.translations import DLUX_STRINGS as common
-    from sales.translations import DLUX_STRINGS as sales
-
-    merged = {}
-    for bundle in (common, catalog, sales, automotive):
-        for lang, strings in bundle.items():
-            merged.setdefault(lang, {}).update(strings)
-    return merged
-
-
-def equipment_overrides():
-    """{lang: {key: machine wording}} for every string the switch rewrites."""
-    overrides = {}
-    for lang, strings in _source_strings().items():
-        for key, value in strings.items():
-            if not isinstance(value, str) or key.startswith("optional_terminology"):
-                continue
-            changed = _EXAMPLES.get(lang, {}).get(key) or _to_equipment(value, lang)
-            if changed != value:
-                overrides.setdefault(lang, {})[key] = changed
-    return overrides
-
-
-def apply_terminology(mode, settings=None):
-    """Write or withdraw the machine wording in the translation override layer."""
-    if settings is None:
-        from dlux.models import SystemSettings
-
-        settings = SystemSettings.load()
-    current = settings.translations_override if isinstance(settings.translations_override, dict) else {}
-    overrides = {lang: dict(values) for lang, values in current.items() if isinstance(values, dict)}
-    changed = False
-    for lang, values in equipment_overrides().items():
-        bucket = overrides.setdefault(lang, {})
-        for key, wording in values.items():
-            if mode == TERMINOLOGY_EQUIPMENT:
-                if key not in bucket:
-                    bucket[key] = wording
-                    changed = True
-            elif bucket.get(key) == wording:
-                del bucket[key]
-                changed = True
-    if changed:
-        settings.translations_override = {lang: values for lang, values in overrides.items() if values}
-        # A flag on the instance would be pickled into the settings cache by
-        # save() and read back as "mid-sync" by every later load.
-        _saving.active = True
-        try:
-            settings.save(update_fields=["translations_override"])
-        finally:
-            _saving.active = False
-    return changed
 
 
 def _stored_mode(settings):
@@ -141,20 +75,12 @@ def _stored_mode(settings):
     return normalize_optional_enhancements(stored)["automotive"]["terminology"]
 
 
-def sync_terminology(sender, instance, **kwargs):
-    """post_save of SystemSettings: match the wording to the mode just saved."""
-    if getattr(_saving, "active", False):
-        return
-    apply_terminology(_stored_mode(instance), settings=instance)
-
-
-def refresh_terminology(**kwargs):
-    """After migrate: strings an upgrade added get the store's chosen wording."""
-    from django.db import DatabaseError
-
-    from .settings import get_automotive_config
-
-    try:
-        apply_terminology(get_automotive_config()["terminology"])
-    except DatabaseError:
-        pass
+register_wording(
+    "terminology",
+    modes=(TERMINOLOGY_VEHICLE, TERMINOLOGY_EQUIPMENT),
+    default=TERMINOLOGY_VEHICLE,
+    stored_mode=lambda settings: _stored_mode(settings),
+    rewrite=_rewrite,
+    examples={TERMINOLOGY_EQUIPMENT: _EXAMPLES},
+    skip_prefixes=("optional_terminology",),
+)

@@ -48,53 +48,28 @@
         {% endif %}
         <div class="col-sm-6 col-xl-3">
             <div class="dlux-table-shell h-100 p-3">
-                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_exchange_rate }} <span class="text-muted">(LYD/USD)</span></div>
+                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_exchange_rate }} <span class="text-muted">(LYD)</span></div>
+                {% for row in rate_rows %}
+                {% if not forloop.first %}<hr class="my-2">{% endif %}
                 <div class="d-flex justify-content-between align-items-baseline mt-1">
-                    <span class="small text-muted">{{ DLUX_STRINGS.ui_custom_rate }}</span>
-                    <span class="h5 mb-0">{{ current_rate }}</span>
+                    <span class="fw-semibold">{{ row.code }}{% if row.is_pricing %} <span class="badge rounded-pill text-bg-primary">{{ DLUX_STRINGS.rate_card_pricing|default:"Pricing" }}</span>{% endif %}</span>
+                    <span class="h6 mb-0">{% if row.store %}{{ row.store|floatformat:4 }}{% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-baseline">
                     <span class="small text-muted"><i class="bi bi-bank me-1"></i>{{ DLUX_STRINGS.ui_official_rate }}</span>
-                    {% if cbl_official_rate %}
-                        <span class="h6 mb-0">{{ cbl_official_rate|floatformat:4 }}</span>
-                    {% else %}
-                        <span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>
-                    {% endif %}
+                    {% if row.official %}<span class="small">{{ row.official|floatformat:4 }}{% if row.official_date %} <span class="text-muted">· {{ row.official_date }}</span>{% endif %}</span>{% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}
                 </div>
                 <div class="d-flex justify-content-between align-items-baseline">
                     <span class="small text-muted"><i class="bi bi-graph-up-arrow me-1"></i>{{ DLUX_STRINGS.ui_black_market_rate }}</span>
-                    {% if ean_market_rate %}
-                        <span class="h6 mb-0">
-                            {% if ean_market.trend == "up" %}<i class="bi bi-caret-up-fill text-success small"></i>{% elif ean_market.trend == "down" %}<i class="bi bi-caret-down-fill text-danger small"></i>{% endif %}
-                            {{ ean_market_rate|floatformat:2 }}
-                        </span>
-                    {% else %}
-                        <span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>
-                    {% endif %}
-                </div>
-                <div class="small text-muted mt-1">
-                    {% if cbl_official %}CBL{% if cbl_official.date %} {{ cbl_official.date }}{% endif %}{% endif %}{% if ean_market %} · EANLibya{% endif %}{% if rate_gap != None %} · {{ DLUX_STRINGS.ui_rate_gap }}: {{ rate_gap|floatformat:2 }}{% endif %}
-                    {% if not cbl_official and not ean_market %}{% if latest_rate_row %}{{ latest_rate_row.created_at|date:"Y-m-d" }}{% else %}—{% endif %}{% endif %}
-                </div>
-                <hr class="my-2">
-                <div class="text-muted small text-uppercase">EUR <span class="text-muted">(LYD/EUR)</span></div>
-                <div class="d-flex justify-content-between align-items-baseline mt-1">
-                    <span class="small text-muted">{{ DLUX_STRINGS.ui_custom_rate }}</span>
-                    {% if has_eur_rate %}<span class="h6 mb-0">{{ current_eur_rate|floatformat:4 }}</span>{% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}
-                </div>
-                <div class="d-flex justify-content-between align-items-baseline">
-                    <span class="small text-muted"><i class="bi bi-bank me-1"></i>{{ DLUX_STRINGS.ui_official_rate }}</span>
-                    {% if cbl_eur_rate %}<span class="h6 mb-0">{{ cbl_eur_rate|floatformat:4 }}</span>{% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}
-                </div>
-                <div class="d-flex justify-content-between align-items-baseline">
-                    <span class="small text-muted"><i class="bi bi-graph-up-arrow me-1"></i>{{ DLUX_STRINGS.ui_black_market_rate }}</span>
-                    {% if ean_eur_rate %}
-                    <span class="h6 mb-0">
-                        {% if ean_eur.trend == "up" %}<i class="bi bi-caret-up-fill text-success small"></i>{% elif ean_eur.trend == "down" %}<i class="bi bi-caret-down-fill text-danger small"></i>{% endif %}
-                        {{ ean_eur_rate|floatformat:2 }}
+                    {% if row.market %}
+                    <span class="small">
+                        {% if row.market_trend == "up" %}<i class="bi bi-caret-up-fill text-success small"></i>{% elif row.market_trend == "down" %}<i class="bi bi-caret-down-fill text-danger small"></i>{% endif %}
+                        {{ row.market|floatformat:2 }}
                     </span>
                     {% else %}<span class="small text-muted">{{ DLUX_STRINGS.ui_unavailable }}</span>{% endif %}
                 </div>
+                {% if row.gap != None %}<div class="small text-muted">{{ DLUX_STRINGS.ui_rate_gap }}: {{ row.gap|floatformat:2 }}</div>{% endif %}
+                {% endfor %}
             </div>
         </div>
     </div>

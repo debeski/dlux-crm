@@ -9,7 +9,7 @@
         <h1 class="h3 mb-0">{{ DLUX_STRINGS.ui_new_opening_stock|default:"Opening Stock" }}</h1>
         <span class="badge rounded-pill text-bg-light border">
             <i class="bi bi-currency-exchange me-1"></i>
-            {{ DLUX_STRINGS.ui_rate|default:"Rate" }}: 1 USD = {{ current_rate }} LYD
+            {{ DLUX_STRINGS.ui_rate|default:"Rate" }}: 1 {{ PRICING_CURRENCY }} = {{ current_rate }} LYD
         </span>
     </div>
     <p class="text-muted">{{ DLUX_STRINGS.ui_opening_stock_help|default:"Load everything already on the shelf in one pass. Each row is a new item, or an existing one you pick from the list. Enter the quantity currently in storage. On Apply, each row creates or updates its product and posts a Stock In movement." }}</p>

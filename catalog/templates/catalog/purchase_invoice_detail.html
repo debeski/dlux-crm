@@ -10,7 +10,7 @@
                 {{ DLUX_STRINGS.pr_purchase_invoice|default:"Purchase Invoice" }} {{ invoice.number }}
                 <span class="badge rounded-pill bg-success align-middle">{{ invoice.status_label }}</span>
             </h1>
-            <p class="text-muted mb-0">{{ invoice.invoice_date }} · {{ DLUX_STRINGS.ui_rate|default:"Rate" }} 1 USD = {{ invoice.exchange_rate }} LYD</p>
+            <p class="text-muted mb-0">{{ invoice.invoice_date }} · {{ DLUX_STRINGS.ui_rate|default:"Rate" }} 1 {{ invoice.currency }} = {{ invoice.exchange_rate }} LYD</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <a href="{% url 'catalog:purchase_invoice_print' invoice.pk %}" target="_blank" class="btn btn-outline-secondary rounded-pill">
@@ -32,9 +32,9 @@
                             <tr>
                                 <th>{{ DLUX_STRINGS.ui_description|default:"Description" }}</th>
                                 <th>{{ DLUX_STRINGS.label_unit|default:"Unit" }}</th>
-                                <th class="text-end">{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</th>
+                                <th class="text-end">{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }} ({{ invoice.currency }})</th>
                                 <th class="text-end">{{ DLUX_STRINGS.ui_qty|default:"Qty" }}</th>
-                                <th class="text-end">{{ DLUX_STRINGS.ui_total_usd|default:"Total (USD)" }}</th>
+                                <th class="text-end">{{ DLUX_STRINGS.ui_doc_total|default:"Total" }} ({{ invoice.currency }})</th>
                                 <th class="text-end">{{ DLUX_STRINGS.label_total_lyd|default:"Total (LYD)" }}</th>
                             </tr>
                         </thead>

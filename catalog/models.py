@@ -21,6 +21,7 @@ from django.utils import timezone
 
 from dlux.models import ManagedAssetField, ScopedModel
 
+from finance.currency import CURRENCY_CHOICES, pricing_currency
 from finance.services import get_current_rate, usd_to_lyd
 
 TWO_PLACES = Decimal("0.01")
@@ -519,7 +520,11 @@ class PurchaseInvoice(ScopedModel):
         verbose_name="Status",
     )
     exchange_rate = models.DecimalField(
-        max_digits=12, decimal_places=4, verbose_name="Exchange Rate (LYD/USD)"
+        max_digits=12, decimal_places=4, verbose_name="Exchange Rate (LYD per unit)"
+    )
+    # The pricing currency (USD/EUR) the costs on this invoice are in.
+    currency = models.CharField(
+        max_length=3, choices=CURRENCY_CHOICES, default=pricing_currency, verbose_name="Currency",
     )
     attachment = models.FileField(
         upload_to="purchase_invoices/", blank=True, verbose_name="Attachment"

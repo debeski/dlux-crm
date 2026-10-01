@@ -15,6 +15,7 @@ from django.utils import timezone
 from catalog.models import Product, ProductBarcode
 from common.i18n import t
 from common.views import scope_filtered_queryset
+from finance.currency import pricing_currency
 from finance.services import get_current_rate, quantize_lyd
 
 from .models import Invoice, InvoiceItem, Payment, PosSale
@@ -152,9 +153,11 @@ def complete_sale(*, user, data, config):
     if not lines:
         raise ValidationError(t("pos_empty_cart", "Add at least one item."))
 
-    rate = get_current_rate()
+    currency = pricing_currency()
+    rate = get_current_rate(currency)
     products = _products(user)
     invoice = Invoice(
+        currency=currency,
         customer_name=str(data.get("customer_name") or "").strip()[:200],
         customer_phone=str(data.get("customer_phone") or "").strip()[:40],
         exchange_rate=rate,

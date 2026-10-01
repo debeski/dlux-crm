@@ -12,6 +12,14 @@ DjangoLux. Three families:
 """
 DLUX_STRINGS = {
     "en": {
+        "rate_card_store": "Store",
+        "rate_card_official": "Official (CBL)",
+        "rate_card_market": "Market (EAN)",
+        "rate_card_pricing": "Pricing",
+        "rate_card_minutes": "{n} min",
+        "rate_card_hours": "{n} h",
+        "rate_card_days": "{n} d",
+        "rate_card_ago": "{age} ago",
         "options_crm": "CRM options",
         "options_crm_desc": "Store-wide settings for the products list, the public shop and the till.",
         # ---- generic table headers (label_<column>) ----
@@ -303,6 +311,14 @@ DLUX_STRINGS = {
         "choice_card": "Card",
     },
     "ar": {
+        "rate_card_store": "المتجر",
+        "rate_card_official": "الرسمي (المركزي)",
+        "rate_card_market": "السوق الموازي",
+        "rate_card_pricing": "عملة التسعير",
+        "rate_card_minutes": "{n} دقيقة",
+        "rate_card_hours": "{n} ساعة",
+        "rate_card_days": "{n} يوم",
+        "rate_card_ago": "منذ {age}",
         "options_crm": "خيارات CRM",
         "options_crm_desc": "إعدادات عامة للمتجر: عرض الأصناف، والمتجر العام، ونقطة البيع.",
         # ---- generic table headers ----
