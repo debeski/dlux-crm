@@ -3,7 +3,8 @@
   "version": "0.10.1",
   "summary": "Updated screens load their new styles and scripts straight away after an update, without a hard reload.",
   "highlights": [
-    "Project styles and scripts are versioned by their contents, so an update never leaves a page on old cached CSS or JavaScript."
+    "Project styles and scripts are versioned by their contents, so an update never leaves a page on old cached CSS or JavaScript.",
+    "Runs on DjangoLux 1.10.1."
   ],
   "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.10.1"
 }

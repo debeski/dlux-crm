@@ -11,6 +11,12 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.10.1 dependency baseline
+
+v0.10.1 pins `django-lux[updater]==1.10.1` (hash-pinned wheel). Same Composer
+floor and no dlux migrations since 1.10.0; relay-fetched exchange rates still need
+Composer 1.6.0. Check PyPI for the latest DjangoLux before every release.
+
 ## v0.9.0 dependency baseline
 
 v0.9.0 pins `django-lux[updater]==1.10.0` (hash-pinned wheel): settings
