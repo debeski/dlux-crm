@@ -11,6 +11,27 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.10.2 cancellation settlements
+
+DjangoLux remains pinned to the verified latest stable PyPI wheel, 1.10.1.
+`sales.0010` creates receipt-linked refund/customer-credit records and credit
+allocations. The normal Composer post-start migration step applies it; no
+manual data rewrite is needed. Previously cancelled receipts remain unresolved
+until staff choose their actual refund or credit disposition. Refund recording
+is bookkeeping only: return the money before marking it refunded.
+
+Release validation on 2026-10-02 used the running sales dev stack at
+`http://localhost:84` (currency-switch checkout fast-forwarded from main):
+383 app cases on SQLite (3 PostgreSQL concurrency cases skipped), 5 scaffold
+checks supplied as test-only container files, 21 PostgreSQL regression/concurrency
+cases, Django system check, and the rebuilt-image smoke test. Browser checks
+covered new/saved row deletion, draft save, issue/stock restoration, partial
+payment to credit, credit application/cancellation release, required refund
+method, refund history, resolve-later/later settlement, customer balance, and
+financial-report revenue/cash/refund/credit separation. The dev database was
+backed up first; QA records are labelled `Release v0.10.2 QA` and the temporary
+test account is disabled after verification.
+
 ## v0.10.1 dependency baseline
 
 v0.10.1 pins `django-lux[updater]==1.10.1` (hash-pinned wheel). Same Composer

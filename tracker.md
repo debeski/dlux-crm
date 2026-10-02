@@ -2,7 +2,7 @@
 
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- Sales v0.10.1 tagged; v0.10.2 in progress: sale item deletion/save, cancelled debt, receipt-linked refunds/customer credit and credit use. Apps: finance, catalog, automotive, sales, common, public_catalog.
+- Sales v0.10.2 validated on the running sales dev stack; release publication pending. Fixes item deletion/save, cancelled debt, receipt-linked refunds/customer credit and credit use.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
@@ -75,7 +75,7 @@
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-10-02: 385/385 full SQLite app tests; 18/18 PostgreSQL refund/credit tests incl. 3 concurrent request tests; 2/2 Node deletion tests; migration drift/manifest/diff clean; desktop/mobile modal, apply-credit/cancel-release and refund preview verified.
+- 2026-10-02: running sales dev: 383 app + 5 scaffold SQLite cases (3 PG-only skips), 21/21 PostgreSQL regressions, system/image smoke checks pass; browser new/saved deletion, stock/credit/refund/later and reporting verified; 2 Node regressions passed.
 - 2026-09-30: v0.9.0 release check — 358/358 incl. automotive + scaffold on the 1.10.0 image; manifest validated for tag v0.9.0.
 - 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
 - 2026-09-29: 344/344 app tests after v0.8.4 merge + dependent settings; earlier 341/341 (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
@@ -84,7 +84,7 @@
 - 2026-09-29: v0.8.4 storefront i18n — CI set 249/249 (SQLite, throwaway `sales-deck-shots` container), migrations clean, manifest validator OK for v0.8.4.
 - 2026-09-26: dlux 1.9.4 — CI test set 248/248 (SQLite), check/migration drift clean, 17 enabled ribbon lists render; hashed 1.9.4 wheel from PyPI.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-10-02: BUSINESS_RULES/ARCHITECTURE/PERMISSIONS document cancellation settlements, credit use/release, cash vs credit reporting and ownership; CHANGELOG/manifest/VERSION at untagged v0.10.2 (not deployed).
+- 2026-10-02: BUSINESS_RULES/ARCHITECTURE/PERMISSIONS + RELEASING cover settlements, credit/reporting and verified live dev release procedure; CHANGELOG/manifest/VERSION aligned at v0.10.2.
 - 2026-09-28: BUSINESS_RULES/ARCHITECTURE/PERMISSIONS/AUTOMOTIVE_FITMENT_PLAN (Phase 3.5) describe quick Fits entry, part identity and parts-mode navigation.
 
 ## Part 2: Global [Max 20 lines]
@@ -94,6 +94,6 @@
 ### Global Rulesets:
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
-- v0.9.0 lives on branch `automotive-parts-first` (worktree `../automotive-parts-first`; branding + Arabic UI fixes committed); the dev stack runs FROM that folder (own copies of `.secrets/`, `media/`). Demo parts: supplier "Demo Parts Supply", invoice PINV-000001 (30 products, 92 fitments). Dev DB holds a 10-make/127-generation vehicle seed; user's Camry "7th" and Accord "4th"/"5th" rows carry placeholder chassis/years. v0.8.3 is released. On PostgreSQL, 2 tests assume fresh IDs (`test_grid_layout_renders_cards`, purchase-invoice numbering); CI's SQLite set passes. Retailer Phase 0/4 remain open.
+- Live dev is `currency-switch` at :84, fast-forwarded to main for v0.10.2; dev DB backup `/tmp/crm-sales-dev-before-v0.10.2.dump`; labelled QA invoices 6–9 retained, temp QA account disabled. v0.9.0 lives on branch `automotive-parts-first` (worktree `../automotive-parts-first`; branding + Arabic UI fixes committed); the dev stack runs FROM that folder (own copies of `.secrets/`, `media/`). Demo parts: supplier "Demo Parts Supply", invoice PINV-000001 (30 products, 92 fitments). Dev DB holds a 10-make/127-generation vehicle seed; user's Camry "7th" and Accord "4th"/"5th" rows carry placeholder chassis/years. v0.8.3 is released. On PostgreSQL, 2 tests assume fresh IDs (`test_grid_layout_renders_cards`, purchase-invoice numbering); CI's SQLite set passes. Retailer Phase 0/4 remain open.
 ### References and Links:
 - Dlux source: `../../pkg-django-lux`; release guide: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`.
