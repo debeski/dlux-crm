@@ -5,7 +5,7 @@ from django.utils.html import format_html
 from dlux.tables import DluxTable
 
 from common.i18n import t
-from common.tables import ModalRowActionsMixin
+from common.tables import ModalRowActionsMixin, modal_action
 
 from .models import Customer, Delivery, Invoice, Payment
 
@@ -91,20 +91,15 @@ class InvoiceTable(DluxTable):
                     },
                 ]
             )
-        if record.status != Invoice.STATUS_CANCELLED:
+        if record.status != Invoice.STATUS_CANCELLED or record.cancellation_pending > 0:
             if not record.is_editable:
                 actions.append({"type": "divider"})
-            actions.append(
-                {
-                    "label": "ui_cancel",
-                    "icon": "bi bi-x-circle",
-                    "type": "form",
-                    "url": reverse("sales:invoice_cancel", args=[record.pk]),
-                    "confirm": t("ui_cancel_confirm", "Cancel this invoice? Stock will be restored."),
-                    "textClass": "text-danger",
-                    "permissions": ["sales.cancel_invoice"],
-                }
-            )
+            actions.append(modal_action(
+                "cancel_resolve" if record.status == Invoice.STATUS_CANCELLED else "ui_cancel", "bi bi-x-circle",
+                reverse("sales:invoice_cancel", args=[record.pk]),
+                title=t("cancel_title", "Cancel invoice / resolve payments"),
+                permissions=["sales.cancel_invoice"],
+            ))
         return actions
 
     def render_customer(self, record):
@@ -127,9 +122,14 @@ class InvoiceTable(DluxTable):
 
 
 class CustomerTable(ModalRowActionsMixin, DluxTable):
+    credit_balance = tables.Column(empty_values=(), verbose_name="Customer Credit (LYD)", orderable=False)
+
+    def render_credit_balance(self, record):
+        return f"{record.credit_balance:,.2f}"
+
     class Meta(DluxTable.Meta):
         model = Customer
-        fields = ("name", "phone", "address", "is_active", "created_at")
+        fields = ("name", "phone", "address", "credit_balance", "is_active", "created_at")
         dlux_actions = True
 
 

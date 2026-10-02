@@ -79,7 +79,43 @@ issued/partial/paid ──cancel──▶ cancelled  (stock restored)
 - **Payments**: each `Payment` updates `amount_paid` and advances status
   (`issued → partial → paid`). Payments link optionally to a `CashDeposit`.
 - **Cancel** (`cancel_invoice`): if the invoice had drawn stock, it is **restored**
-  via reversing `StockMovement` IN rows.
+  via reversing `StockMovement` IN rows. Cancelled invoices have zero balance
+  due and are excluded from sales revenue/outstanding aggregates. Original
+  totals and payment receipts remain as history. Cancellation opens a payment
+  settlement dialog with three choices: **Refund payments** (record money already
+  returned, with cash/card/bank/cheque method and optional notes), **Customer
+  credit** (requires a linked customer), or **Resolve later** (default). Each
+  original receipt can be resolved exactly once; a partially paid invoice can
+  only refund/credit the money actually received, not its unpaid balance.
+- **Unresolved cancellation payments**: the cancelled invoice shows the amount
+  still owed to the customer and a **Resolve payments** action, including for
+  invoices cancelled before this feature. The migration creates no historical
+  refunds or credits automatically; staff must record the actual disposition.
+- **Customer credit**: available LYD credit appears in the customer list and on
+  eligible issued/partially paid invoices. **Apply customer credit** chooses an
+  original receipt and an amount up to both its available credit and the target
+  invoice balance. It creates a non-cash `CustomerCreditUse`, advances payment
+  status, and contributes to `amount_paid`; it creates no new cash receipt or
+  deposit. Request UUIDs prevent duplicate application, and customer/invoice
+  locks serialize credit use against cancellation and other credit requests.
+- **Cancelling credit-paid invoices**: previous credit allocations remain as
+  history but no longer consume their source credit; they become available to
+  the same customer again. Only actual cash/card/bank/cheque receipts on the
+  cancelled invoice enter its new refund/credit settlement. Repeated cancellation
+  neither restores stock nor resolves a receipt twice.
+- **Financial reporting**: original receipts stay in gross collected cash;
+  refunds are separate outflows dated by `resolved_at`, and net collected is
+  gross receipts minus refunds. Available customer credit and unresolved
+  cancellation payments are current customer liabilities, separate from
+  revenue/expenses. Sales-report Paid includes cash and applied customer credit.
+  Cancellation never rewrites a previously linked cash deposit.
+- **History protection**: `PaymentResolution` and `CustomerCreditUse` are
+  append-only records. Cancelled invoice receipts cannot be edited/deleted or
+  receive new payments through the payment service. Refund recording does not
+  initiate a bank/card transfer; return the money first, then record it.
+- **Draft line removal**: retain each formset index and submit its `DELETE`
+  checkbox, including newly added lines. Deleted line inputs are disabled
+  except for `id`/`DELETE`; validation redisplay keeps deleted lines hidden.
 - In the invoice and payment lists, row actions live in the standard **DjangoLux
   context menu** (right-click, long-press, or double-click primary action). The
   invoice number / receipt number columns are display values, not hidden action

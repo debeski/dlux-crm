@@ -3,6 +3,7 @@ from django.views.generic import RedirectView
 
 from .pos_settings import pos_enabled
 from .pos_views import CheckoutView, LookupView, ReceiptView, TillView, VehicleProductsView
+from .payment_resolution_views import InvoiceCancellationView, CustomerCreditUseView
 from .views import (
     CustomerListView,
     DashboardView,
@@ -65,8 +66,9 @@ urlpatterns = [
     path("<int:pk>/", InvoiceDetailView.as_view(), name="invoice_detail"),
     path("<int:pk>/edit/", InvoiceUpdateView.as_view(), name="invoice_edit"),
     path("<int:pk>/issue/", InvoiceIssueView.as_view(), name="invoice_issue"),
-    path("<int:pk>/cancel/", InvoiceCancelView.as_view(), name="invoice_cancel"),
+    path("<int:pk>/cancel/", InvoiceCancellationView.as_view(), name="invoice_cancel"),
     path("<int:pk>/print/", InvoicePrintView.as_view(), name="invoice_print"),
+    path("<int:pk>/credit/", CustomerCreditUseView.as_view(), name="credit_apply"),
     path("<int:pk>/pay/", PaymentCreateView.as_view(), name="payment_add"),
     path("customers/", CustomerListView.as_view(), name="customer_list"),
     path("deliveries/", DeliveryListView.as_view(), name="delivery_list"),

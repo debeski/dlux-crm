@@ -503,7 +503,7 @@ class SalesContextMenuTests(TestCase):
         self.assertIn(reverse("sales:invoice_print", args=[invoice.pk]), urls)
         self.assertIn(reverse("sales:invoice_edit", args=[invoice.pk]), urls)
         self.assertIn(reverse("sales:invoice_issue", args=[invoice.pk]), form_urls)
-        self.assertIn(reverse("sales:invoice_cancel", args=[invoice.pk]), form_urls)
+        self.assertTrue(any(action.get("event") == "dlux:dynamic_modal:open" and action.get("data", {}).get("url") == reverse("sales:invoice_cancel", args=[invoice.pk]) for action in actions))
         self.assertEqual(print_action["target"], "_blank")
         self.assertTrue(actions[0]["dblclick"])
 

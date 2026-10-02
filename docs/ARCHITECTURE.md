@@ -344,3 +344,26 @@ See [BUSINESS_RULES.md](BUSINESS_RULES.md) for pricing and the frozen-rate rule,
   and permission-gated.
 - Project security settings (CSP, CSRF/session cookies, HSTS) come from the dlux
   project scaffold in `config/settings.py`.
+
+## Cancellation payments and customer credit (sales.0010)
+
+`sales.PaymentResolution` records one immutable refund or customer-credit
+allocation per original `Payment` (OneToOne/PROTECT), with amount, method,
+customer, timestamp, actor, and optional notes. An unresolved cancellation is
+represented by cancelled-invoice receipts without a resolution; existing
+cancellations therefore need no invented migration history.
+
+`sales.CustomerCreditUse` links a credit resolution to a later invoice with a
+positive LYD amount and a unique request UUID. `Invoice.recalc_payments()` adds
+cash receipts and credit allocations, while credit availability excludes uses
+whose target invoice is cancelled. This releases credit without creating new
+cash or altering original receipts. Services lock the Customer first, then the
+invoice/source credit; receipt creation/deletion takes matching locks so a
+payment cannot be appended to a concurrently cancelled invoice.
+
+Cancellation and credit application use the Dlux dynamic-modal protocol, with
+full-page fallbacks, in `sales/payment_resolution_views.py`. Read boundaries
+scope target invoices, customers, and source invoices by ownership. Credit
+allocations are separate from `Payment`, preventing reuse from double-counting
+cash/deposits. Financial-report refund outflows use settlement dates, while
+credit and pending-refund liabilities are current snapshots.

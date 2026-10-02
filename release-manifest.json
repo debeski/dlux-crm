@@ -1,10 +1,12 @@
 {
   "schema_version": 1,
-  "version": "0.10.1",
-  "summary": "Updated screens load their new styles and scripts straight away after an update, without a hard reload.",
+  "version": "0.10.2",
+  "summary": "Sale invoices save after removing items; cancellation supports refunds, customer credit, and unresolved payments.",
   "highlights": [
-    "Project styles and scripts are versioned by their contents, so an update never leaves a page on old cached CSS or JavaScript.",
-    "Runs on DjangoLux 1.10.1."
+    "Removing a sale invoice item no longer blocks saving the draft.",
+    "Cancel a sale with a recorded refund, customer credit for a later invoice, or an amount to resolve later.",
+    "Customer credit can pay later invoices; original receipts and settlement history remain intact.",
+    "Financial reports separate refunds, net collected money, and customer credit from sales."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.10.1"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.10.2"
 }

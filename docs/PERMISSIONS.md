@@ -61,7 +61,7 @@ permission sets in [`sales/management/commands/seed_roles.py`](../sales/manageme
 | Permission | Model | Meaning |
 |------------|-------|---------|
 | `sales.issue_invoice` | Invoice | Finalize a draft (draws down stock) |
-| `sales.cancel_invoice` | Invoice | Cancel an invoice (restores stock) |
+| `sales.cancel_invoice` | Invoice | Cancel an owned/visible invoice, restore stock, and record refund/credit/later settlement |
 | `sales.view_sales_report` | Invoice | View sales reports + XLSX export |
 | `sales.view_financial_report` | Invoice | View the whole-store fiscal-year P&L (not row-scoped) |
 | `sales.view_all_invoice` | Invoice | See every rep's invoices, not just own |
@@ -130,3 +130,21 @@ only and never bypasses server-side permission or ownership checks.
 
 Because reps/couriers lack the `view_all_*` permissions, they automatically see
 only their own rows — no per-user configuration needed.
+
+## Cancellation settlements and customer credit
+
+`/staff/sales/<id>/cancel/` opens the cancellation/settlement modal on GET and
+writes only on POST. It requires `sales.cancel_invoice` and invoice ownership
+(or `sales.view_all_invoice`). The same route settles unresolved payments on an
+already cancelled invoice. Walk-in invoices can be refunded or left unresolved;
+customer credit requires the invoice's linked Customer.
+
+`/staff/sales/<id>/credit/` opens/applies customer credit, requiring
+`sales.add_payment` plus target-invoice ownership. Selectable source credits must
+belong to the target's customer; both that customer and the source invoice must
+be visible to the acting user. Forged cross-customer/cross-owner source IDs fail.
+Existing role grants apply; no new permission grant is required.
+
+`PaymentResolution` and `CustomerCreditUse` inherit `ScopedModel`, have no generic
+CRUD permissions, and are written through the atomic lifecycle services only.
+Their refund/credit history is displayed through the owning invoice detail page.

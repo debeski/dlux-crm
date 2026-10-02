@@ -30,15 +30,22 @@
                 <button class="btn btn-success rounded-pill"><i class="bi bi-check2-circle me-1"></i>{{ DLUX_STRINGS.ui_issue }}</button>
             </form>
             {% endif %}
-            {% if invoice.status != 'cancelled' and perms.sales.cancel_invoice %}
-            <form method="post" action="{% url 'sales:invoice_cancel' invoice.pk %}"
-                  onsubmit="return confirm('{{ DLUX_STRINGS.ui_cancel_confirm|escapejs }}');">{% csrf_token %}
-                <button class="btn btn-outline-danger rounded-pill"><i class="bi bi-x-circle me-1"></i>{{ DLUX_STRINGS.ui_cancel }}</button>
-            </form>
+            {% if perms.sales.cancel_invoice %}
+            {% if invoice.status != 'cancelled' or invoice.cancellation_pending > 0 %}
+            <button type="button" class="btn btn-outline-danger rounded-pill" data-dynamic-modal="{% url 'sales:invoice_cancel' invoice.pk %}" data-modal-title="{{ DLUX_STRINGS.cancel_title }}">
+                <i class="bi bi-x-circle me-1"></i>{% if invoice.status == 'cancelled' %}{{ DLUX_STRINGS.cancel_resolve }}{% else %}{{ DLUX_STRINGS.ui_cancel }}{% endif %}
+            </button>
+            {% endif %}
             {% endif %}
         </div>
     </div>
 
+    {% if invoice.cancellation_pending > 0 %}
+    <div class="alert alert-warning" role="alert">{{ DLUX_STRINGS.cancel_unresolved }}: <strong>{{ invoice.cancellation_pending|floatformat:2 }} LYD</strong></div>
+    {% endif %}
+    {% if invoice.status == 'cancelled' and invoice.credit_applied > 0 %}
+    <div class="alert alert-info">{{ DLUX_STRINGS.cancel_credit_released }}: {{ invoice.credit_applied|floatformat:2 }} LYD</div>
+    {% endif %}
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm mb-4">
@@ -108,8 +115,27 @@
                         </tbody>
                     </table>
                 </div>
+                {% if payment_resolutions or credit_uses %}
+                <div class="card-body border-top">
+                    <h2 class="h6">{{ DLUX_STRINGS.cancel_settlement_history }}</h2>
+                    <ul class="list-unstyled mb-0">
+                        {% for entry in payment_resolutions %}
+                        <li class="mb-2">{{ entry.payment.receipt_number }} · {% if entry.action == 'refund' %}{{ DLUX_STRINGS.cancel_refund }} · {{ entry.get_method_display }}{% else %}{{ DLUX_STRINGS.cancel_customer_credit }}{% endif %} · {{ entry.amount|floatformat:2 }} LYD · {{ entry.resolved_at|date:'Y-m-d H:i' }} · {{ entry.created_by|default:'—' }}{% if entry.notes %}<br>{{ entry.notes }}{% endif %}</li>
+                        {% endfor %}
+                        {% for entry in credit_uses %}
+                        <li class="mb-2">{{ DLUX_STRINGS.cancel_credit_used }} · {{ entry.credit.payment.receipt_number }} · {{ entry.amount|floatformat:2 }} LYD · {{ entry.applied_at|date:'Y-m-d H:i' }}{% if invoice.status == 'cancelled' %} · {{ DLUX_STRINGS.cancel_released }}{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
                 {% if invoice.status == 'issued' or invoice.status == 'partial' %}
                 {% if perms.sales.add_payment %}
+                {% if available_credit > 0 %}
+                <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                    <span>{{ DLUX_STRINGS.cancel_available_credit }}: <strong>{{ available_credit|floatformat:2 }} LYD</strong></span>
+                    <button type="button" class="btn btn-outline-primary rounded-pill" data-dynamic-modal="{% url 'sales:credit_apply' invoice.pk %}" data-modal-title="{{ DLUX_STRINGS.cancel_apply_credit }}">{{ DLUX_STRINGS.cancel_apply_credit }}</button>
+                </div>
+                {% endif %}
                 <div class="card-body border-top">
                     <form method="post" action="{% url 'sales:payment_add' invoice.pk %}" class="row g-2 align-items-end">
                         {% csrf_token %}

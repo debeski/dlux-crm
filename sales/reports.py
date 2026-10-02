@@ -19,7 +19,7 @@ from common.identity import store_name
 from common.i18n import t
 from finance.services import get_current_rate, usd_to_lyd
 
-from .models import Invoice, InvoiceItem, Payment
+from .models import Invoice, InvoiceItem, Payment, PaymentResolution
 
 LIVE_STATUSES = [Invoice.STATUS_ISSUED, Invoice.STATUS_PARTIAL, Invoice.STATUS_PAID]
 _Z = Decimal("0.00")
@@ -144,7 +144,7 @@ def build_sales_report_xlsx(report):
     ws["A2"] = f"Period: {report['date_from']} → {report['date_to']}"
     rows = [
         ("Total Sales (LYD)", report["total_sales"]),
-        ("Total Collected (LYD)", report["total_paid"]),
+        ("Total Paid — Cash / Customer Credit (LYD)", report["total_paid"]),
         ("Outstanding (LYD)", report["outstanding"]),
         ("Invoices", report["invoice_count"]),
     ]
@@ -277,6 +277,11 @@ def build_financial_report(date_from, date_to):
         Payment.objects.filter(paid_at__date__range=(date_from, date_to)).aggregate(s=Sum("amount"))["s"]
     ) or _Z
 
+    refunds = PaymentResolution.objects.filter(action="refund", resolved_at__date__range=(date_from, date_to)).aggregate(s=Sum("amount"))["s"] or _Z
+    net_collected = cash_collected - refunds
+    customer_credit = sum((entry.available_amount for entry in PaymentResolution.objects.filter(action="credit")), _Z)
+    pending_refunds = Payment.objects.filter(invoice__status=Invoice.STATUS_CANCELLED, resolution__isnull=True).aggregate(s=Sum("amount"))["s"] or _Z
+
     # Current outstanding receivables (issued/partial, any date).
     open_qs = Invoice.objects.filter(status__in=[Invoice.STATUS_ISSUED, Invoice.STATUS_PARTIAL])
     open_agg = open_qs.aggregate(total=Sum("total_lyd"), paid=Sum("amount_paid"))
@@ -309,6 +314,10 @@ def build_financial_report(date_from, date_to):
         "operating_expenses": operating_expenses,
         "net_profit": net_profit,
         "cash_collected": cash_collected,
+        "refunds": refunds,
+        "net_collected": net_collected,
+        "customer_credit": customer_credit,
+        "pending_refunds": pending_refunds,
         "receivables": receivables,
         "inventory_value": inventory_value,
         "monthly": monthly,

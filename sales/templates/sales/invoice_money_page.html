@@ -1,0 +1,8 @@
+{% extends "dlux/base.html" %}
+{% block content %}
+<div class="container py-4">
+    <h1 class="h3">{{ title }}</h1>
+    {% include "sales/invoice_money_modal.html" %}
+    <a class="btn btn-link" href="{% url 'sales:invoice_detail' invoice.pk %}">{{ DLUX_STRINGS.ui_back|default:'Back' }}</a>
+</div>
+{% endblock %}

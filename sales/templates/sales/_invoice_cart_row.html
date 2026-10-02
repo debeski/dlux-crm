@@ -1,4 +1,4 @@
-<div class="cart-row" data-cart-row data-kind="{{ form.instance.kind|default:'product' }}"
+<div class="cart-row{% if form.DELETE.value %} d-none{% endif %}" data-cart-row data-kind="{{ form.instance.kind|default:'product' }}"
      data-variant-stock="{% if form.instance.variant_id %}{{ form.instance.variant.stock_qty }}{% endif %}">
     {{ form.id }}{{ form.kind }}{{ form.product }}{{ form.service }}{{ form.variant }}{{ form.color }}{{ form.size }}
     <span class="d-none">{{ form.DELETE }}</span>

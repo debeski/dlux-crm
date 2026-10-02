@@ -42,7 +42,8 @@ from .reports import (
     fiscal_year_window,
     parse_window,
 )
-from .services import cancel_invoice, issue_invoice
+from .services import issue_invoice
+from .payment_resolution_views import InvoiceCancellationView as InvoiceCancelView
 from .tables import CustomerTable, DeliveryTable, InvoiceTable, PaymentTable
 
 
@@ -342,6 +343,11 @@ class InvoiceDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView)
         ctx["items"] = invoice.items.all()
         ctx["payments"] = invoice.payments.all()
         ctx["payment_form"] = PaymentForm()
+        from .payment_resolution_views import visible_credits
+        ctx["available_credit"] = sum((credit.available_amount for credit in visible_credits(invoice, self.request.user)), Decimal("0.00"))
+        ctx["credit_uses"] = invoice.credit_uses.select_related("credit__payment")
+        from .models import PaymentResolution
+        ctx["payment_resolutions"] = PaymentResolution.objects.filter(payment__invoice=invoice).select_related("payment", "created_by")
         # Feeds the deposit combobox <datalist> (search-and-add batches by reference).
         ctx["cash_deposits"] = scope_filtered_queryset(
             CashDeposit.objects.exclude(reference="").order_by("-deposited_at"),
@@ -365,17 +371,6 @@ class InvoiceIssueView(LoginRequiredMixin, PermissionRequiredMixin, View):
         messages.success(request, _("Invoice %(no)s issued. Stock updated.") % {"no": invoice.number})
         return redirect("sales:invoice_detail", pk=pk)
 
-
-class InvoiceCancelView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    permission_required = "sales.cancel_invoice"
-    raise_exception = True
-
-    def post(self, request, pk):
-        invoice = get_object_or_404(_visible_invoices(request.user), pk=pk)
-        cancel_invoice(invoice, request.user)
-        log_user_action(request, "CANCEL", instance=invoice)
-        messages.warning(request, _("Invoice %(no)s cancelled.") % {"no": invoice.number})
-        return redirect("sales:invoice_detail", pk=pk)
 
 
 class InvoicePrintView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
@@ -423,6 +418,7 @@ class PaymentReceiptView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
             ).aggregate(t=Sum("amount"))["t"]
             or Decimal("0.00")
         )
+        paid_through += invoice.credit_uses.filter(applied_at__lte=payment.paid_at).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
         lang = get_current_language_code(self.request)
         ctx["invoice"] = invoice
         ctx["paid_before_receipt"] = quantize_lyd(paid_through - payment.amount)
@@ -445,10 +441,15 @@ class PaymentCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if form.is_valid():
             payment = form.save(commit=False)
             payment.invoice = invoice
-            self._sync_deposit(request, payment, form.cleaned_data.get("deposit_ref"))
-            payment.save()  # recalc_payments + deposit recalc run in Payment.save()
-            log_user_action(request, "PAYMENT", instance=invoice)
-            messages.success(request, _("Payment recorded."))
+            try:
+                with transaction.atomic():
+                    self._sync_deposit(request, payment, form.cleaned_data.get("deposit_ref"))
+                    payment.save()
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                log_user_action(request, "PAYMENT", instance=invoice)
+                messages.success(request, _("Payment recorded."))
         else:
             messages.error(request, _("Could not record payment. Check the amount."))
         return redirect("sales:invoice_detail", pk=pk)

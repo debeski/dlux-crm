@@ -14,8 +14,9 @@ from django.utils.translation import gettext as _
 
 from catalog.models import StockMovement
 from finance.models import ExchangeRate
+from finance.services import quantize_lyd
 
-from .models import Invoice
+from .models import Customer, CustomerCreditUse, Invoice, Payment, PaymentResolution
 
 
 def _item_variant(item):
@@ -89,10 +90,13 @@ def issue_invoice(invoice, user):
 
 
 @transaction.atomic
-def cancel_invoice(invoice, user):
+def cancel_invoice(invoice, user, *, payment_action="later", refund_method="", notes=""):
     """Cancel an invoice and restore any stock it had drawn down."""
+    _lock_customer(invoice)
     invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    _validate_resolution(invoice, payment_action, refund_method)
     if invoice.status == Invoice.STATUS_CANCELLED:
+        _resolve_payments(invoice, user, payment_action, refund_method, notes)
         return invoice
 
     was_issued = invoice.status in (
@@ -113,4 +117,56 @@ def cancel_invoice(invoice, user):
 
     invoice.status = Invoice.STATUS_CANCELLED
     invoice.save(update_fields=["status", "updated_at"])
+    _resolve_payments(invoice, user, payment_action, refund_method, notes)
     return invoice
+
+
+def _lock_customer(invoice):
+    customer_id = Invoice.objects.filter(pk=invoice.pk).values_list("customer_id", flat=True).get()
+    if customer_id:
+        Customer.objects.select_for_update().get(pk=customer_id)
+
+
+def _validate_resolution(invoice, action, method):
+    if action not in ("later", "refund", "credit"):
+        raise ValidationError(_("Choose refund, customer credit, or resolve later."))
+    if action == "refund" and method not in dict(Payment.METHOD_CHOICES):
+        raise ValidationError(_("Choose the refund payment method."))
+    if action == "credit" and not invoice.customer_id:
+        raise ValidationError(_("Customer credit requires a linked customer."))
+
+
+def _resolve_payments(invoice, user, action, method, notes):
+    if action == "later":
+        return
+    for payment in invoice.payments.filter(resolution__isnull=True).select_for_update(of=("self",)):
+        PaymentResolution.objects.create(
+            payment=payment, customer=invoice.customer, action=action,
+            amount=payment.amount, method=method if action == "refund" else "",
+            notes=notes, created_by=user,
+        )
+
+
+@transaction.atomic
+def apply_customer_credit(invoice, credit, amount, request_key, user):
+    _lock_customer(invoice)
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    credit = PaymentResolution.objects.select_for_update().get(pk=credit.pk)
+    prior = CustomerCreditUse.objects.filter(request_key=request_key).first()
+    if prior:
+        if prior.invoice_id != invoice.pk or prior.credit_id != credit.pk or prior.amount != amount:
+            raise ValidationError(_("This request has already been used for another credit payment."))
+        return prior
+    if invoice.status not in (Invoice.STATUS_ISSUED, Invoice.STATUS_PARTIAL):
+        raise ValidationError(_("Customer credit can only pay an issued or partially paid invoice."))
+    if not invoice.customer_id or credit.customer_id != invoice.customer_id or credit.action != "credit":
+        raise ValidationError(_("Choose credit belonging to this customer."))
+    amount = Decimal(amount)
+    if not amount.is_finite() or amount <= 0 or amount != quantize_lyd(amount):
+        raise ValidationError(_("Enter a positive amount with at most two decimal places."))
+    invoice.recalc_payments()
+    if amount > credit.available_amount or amount > invoice.balance_due:
+        raise ValidationError(_("The amount exceeds the available credit or invoice balance."))
+    entry = CustomerCreditUse.objects.create(invoice=invoice, credit=credit, amount=amount, request_key=request_key, created_by=user)
+    invoice.recalc_payments()
+    return entry

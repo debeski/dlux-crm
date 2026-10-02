@@ -2,7 +2,7 @@
 
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- Sales v0.8.3 released 2026-09-26 on `django-lux[updater]==1.9.4` (hash-pinned wheel; tag pushed, CI publishes `debeski/dlux-crm`). Local tag v0.8.2 was never pushed and is superseded. Apps: finance, catalog, automotive, sales, common, public_catalog.
+- Sales v0.10.1 tagged; v0.10.2 in progress: sale item deletion/save, cancelled debt, receipt-linked refunds/customer credit and credit use. Apps: finance, catalog, automotive, sales, common, public_catalog.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
@@ -49,7 +49,7 @@
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
   - [ ] Storefront polish: mobile `/shop/` search input collapses (placeholder hidden); landing hero kicker has low contrast.
 - **Completed Recently:**
-  - [x] Workspace: *Open the till* / *Browse by vehicle* quick actions + `pos_today` / `vehicle_browser` tiles while enabled (2026-09-30).
+  - [x] 2026-10-02: invoice row deletion/save + cancelled debt; `sales.0010` refunds/customer credit/later modal and idempotent credit use, cancellation releases used credit; receipts retained and reports separate refund/credit liabilities.
   - [x] Removed POS *Open the till on login* and the parts-mode `/staff/` landing (never applied: DLux login goes to its Home); landing = DLux Home (store/per-user; per-group coming in dlux); real-login test `common.tests.test_login_landing` (2026-09-30).
   - [x] Machine wording synced on `SystemSettings` post_save (wizard/import safe); dlux pinned 1.10.0 stable (2026-09-30); relay rates need Composer 1.6.0.
   - [x] Dependent settings: POS and Optional-enhancements dependents greyed/disabled with dlux tooltip instead of hidden; stored values kept while off (2026-09-29).
@@ -75,7 +75,7 @@
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
   - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-10-01: v0.10.0 — 366/366 incl. scaffold on the 1.10.0 image; manifest validated for v0.10.0; workspace rate board and CRM pricing section checked in the browser.
+- 2026-10-02: 385/385 full SQLite app tests; 18/18 PostgreSQL refund/credit tests incl. 3 concurrent request tests; 2/2 Node deletion tests; migration drift/manifest/diff clean; desktop/mobile modal, apply-credit/cancel-release and refund preview verified.
 - 2026-09-30: v0.9.0 release check — 358/358 incl. automotive + scaffold on the 1.10.0 image; manifest validated for tag v0.9.0.
 - 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
 - 2026-09-29: 344/344 app tests after v0.8.4 merge + dependent settings; earlier 341/341 (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
@@ -84,7 +84,7 @@
 - 2026-09-29: v0.8.4 storefront i18n — CI set 249/249 (SQLite, throwaway `sales-deck-shots` container), migrations clean, manifest validator OK for v0.8.4.
 - 2026-09-26: dlux 1.9.4 — CI test set 248/248 (SQLite), check/migration drift clean, 17 enabled ribbon lists render; hashed 1.9.4 wheel from PyPI.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-09-29: ARCHITECTURE (CRM options tile, storefront localization), BUSINESS_RULES (POS grid, payment balancing, ZXing, CRM options).
+- 2026-10-02: BUSINESS_RULES/ARCHITECTURE/PERMISSIONS document cancellation settlements, credit use/release, cash vs credit reporting and ownership; CHANGELOG/manifest/VERSION at untagged v0.10.2 (not deployed).
 - 2026-09-28: BUSINESS_RULES/ARCHITECTURE/PERMISSIONS/AUTOMOTIVE_FITMENT_PLAN (Phase 3.5) describe quick Fits entry, part identity and parts-mode navigation.
 
 ## Part 2: Global [Max 20 lines]

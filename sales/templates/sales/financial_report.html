@@ -44,12 +44,17 @@
         </div>
         <div class="col-sm-6 col-xl-2">
             <div class="dlux-table-shell h-100 p-3">
-                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_cash_collected|default:"Cash Collected" }}</div>
-                <div class="h4 mb-0">{{ report.cash_collected|floatformat:2 }} <span class="fs-6 text-muted">LYD</span></div>
+                <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.cancel_net_collected }}</div>
+                <div class="h4 mb-0">{{ report.net_collected|floatformat:2 }} <span class="fs-6 text-muted">LYD</span></div>
+                <div class="small text-muted">{{ DLUX_STRINGS.ui_cash_collected }}: {{ report.cash_collected|floatformat:2 }} · {{ DLUX_STRINGS.cancel_refunds }}: {{ report.refunds|floatformat:2 }}</div>
             </div>
         </div>
     </div>
 
+    <div class="row g-3 mb-3">
+        <div class="col-sm-6"><div class="dlux-table-shell p-3">{{ DLUX_STRINGS.cancel_customer_credit }} ({{ DLUX_STRINGS.ui_as_of_now }}): <strong>{{ report.customer_credit|floatformat:2 }} LYD</strong></div></div>
+        <div class="col-sm-6"><div class="dlux-table-shell p-3">{{ DLUX_STRINGS.cancel_unresolved }} ({{ DLUX_STRINGS.ui_as_of_now }}): <strong>{{ report.pending_refunds|floatformat:2 }} LYD</strong></div></div>
+    </div>
     {# Current snapshot figures (point-in-time, not the period) #}
     <div class="row g-3 mb-4">
         <div class="col-sm-6">

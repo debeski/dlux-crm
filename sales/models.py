@@ -9,12 +9,14 @@ created with (``exchange_rate``) and every line **freezes** its own
 ``unit_price_lyd``. Later rate changes never rewrite a past invoice's totals.
 """
 from decimal import Decimal, ROUND_HALF_UP
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 from dlux.models import ScopedModel
 
@@ -46,6 +48,10 @@ class Customer(ScopedModel):
         verbose_name_plural = "Customers"
         ordering = ["name"]
         permissions = [("view_all_customer", "Can view all customers (not just own)")]
+
+    @property
+    def credit_balance(self):
+        return sum((entry.available_amount for entry in PaymentResolution.objects.filter(customer=self, action="credit")), Decimal("0.00"))
 
     def __str__(self):
         return self.name
@@ -159,7 +165,23 @@ class Invoice(ScopedModel):
     # --- Derived display helpers ---
     @property
     def balance_due(self):
+        if self.status == self.STATUS_CANCELLED:
+            return Decimal("0.00")
         return quantize_lyd(self.total_lyd - self.amount_paid)
+
+    @property
+    def cash_received(self):
+        return sum((p.amount for p in self.payments.all()), Decimal("0.00"))
+
+    @property
+    def cancellation_pending(self):
+        if self.status != self.STATUS_CANCELLED:
+            return Decimal("0.00")
+        return sum((p.amount for p in self.payments.filter(resolution__isnull=True)), Decimal("0.00"))
+
+    @property
+    def credit_applied(self):
+        return sum((entry.amount for entry in self.credit_uses.all()), Decimal("0.00"))
 
     @property
     def display_customer(self):
@@ -203,7 +225,7 @@ class Invoice(ScopedModel):
         if db_status is not None:
             self.status = db_status
         paid = sum((p.amount for p in self.payments.all()), Decimal("0.00"))
-        self.amount_paid = quantize_lyd(paid)
+        self.amount_paid = quantize_lyd(paid + self.credit_applied)
         # Status only advances for live (non-draft, non-cancelled) invoices.
         if self.status in (self.STATUS_ISSUED, self.STATUS_PARTIAL, self.STATUS_PAID):
             if self.total_lyd > 0 and self.amount_paid >= self.total_lyd:
@@ -363,7 +385,15 @@ class Payment(ScopedModel):
         from common.i18n import t
         return t(f"method_{self.method}", self.get_method_display())
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        from .services import _lock_customer
+
+        _lock_customer(self.invoice)
+        locked_invoice = Invoice.objects.select_for_update().get(pk=self.invoice_id)
+        prior = type(self).all_objects.filter(pk=self.pk).select_related("invoice").first() if self.pk else None
+        if locked_invoice.status == Invoice.STATUS_CANCELLED or (prior and prior.invoice.status == Invoice.STATUS_CANCELLED):
+            raise ValidationError(_("Payments on cancelled invoices cannot be changed. Resolve them with a refund or customer credit."))
         # Track a prior deposit link so a reassigned payment recomputes both batches.
         using = kwargs.get("using")
         prev_deposit_id = None
@@ -379,7 +409,14 @@ class Payment(ScopedModel):
         self.invoice.recalc_payments()
         self._recalc_linked_deposits(prev_deposit_id)
 
+    @transaction.atomic
     def delete(self, *args, **kwargs):
+        from .services import _lock_customer
+
+        _lock_customer(self.invoice)
+        locked_invoice = Invoice.objects.select_for_update().get(pk=self.invoice_id)
+        if locked_invoice.status == Invoice.STATUS_CANCELLED or PaymentResolution.objects.filter(payment=self).exists():
+            raise ValidationError(_("Payments on cancelled invoices must be kept as history."))
         invoice = self.invoice
         deposit = self.deposit
         super().delete(*args, **kwargs)
@@ -393,6 +430,67 @@ class Payment(ScopedModel):
         ids = {i for i in (self.deposit_id, prev_deposit_id) if i}
         for deposit in CashDeposit.objects.filter(pk__in=ids):
             deposit.recalc_amount()
+
+
+class PaymentResolution(ScopedModel):
+    """One final disposition per original cash receipt; written by lifecycle services."""
+
+    OWNER_FIELDS = ("payment__invoice__salesperson", "payment__invoice__created_by")
+    payment = models.OneToOneField(Payment, on_delete=models.PROTECT, related_name="resolution")
+    customer = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.PROTECT, related_name="payment_resolutions")
+    action = models.CharField(max_length=10, choices=(("refund", "Refund"), ("credit", "Customer credit")))
+    amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    method = models.CharField(max_length=20, choices=Payment.METHOD_CHOICES, blank=True)
+    resolved_at = models.DateTimeField(default=timezone.now)
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount__gt=0), name="sales_resolution_positive"),
+            models.CheckConstraint(condition=models.Q(action="refund", method__in=["cash", "card", "bank_transfer", "cheque"]) | models.Q(action="credit", customer__isnull=False, method=""), name="sales_resolution_disposition"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError(_("Payment settlements are immutable."))
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(_("Payment settlements must be kept as history."))
+
+    @property
+    def available_amount(self):
+        if self.action != "credit":
+            return Decimal("0.00")
+        used = self.uses.exclude(invoice__status=Invoice.STATUS_CANCELLED).aggregate(total=models.Sum("amount"))["total"] or Decimal("0.00")
+        return quantize_lyd(self.amount - used)
+
+    def __str__(self):
+        return f"{self.payment.receipt_number} — {self.amount} LYD"
+
+
+class CustomerCreditUse(ScopedModel):
+    """A non-cash payment allocation; cancelled target invoices release it."""
+
+    OWNER_FIELDS = ("invoice__salesperson", "invoice__created_by")
+    credit = models.ForeignKey(PaymentResolution, on_delete=models.PROTECT, related_name="uses")
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="credit_uses")
+    amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    request_key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    applied_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [models.CheckConstraint(condition=models.Q(amount__gt=0), name="sales_credit_use_positive")]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError(_("Credit allocations are immutable."))
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError(_("Credit allocations must be kept as history."))
 
 
 class Delivery(ScopedModel):

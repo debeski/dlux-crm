@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.10.2
+- **Sale Invoice Row Deletion**: Keep deleted new and saved rows indexed with `DELETE` posted; disable their editable fields and preserve deletion on validation redisplay so draft saves no longer fail on missing rows.
+- **Cancelled Invoice Debt**: `Invoice.balance_due` returns zero for cancelled sales, including existing records, while preserving invoice totals and payment receipts. Sales reports continue to exclude cancelled invoices.
+- **Cancellation Refunds And Customer Credit**: `sales.0010` adds receipt-linked `PaymentResolution` and UUID-idempotent `CustomerCreditUse`. Cancel/Resolve modals offer refund method, customer credit, or unresolved liability; eligible invoices apply customer credit without creating cash receipts. Cancelling a credit-paid invoice releases its credit; settled receipts and allocations remain immutable.
+- **Cancellation Financial Reporting**: Financial reports show refund outflows, net collected receipts, current customer credit and unresolved cancellations; customer lists expose available credit. Invoice details retain settlement history; sales Paid includes cash and credit. Existing cancelled payments can be resolved without replaying stock restoration.
+- **Validation**: 385 full SQLite app tests, 18 PostgreSQL settlement/credit tests (including 3 simultaneous-request tests), and 2 Node deletion tests pass. Migration drift and v0.10.2 manifest checks pass; desktop/mobile cancellation dialog, credit application/release and refund history driven in an isolated browser preview.
+
 ## v0.10.1
 - **DjangoLux 1.10.1**: Pins `django-lux[updater]==1.10.1` (hash-pinned wheel; from 1.10.0). It fixes the Options updater's *Include beta releases* switch staying on "Pending" until a reload. Same Composer floor (`>=1.5.3b1`), no dlux migrations.
 - **Static Assets Versioned By Content**: The new Workspace exchange card kept its old look until a hard reload: `workspace_dashboard.html` loaded its CSS with a hand-written `?v=20260710d` that was never bumped, and Caddy serves static files `immutable` for a year. New `{% asset %}` tag (`common/templatetags/asset_tags.py`) appends a 12-character hash of the file's contents, so a URL changes exactly when its file does. All 31 project CSS/JS references move to it — the 17 hand-stamped `{% static %}` ones and the 14 `{% dlux_static %}` ones, whose `?v=` is the DjangoLux release and does not move when only the project changes.

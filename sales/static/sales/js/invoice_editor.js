@@ -251,12 +251,12 @@
 
         function removeRow(row) {
             var del = field(row, "DELETE");
-            var id = field(row, "id");
-            if (del && id && id.value) {
+            if (del) {
                 del.checked = true;
                 row.classList.add("d-none");
-            } else {
-                row.remove();
+                row.querySelectorAll("input").forEach(function (input) {
+                    if (input !== del && !input.name.endsWith("-id")) input.disabled = true;
+                });
             }
             recalcAll();
         }
@@ -269,6 +269,8 @@
             var rm = row.querySelector("[data-cart-remove]");
             if (rm) rm.addEventListener("click", function () { removeRow(row); });
             if (row.dataset.kind === "custom") showCustom(row);
+            var del = field(row, "DELETE");
+            if (del && del.checked) removeRow(row);
         }
 
         // ---- Wire controls ------------------------------------------------ //

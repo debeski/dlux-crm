@@ -1,0 +1,18 @@
+{% load crispy_forms_tags %}
+<form method="post" action="{{ editor_url }}" id="invoice-money-form" novalidate>
+    {% csrf_token %}
+    <p class="fw-semibold">{{ invoice.number }} · {{ invoice.display_customer }}</p>
+    {% if is_cancel %}
+    <p>{{ DLUX_STRINGS.cancel_help }} {{ DLUX_STRINGS.cancel_unresolved }}: <strong>{% if invoice.status == 'cancelled' %}{{ invoice.cancellation_pending|floatformat:2 }}{% else %}{{ invoice.cash_received|floatformat:2 }}{% endif %} LYD</strong></p>
+    {% if invoice.credit_applied > 0 %}<p>{{ DLUX_STRINGS.cancel_credit_released }}: {{ invoice.credit_applied|floatformat:2 }} LYD</p>{% endif %}
+    <p class="small text-muted">{{ DLUX_STRINGS.cancel_refund_help }}</p>
+    {% else %}
+    <p>{{ DLUX_STRINGS.ui_balance_due }}: {{ invoice.balance_due|floatformat:2 }} LYD</p>
+    {% endif %}
+    {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    {% crispy form %}
+    <div class="d-flex justify-content-end gap-2" data-dlux-modal-footer>
+        <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">{{ DLUX_STRINGS.ui_cancel }}</button>
+        <button type="submit" form="invoice-money-form" class="btn btn-primary rounded-pill">{{ submit_label }}</button>
+    </div>
+</form>
