@@ -2,7 +2,7 @@
 
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- Sales v0.10.2 validated on the running sales dev stack; release publication pending. Fixes item deletion/save, cancelled debt, receipt-linked refunds/customer credit and credit use.
+- Sales v0.10.2 released: running sales dev validation and CI passed; GitHub release and amd64/arm64 Docker image published. Fixes item deletion/save, cancelled debt, receipt-linked refunds/customer credit and credit use.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
