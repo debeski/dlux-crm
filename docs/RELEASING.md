@@ -13,6 +13,8 @@ and the image smoke test. Keeping them equal is enforced by
 
 ## v0.11.0 currency and machinery
 
+v0.11.0 was published on 2026-10-04 from `33df98e`. CI and [Release workflow 37209994905](https://github.com/debeski/dlux-crm/actions/runs/37209994905) passed. [Release notes](https://github.com/debeski/dlux-crm/releases/tag/v0.11.0); image tags are `debeski/dlux-crm:sales-v0.11.0` and `debeski/dlux-crm:sales`.
+
 DjangoLux stays pinned to latest stable 1.10.1 (PyPI checked 2026-10-04). This release adds concurrent USD/EUR purchase entry, per-product currencies and aliases, frozen invoice costs, independent machinery compatibility and service-only category branches. Normal startup applies `automotive.0004`, `catalog.0010–0012`, `sales.0011` and `machinery.0001–0002`. Back up the database before upgrading. The machinery data migration preserves original vehicle records and copies legacy equipment compatibility; it does not erase stock or invoices.
 
 For the client-specific CIFA diagram, run the idempotent `python manage.py seed_machine_categories` after migration if that vocabulary is wanted. It creates the illustrated F8 branches and quoted Repair service, with no invented stock or prices. Vehicle year/engine/transmission criteria are always enabled; the five extra criteria remain configurable. Both enhancements can coexist, and saved sidebar entries obey their switches.
