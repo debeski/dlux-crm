@@ -96,6 +96,7 @@ class VehicleModel(ScopedModel):
         verbose_name="Equipment Type",
     )
     name = models.CharField(max_length=120, verbose_name="Name")
+    alias = models.CharField(max_length=200, blank=True, verbose_name="Local alias")
     is_active = models.BooleanField(default=True, verbose_name="Active")
 
     class Meta:

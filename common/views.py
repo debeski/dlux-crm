@@ -402,6 +402,11 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
 
         return automotive_enabled() and self.request.user.has_perms(VehicleBrowserView.permission_required)
 
+    def _machine_browser_open(self):
+        from machinery.settings import machinery_enabled
+        from machinery.views import MachineBrowserView
+        return machinery_enabled() and self.request.user.has_perms(MachineBrowserView.permission_required)
+
     def _build_quick_actions(self):
         user = self.request.user
         # Optional enhancements lead when on: they are the counter's daily start.
@@ -416,6 +421,8 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
                 "label": self._s("ui_browse_by_vehicle", "Browse by vehicle"), "icon": "bi bi-car-front-fill",
                 "url": reverse("automotive:browse"),
             })
+        if self._machine_browser_open():
+            actions.append({"label": self._s("page_machine_browser", "Browse machinery"), "icon": "bi bi-gear-wide-connected", "url": reverse("machinery:browse")})
         candidates = [
             (("sales.add_invoice",), "ui_new_invoice", "New Invoice", "bi bi-receipt", "sales:invoice_create"),
             (
@@ -573,7 +580,7 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
 
     def _catalog_tiles(self):
         from catalog.models import Product, PurchaseInvoice, StockMovement, StockTake, Supplier
-        from finance.services import usd_to_lyd
+        from finance.services import get_current_rate, usd_to_lyd
 
         user = self.request.user
         tiles = []
@@ -605,18 +612,19 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             ))
 
         if user.has_perm("catalog.view_inventory_valuation"):
-            from finance.currency import pricing_currency
-
-            total_usd = Decimal("0.00")
+            total_lyd = Decimal("0.00")
+            foreign_totals = {"USD": Decimal("0"), "EUR": Decimal("0")}
             valued_products = scope_filtered_queryset(
                 Product.objects.filter(is_active=True, track_stock=True), user
             )
             for product in valued_products:
-                total_usd += (product.stock_qty or Decimal("0")) * (product.cost_usd or Decimal("0"))
+                value = (product.stock_qty or Decimal("0")) * (product.cost_usd or Decimal("0"))
+                foreign_totals[product.currency] += value
+                total_lyd += usd_to_lyd(value, get_current_rate(product.currency))
             tiles.append(_tile(
                 "inventory_value", self._s("inventory_valuation", "Inventory Valuation"),
-                "bi bi-safe2", value=_money(usd_to_lyd(total_usd)), unit="LYD",
-                meta=f"{_money(total_usd)} {pricing_currency()}", url=reverse("catalog:inventory_valuation"),
+                "bi bi-safe2", value=_money(total_lyd), unit="LYD",
+                meta=" / ".join(f"{_money(value)} {code}" for code, value in foreign_totals.items()), url=reverse("catalog:inventory_valuation"),
                 tone="green",
             ))
 
@@ -728,6 +736,10 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
                 url=reverse("automotive:browse"), tone="cyan",
                 footer=self._s("ui_browse_by_vehicle", "Browse by vehicle"),
             ))
+        if self._machine_browser_open():
+            from machinery.models import MachineModel
+            count = scope_filtered_queryset(MachineModel.objects.filter(is_active=True), self.request.user).count()
+            tiles.append(_tile("machine_browser", self._s("models_machinemodel", "Machine models"), "bi bi-gear-wide-connected", value=_count(count), meta=self._s("machine_flow", "Type → Manufacturer → Model → Category"), url=reverse("machinery:browse"), tone="cyan", footer=self._s("page_machine_browser", "Browse machinery")))
         return tiles
 
     def _finance_tiles(self):

@@ -1,0 +1,9 @@
+{% extends "common/scoped_list.html" %}
+{% load dlux_tags %}
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% dlux_static 'dlux/panel/css/main.css' %}">
+{% endblock %}
+{% block scoped_before_ribbon %}
+{% include "finance/includes/currency_wall.html" %}
+{% endblock %}

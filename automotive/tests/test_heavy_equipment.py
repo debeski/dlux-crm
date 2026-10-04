@@ -144,7 +144,7 @@ class TerminologyTests(TestCase):
         overrides = SystemSettings.load().translations_override
         self.assertEqual(overrides["ar"]["models_vehiclemake"], "مصنعو المعدات")
         self.assertEqual(overrides["ar"]["models_vehiclemodel"], "طرازات الآليات")
-        self.assertEqual(overrides["en"]["automotive_hub"], "Equipment Compatibility")
+        self.assertEqual(overrides["en"]["automotive_hub"], "Machines Hub")
 
         apply_wording(terminology=TERMINOLOGY_VEHICLE)
         overrides = SystemSettings.load().translations_override

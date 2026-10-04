@@ -47,6 +47,9 @@ class CategoryTable(ModalRowActionsMixin, DluxTable):
         fields = ("name", "is_active", "created_at")
         dlux_actions = True
 
+    def render_name(self, record):
+        return str(record)
+
 
 class SupplierTable(ModalRowActionsMixin, DluxTable):
     class Meta(DluxTable.Meta):

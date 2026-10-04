@@ -164,8 +164,8 @@
         }
 
         function jumpTo(chip) {
-            const params = {make: chip.make, model: chip.vehicle_model};
-            if (!chip.needs_year && !chip.all_years) {
+            const params = chip.browse_params || {make: chip.make, model: chip.vehicle_model};
+            if (!chip.browse_params && !chip.needs_year && !chip.all_years) {
                 const typed = (search.value.match(/\b(?:19|20)\d{2}\b/) || [])[0];
                 const year = typed ? Number(typed) : NaN;
                 params.year = year >= chip.year_from && year <= chip.year_to ? year : chip.year_to;

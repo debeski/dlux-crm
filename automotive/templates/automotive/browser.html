@@ -28,7 +28,7 @@
                     <div class="fits-picker__results list-group shadow-sm" data-fits-results role="listbox" hidden></div>
                 </div>
             </div>
-            <form method="get" class="d-flex flex-column flex-md-row gap-2" role="search">
+            <form data-dlux-entry-clipboard="false" method="get" class="d-flex flex-column flex-md-row gap-2" role="search">
                 <div class="input-group flex-grow-1">
                     <span class="input-group-text bg-transparent"><i class="bi bi-upc-scan"></i></span>
                     <input class="form-control" type="search" name="q" value="{{ search_query }}" placeholder="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search part number, SKU, barcode, or product name' }}" aria-label="{{ DLUX_STRINGS.vehicle_direct_search_placeholder|default:'Search part number, SKU, barcode, or product name' }}">
@@ -109,21 +109,7 @@
 
         <div class="vehicle-product-grid">
             {% for product in products %}
-            <article class="vehicle-product-card">
-                <button type="button" class="vehicle-product-open" data-dynamic-modal="{% url 'catalog:product_card' product.pk %}" data-modal-title="{{ product.name }}">
-                    <span class="vehicle-product-image">
-                        {% if product.image_url %}<img src="{{ product.image_url }}" alt="">{% else %}<i class="bi bi-box-seam"></i>{% endif %}
-                    </span>
-                    <span class="vehicle-product-body">
-                        <span class="vehicle-product-name">{{ product.name }}</span>
-                        <span class="vehicle-product-meta">{{ product.category|default:"—" }}{% if product.sku %} · <span class="font-monospace">{{ product.sku }}</span>{% endif %}</span>
-                        <span class="vehicle-product-footer">
-                            <strong>{{ product.browser_price_lyd|floatformat:2 }} LYD</strong>
-                            {% if product.stock_qty <= 0 %}<span class="badge text-bg-danger">{{ DLUX_STRINGS.ui_out_of_stock|default:"Out of stock" }}</span>{% elif product.is_low_stock %}<span class="badge text-bg-warning">{{ DLUX_STRINGS.ui_low_stock|default:"Low stock" }}</span>{% else %}<span class="badge text-bg-success">{{ product.stock_qty|floatformat:"-2" }} {{ product.get_unit_display }}</span>{% endif %}
-                        </span>
-                    </span>
-                </button>
-            </article>
+            {% include "automotive/includes/browser_product.html" %}
             {% empty %}
             <div class="vehicle-empty"><i class="bi bi-search fs-3"></i><strong>{{ DLUX_STRINGS.vehicle_no_products|default:"No compatible products found" }}</strong><span>{{ DLUX_STRINGS.vehicle_no_products_help|default:"Keep the selected vehicle and change a qualifier, or review its fitment data." }}</span></div>
             {% endfor %}

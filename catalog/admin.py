@@ -19,7 +19,7 @@ class SupplierAdmin(admin.ModelAdmin):
 class ProductAdmin(admin.ModelAdmin):
     list_display = ("name", "sku", "category", "color", "size", "cost_usd", "price_usd", "stock_qty", "is_active")
     list_filter = ("category", "unit", "color", "is_active", "track_stock")
-    search_fields = ("name", "sku", "barcode", "size")
+    search_fields = ("name", "alias", "sku", "barcode", "size")
     readonly_fields = ("stock_qty",)
 
 

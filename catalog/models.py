@@ -5,10 +5,9 @@ Two sellable families:
   * ``Product``  — stock items (smart locks, spare parts, unrelated goods).
   * ``Service``  — labour offerings (installation, maintenance, warranty, delivery).
 
-Pricing model (decided with the owner): **hybrid USD base + optional LYD override**.
-A product's price is held in USD (cost + markup, the way Switch imports), and the
-LYD selling price is derived live from the global black-market rate in ``finance``.
-Any item may carry a manual ``price_lyd_override`` for ad-hoc / unrelated goods.
+Each product keeps USD or EUR cost and selling prices; its live currency rate
+converts them to LYD. A manual ``price_lyd_override`` fixes the local shelf price.
+Historical ``*_usd`` field names store amounts in the record's currency.
 
 ``catalog`` depends on ``finance`` only (for the rate). It must never import
 ``sales`` — the stock ledger references invoices by their string number instead.
@@ -103,6 +102,8 @@ class Category(ScopedModel):
     """Grouping for products (e.g. Smart Locks, Spare Parts, Accessories)."""
     is_section = True
     name = models.CharField(max_length=120, verbose_name="Name")
+    is_service = models.BooleanField(default=False, verbose_name="Service category")
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="children", verbose_name="Parent category")
     description = models.TextField(blank=True, verbose_name="Description")
     is_active = models.BooleanField(default=True, verbose_name="Active")
 
@@ -112,7 +113,35 @@ class Category(ScopedModel):
         ordering = ["name"]
 
     def __str__(self):
-        return self.name
+        nodes, current, seen = [], self, set()
+        while current is not None and current.pk not in seen:
+            seen.add(current.pk)
+            nodes.append(current.name)
+            current = current.parent if current.parent_id else None
+        return " / ".join(reversed(nodes))
+
+    def descendant_ids(self, queryset=None):
+        pairs = list((queryset if queryset is not None else Category.objects.all()).values_list("pk", "parent_id"))
+        found = {self.pk}
+        while True:
+            children = {pk for pk, parent in pairs if parent in found}
+            if children <= found:
+                return found
+            found |= children
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.is_service and self.pk and self.products.exists():
+            raise ValidationError({"is_service": "Move existing stock items before marking this as a service category."})
+        node, seen = self.parent, {self.pk} if self.pk else set()
+        while node is not None:
+            if node.pk in seen:
+                raise ValidationError({"parent": "A category cannot contain itself or one of its ancestors."})
+            if node.scope_id != self.scope_id:
+                raise ValidationError({"parent": "Choose a category from the same scope."})
+            seen.add(node.pk)
+            node = node.parent
 
 
 class Supplier(ScopedModel):
@@ -187,6 +216,8 @@ class Product(ImageAssetMixin, ScopedModel):
 
     sku = models.CharField(max_length=40, unique=True, blank=True, verbose_name="SKU")
     name = models.CharField(max_length=200, verbose_name="Name")
+    alias = models.CharField(max_length=200, blank=True, verbose_name="Local alias")
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default=pricing_currency, verbose_name="Pricing currency")
     category = models.ForeignKey(
         Category, null=True, blank=True, on_delete=models.PROTECT,
         related_name="products", verbose_name="Category",
@@ -203,7 +234,7 @@ class Product(ImageAssetMixin, ScopedModel):
     )
     size = models.CharField(max_length=120, null=True, blank=True, verbose_name="Size / Spec")
 
-    # --- Pricing (USD base) ---
+    # --- Pricing in the product currency ---
     cost_usd = models.DecimalField(
         max_digits=12, decimal_places=2, default=Decimal("0.00"),
         validators=[MinValueValidator(Decimal("0.00"))], verbose_name="Import Cost (USD)",
@@ -241,11 +272,17 @@ class Product(ImageAssetMixin, ScopedModel):
         ordering = ["name"]
         indexes = [models.Index(fields=["name"], name="catalog_product_name_idx")]
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.category_id and self.category.is_service:
+            raise ValidationError({"category": "Choose a parts category; this category is reserved for services."})
+
     def __str__(self):
         return f"{self.name} ({self.sku})" if self.sku else self.name
 
     def save(self, *args, **kwargs):
-        # Persist the derived USD selling price so detail views and every
+        # Persist the derived selling price so detail views and every
         # downstream read see a real number instead of 0 when the user only
         # entered cost + markup (the form JS normally fills this, but this keeps
         # the record consistent even for API/import/no-JS saves).
@@ -306,17 +343,25 @@ class Product(ImageAssetMixin, ScopedModel):
 
     @property
     def effective_price_usd(self):
-        """USD selling price: explicit ``price_usd`` if set, else cost + markup."""
+        """Foreign selling price: explicit ``price_usd`` if set, else cost + markup."""
         if self.price_usd and self.price_usd > 0:
             return self.price_usd
         base = (self.cost_usd or Decimal("0")) * (Decimal("1") + (self.markup_percent or Decimal("0")) / Decimal("100"))
         return base.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
 
-    def selling_price_lyd(self, rate=None):
+    def pricing_rate(self, rate=None, currency=None):
+        if rate is not None and self.currency == (currency or pricing_currency()):
+            return Decimal(rate)
+        return get_current_rate(self.currency)
+
+    def cost_lyd(self, rate=None, currency=None):
+        return usd_to_lyd(self.cost_usd, self.pricing_rate(rate, currency))
+
+    def selling_price_lyd(self, rate=None, currency=None):
         """The LYD price shown to customers: manual override wins, else converted."""
         if self.price_lyd_override is not None:
             return self.price_lyd_override
-        return usd_to_lyd(self.effective_price_usd, rate)
+        return usd_to_lyd(self.effective_price_usd, self.pricing_rate(rate, currency))
 
     def get_modal_context(self):
         """Extra rows for the dlux generic detail view. Surfaces the *effective*
@@ -350,6 +395,10 @@ class Product(ImageAssetMixin, ScopedModel):
         image_row = _image_detail_row(self, t("label_product_image", "Image"))
         if image_row:
             rows.insert(0, image_row)
+        from machinery.details import compatibility_detail
+        machine_row = compatibility_detail(self)
+        if machine_row:
+            rows.append(machine_row)
         return {"extra_detail_fields": rows}
 
     @property
@@ -439,6 +488,7 @@ class Service(ImageAssetMixin, ScopedModel):
     )
 
     name = models.CharField(max_length=200, verbose_name="Name")
+    category = models.ForeignKey(Category, null=True, blank=True, on_delete=models.PROTECT, related_name="services", verbose_name="Category")
     service_type = models.CharField(
         max_length=20, choices=TYPE_CHOICES, default=TYPE_INSTALLATION, db_index=True,
         verbose_name="Service Type",
@@ -491,6 +541,10 @@ class Service(ImageAssetMixin, ScopedModel):
         image_row = _image_detail_row(self, t("label_service_image", "Image"))
         if image_row:
             rows.insert(0, image_row)
+        from machinery.details import compatibility_detail
+        machine_row = compatibility_detail(self)
+        if machine_row:
+            rows.append(machine_row)
         return {"extra_detail_fields": rows}
 
 
@@ -554,7 +608,7 @@ class PurchaseInvoice(ScopedModel):
 
     def save(self, *args, **kwargs):
         if self.exchange_rate is None:
-            self.exchange_rate = get_current_rate()
+            self.exchange_rate = get_current_rate(self.currency)
         if self.status == self.STATUS_POSTED and self.posted_at is None:
             self.posted_at = timezone.now()
         super().save(*args, **kwargs)
@@ -892,7 +946,7 @@ class StockTakeLine(models.Model):
         v = self.variance
         if v is None:
             return Decimal("0.00")
-        return usd_to_lyd(v * (self.product.cost_usd or Decimal("0")), rate)
+        return usd_to_lyd(v * (self.product.cost_usd or Decimal("0")), self.product.pricing_rate(rate))
 
 
 class ProductBarcode(ScopedModel):

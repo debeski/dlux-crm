@@ -105,7 +105,7 @@ class OptionalEnhancementsConfigTests(TestCase):
         self.assertTrue(stored["automotive"]["criteria"]["engine"])
         self.assertFalse(stored["automotive"]["criteria"]["fuel_type"])
 
-    def test_switching_off_keeps_wording_and_criteria(self):
+    def test_switching_off_restores_vehicle_wording_and_keeps_criteria(self):
         import automotive.dlux_options  # noqa: F401
         from dlux.options import write_app_system_config
         from dlux.views.options import app_settings_modal_view
@@ -121,7 +121,7 @@ class OptionalEnhancementsConfigTests(TestCase):
         self.assertTrue(json.loads(response.content)["success"])
         stored = get_automotive_config()
         self.assertFalse(stored["enabled"])
-        self.assertEqual(stored["terminology"], "equipment")
+        self.assertEqual(stored["terminology"], "vehicle")
         self.assertTrue(stored["criteria"]["engine"])
         self.assertFalse(stored["criteria"]["trim"])
 
@@ -137,6 +137,15 @@ class OptionalEnhancementsConfigTests(TestCase):
         request.user = user
         with self.assertRaises(PermissionDenied):
             app_settings_modal_view(request, OPTIONAL_ENHANCEMENTS_NS)
+
+    def test_only_optional_criteria_have_switches_and_required_criteria_stay_on(self):
+        form = OptionalEnhancementsSettingsForm(data={"automotive_enabled": "on", "machinery_enabled": "on"}, current_value={"automotive": {"criteria": {"model_year": False, "engine": False, "transmission": False}}})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual({name for name in form.fields if name.startswith("criterion_")}, {"criterion_equipment_type", "criterion_generation_chassis", "criterion_fuel_type", "criterion_trim", "criterion_position"})
+        config = form.to_app_config()
+        for criterion in ("model_year", "engine", "transmission"):
+            self.assertTrue(config["automotive"]["criteria"][criterion])
+            self.assertTrue(normalize_optional_enhancements({"automotive": {"criteria": {criterion: False}}})["automotive"]["criteria"][criterion])
 
     def test_manage_vehicle_data_requires_persisted_enabled_setting(self):
         import automotive.dlux_options  # noqa: F401
@@ -165,6 +174,14 @@ class OptionalEnhancementsConfigTests(TestCase):
         enabled_html = enabled.content.decode()
         self.assertIn("data-persisted-enabled='true'", enabled_html)
         self.assertIn("href='/staff/automotive/'", enabled_html)
+        self.assertIn("data-machinery-manage", disabled_html)
+        self.assertIn("data-settings-depends-on", disabled_html)
+        write_app_system_config(OPTIONAL_ENHANCEMENTS_NS, normalize_optional_enhancements({"machinery": {"enabled": True}}))
+        machine_html = self.client.get(url).content.decode()
+        self.assertIn("href='/staff/machinery/'", machine_html)
+        self.assertIn("data-machinery-manage data-persisted-enabled='true'", machine_html)
+        self.assertIn("bi bi-sliders me-1", machine_html)
+
 
 
 class AutomotiveModelTests(TestCase):
@@ -322,7 +339,7 @@ class OptionalEnhancementsStaticTests(TestCase):
         script = Path("automotive/static/automotive/js/optional_enhancements.js").read_text()
         include = Path("common/templates/dlux/includes/custom_scripts.html").read_text()
         self.assertIn("MutationObserver", script)
-        self.assertIn("data-automotive-workflow-output", script)
+        self.assertNotIn("data-automotive-workflow-output", script)
         self.assertIn("persistedEnabled", script)
         self.assertIn("event.preventDefault()", script)
         self.assertIn("optional_enhancements.js", include)

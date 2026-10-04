@@ -27,17 +27,17 @@ class PricingSettingsForm(forms.Form):
         choices=(
             (CURRENCY_USD, lazy_t("currency_usd", "US Dollar (USD)")),
             (CURRENCY_EUR, lazy_t("currency_eur", "Euro (EUR)")),
+            ("BOTH", lazy_t("currency_both", "Both (USD / EUR)")),
         ),
         label=lazy_t("pricing_currency", "Pricing currency"),
         help_text=lazy_t(
             "pricing_currency_help",
-            "The currency costs and prices are entered and shown in, everywhere. "
-            "Invoices keep the currency they were made in.",
+            "Default for new products and invoices. Products retain their own currencies.",
         ),
     )
     convert_prices = forms.BooleanField(
         required=False,
-        label=lazy_t("pricing_convert_confirm", "Convert catalog prices when switching"),
+        label=lazy_t("pricing_convert_confirm", "Convert service prices and draft sales invoices when switching"),
     )
 
     def __init__(self, *args, current_value=None, **kwargs):
@@ -46,7 +46,7 @@ class PricingSettingsForm(forms.Form):
         kwargs.pop("settings_definition", None)
         self.current = normalize_pricing_config(current_value)["currency"]
         initial = dict(kwargs.pop("initial", {}) or {})
-        initial["currency"] = self.current
+        initial["currency"] = "BOTH" if normalize_pricing_config(current_value)["both_active"] else self.current
         kwargs["initial"] = initial
         super().__init__(*args, **kwargs)
         self.counts = priced_catalog_counts()
@@ -76,7 +76,7 @@ class PricingSettingsForm(forms.Form):
         factor = conversion_factor(self.current, other).quantize(Decimal("0.0001"))
         return t(
             "pricing_convert_preview",
-            "Switching converts {products} products and {services} services: 1 {current} = {factor} {other} "
+            "Switching keeps product currencies and converts {services} services: 1 {current} = {factor} {other} "
             "at your rates (1 {current} = {current_rate} LYD, 1 {other} = {other_rate} LYD). "
             "Selling prices in LYD stay the same.",
         ).format(
@@ -88,7 +88,7 @@ class PricingSettingsForm(forms.Form):
     def clean(self):
         cleaned = super().clean()
         new = cleaned.get("currency")
-        if not new or new == self.current:
+        if not new or new == "BOTH" or new == self.current:
             return cleaned
         if not (has_configured_rate(self.current) and has_configured_rate(new)):
             self.add_error("currency", t(
@@ -104,4 +104,5 @@ class PricingSettingsForm(forms.Form):
 
     def to_app_config(self, current_value=None):
         # Conversion happens on save of the settings row (currency.convert_on_switch).
-        return {"currency": self.cleaned_data["currency"]}
+        selected = self.cleaned_data["currency"]
+        return {"currency": self.current if selected == "BOTH" else selected, "both_active": selected == "BOTH"}

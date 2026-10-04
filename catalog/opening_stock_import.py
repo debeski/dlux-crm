@@ -17,20 +17,26 @@ MAX_IMPORT_ROWS = 1000
 
 IMPORT_COLUMNS = (
     ("name", "Name", True),
+    ("alias", "Local Alias", False),
+    ("currency", "Currency", False),
     ("category", "Category", False),
     ("unit", "Unit", False),
     ("barcode", "Barcode", False),
     ("color", "Color", False),
     ("size", "Size / Spec", False),
-    ("cost_usd", "Cost (USD)", False),
+    ("cost_usd", "Cost", False),
     ("markup_percent", "Markup %", False),
-    ("price_usd", "Price (USD)", False),
+    ("price_usd", "Price", False),
     ("price_lyd_override", "Manual LYD Price", False),
     ("quantity", "Quantity in Storage", True),
 )
 
 _HEADER_ALIASES = {
     "name": "name",
+    "alias": "alias",
+    "local alias": "alias",
+    "currency": "currency",
+    "pricing currency": "currency",
     "product": "name",
     "product name": "name",
     "item": "name",
@@ -75,7 +81,7 @@ _HEADER_ALIASES.update({
 
 
 def import_columns(currency=None):
-    """``IMPORT_COLUMNS`` with the money headers in the store's pricing currency."""
+    """Neutral money headers; each row carries its product currency."""
     currency = currency or pricing_currency()
     return tuple((key, label.replace("USD", currency), required) for key, label, required in IMPORT_COLUMNS)
 
@@ -108,7 +114,11 @@ def _category(value):
     raw = _text(value)
     if not raw:
         return None
-    matches = list(Category.objects.filter(name__iexact=raw).order_by("pk")[:2])
+    if "/" in raw:
+        path = " / ".join(part.strip() for part in raw.split("/"))
+        matches = [category for category in Category.objects.select_related("parent") if str(category).casefold() == path.casefold()][:2]
+    else:
+        matches = list(Category.objects.filter(name__iexact=raw).order_by("pk")[:2])
     if not matches:
         raise OpeningStockImportError(
             f"Category '{raw}' does not exist. Create it first or leave Category blank."
@@ -157,10 +167,12 @@ def _changes(product, cleaned):
     comparisons = (
         ("Category", product.category_id, getattr(cleaned.get("category"), "pk", None)),
         ("Unit", product.unit, cleaned.get("unit")),
+        ("Currency", product.currency, cleaned.get("currency")),
+        ("Local alias", product.alias, cleaned.get("alias")),
         ("Barcode", product.barcode or "", cleaned.get("barcode") or ""),
-        (f"Cost ({pricing_currency()})", product.cost_usd, cleaned.get("cost_usd") or Decimal("0")),
+        (f"Cost ({cleaned.get('currency') or product.currency})", product.cost_usd, cleaned.get("cost_usd") or Decimal("0")),
         ("Markup %", product.markup_percent, cleaned.get("markup_percent") or Decimal("0")),
-        (f"Price ({pricing_currency()})", product.price_usd, cleaned.get("price_usd") or Decimal("0")),
+        (f"Price ({cleaned.get('currency') or product.currency})", product.price_usd, cleaned.get("price_usd") or Decimal("0")),
         ("Manual LYD", product.price_lyd_override, cleaned.get("price_lyd_override")),
     )
     return [label for label, old, new in comparisons if old != new]
@@ -171,6 +183,8 @@ def _primitive(cleaned):
     return {
         "product": getattr(product_value, "pk", product_value) or "",
         "name": cleaned.get("name") or "",
+        "alias": cleaned.get("alias") or "",
+        "currency": cleaned.get("currency") or pricing_currency(),
         "category": cleaned["category"].pk if cleaned.get("category") else "",
         "unit": cleaned.get("unit") or Product.UNIT_PIECE,
         "barcode": cleaned.get("barcode") or "",
@@ -257,6 +271,8 @@ def validate_workbook(upload):
         form_data = {
             "product": product.pk if product else "",
             "name": name,
+            "alias": _text(source.get("alias")) or (product.alias if product else ""),
+            "currency": _text(source.get("currency")).upper() or (product.currency if product else pricing_currency()),
             "category": category.pk if category else "",
             "unit": unit,
             "barcode": barcode,
@@ -288,6 +304,7 @@ def validate_workbook(upload):
                 str(value or "")
                 for value in (
                     cleaned.get("category"), cleaned.get("unit"), cleaned.get("barcode"),
+                    cleaned.get("currency"), cleaned.get("alias"),
                     cleaned.get("cost_usd"), cleaned.get("markup_percent"),
                     cleaned.get("price_usd"), cleaned.get("price_lyd_override"),
                 )

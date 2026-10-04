@@ -39,14 +39,14 @@
         </div>
         <div class="col-6 col-lg-3">
             <div class="product-card-stat">
-                <span>{{ DLUX_STRINGS.label_product_price_usd|default:"Price (USD)" }}</span>
-                <strong>{{ product.price_usd|floatformat:2 }} {{ PRICING_CURRENCY }}</strong>
+                <span>{{ DLUX_STRINGS.ui_doc_price|default:"Selling price" }}</span>
+                <strong>{{ product.price_usd|floatformat:2 }} {{ product.currency }}</strong>
             </div>
         </div>
         <div class="col-6 col-lg-3">
             <div class="product-card-stat">
-                <span>{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</span>
-                <strong>{{ product.cost_usd|floatformat:2 }} {{ PRICING_CURRENCY }}</strong>
+                <span>{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }}</span>
+                <strong>{{ product.cost_usd|floatformat:2 }} {{ product.currency }}</strong>
             </div>
         </div>
     </div>
@@ -81,6 +81,7 @@
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_unit|default:"Unit" }}</dt><dd class="col-7">{{ product.get_unit_display }}</dd>
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup" }}</dt><dd class="col-7">{{ product.markup_percent|floatformat:2 }}%</dd>
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_reorder_level|default:"Reorder level" }}</dt><dd class="col-7">{{ product.reorder_level|floatformat:"-2" }}</dd>
+                    <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_alias|default:"Local alias" }}</dt><dd class="col-7">{{ product.alias|default:"—" }}</dd>
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_price_lyd_override|default:"Manual LYD" }}</dt><dd class="col-7">{% if product.price_lyd_override != None %}{{ product.price_lyd_override|floatformat:2 }} LYD{% else %}—{% endif %}</dd>
                 </dl>
                 {% if product.description %}<p class="small text-muted border-top pt-2 mb-0">{{ product.description|linebreaksbr }}</p>{% endif %}
@@ -105,6 +106,7 @@
             </div>
         </div>
 
+        {% if machine_models %}<div class="col-12"><div class="product-card-panel"><div class="product-card-heading">{{ DLUX_STRINGS.machine_compatibility|default:"Compatible machines" }}</div>{% for machine in machine_models %}<span class="badge rounded-pill border text-body me-2">{{ machine }}</span>{% endfor %}</div></div>{% endif %}
         <div class="col-12 col-lg-7">
             <div class="product-card-panel product-card-history">
                 <div class="product-card-heading"><i class="bi bi-clock-history me-1"></i>{{ DLUX_STRINGS.page_stock_movements|default:"Recent stock movements" }} <span class="badge rounded-pill text-bg-secondary">{{ movements|length }}</span></div>

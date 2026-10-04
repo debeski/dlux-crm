@@ -1,6 +1,6 @@
 import json
 import secrets
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -59,7 +59,7 @@ def _variant_payload(variant):
     }
 
 
-def _product_autofill_map_json():
+def _product_autofill_map_json(currency=None):
     """JSON {pk: {cost, markup, price_usd, price_lyd, category, unit, barcode, ...}}
     used by both Opening Stock and Purchase Invoice grids."""
     data = {}
@@ -68,10 +68,13 @@ def _product_autofill_map_json():
         default_variant = variants[0] if len(variants) == 1 else None
         fallback_color = (p.color or "") if not variants else ""
         fallback_size = (p.size or "") if not variants else ""
+        factor = get_current_rate(p.currency) / get_current_rate(currency) if currency and currency != p.currency else Decimal("1")
         data[str(p.pk)] = {
-            "cost": float(p.cost_usd or 0),
+            "currency": p.currency,
+            "alias": p.alias,
+            "cost": float((p.cost_usd or 0) * factor),
             "markup": float(p.markup_percent or 0),
-            "price_usd": float(p.price_usd or 0),
+            "price_usd": float((p.price_usd or 0) * factor),
             "price_lyd": float(p.price_lyd_override) if p.price_lyd_override is not None else "",
             "category": str(p.category_id or ""),
             "unit": p.unit,
@@ -80,10 +83,10 @@ def _product_autofill_map_json():
             "size": (default_variant.size if default_variant else fallback_size),
             "variants": [_variant_payload(v) for v in variants],
         }
-    return json.dumps(data)
+    return json.dumps(data).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
-def _save_product_from_intake_line(cd):
+def _save_product_from_intake_line(cd, invoice_currency=None, invoice_rate=None):
     """Create or reuse a product from an inbound stock row, then apply the row's
     pricing fields to it. The typed product name is also a no-JS fallback match."""
     name = (cd.get("name") or "").strip()
@@ -93,7 +96,8 @@ def _save_product_from_intake_line(cd):
         product = Product.objects.filter(name__iexact=name).first()
     if product is None:
         product = Product(name=name)
-    product.name = name or product.name
+    if not product.pk or name.casefold() != product.alias.casefold():
+        product.name = name or product.name
     product.category = cd.get("category")
     product.unit = cd.get("unit") or product.unit
     if cd.get("barcode"):
@@ -101,12 +105,21 @@ def _save_product_from_intake_line(cd):
     if product.pk is None:
         product.color = cd.get("color") or None
         product.size = cd.get("size") or None
-    product.cost_usd = cd.get("cost_usd") or Decimal("0")
+    currency = cd.get("currency") or (product.currency if product.pk else invoice_currency or pricing_currency())
+    product.currency = currency
+    if cd.get("alias"):
+        product.alias = cd["alias"]
+    factor = Decimal("1")
+    if invoice_currency and invoice_currency != currency:
+        factor = Decimal(invoice_rate) / get_current_rate(currency)
+    product.cost_usd = ((cd.get("cost_usd") or Decimal("0")) * factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     product.markup_percent = cd.get("markup_percent") or Decimal("0")
-    product.price_usd = cd.get("price_usd") or Decimal("0")
+    product.price_usd = ((cd.get("price_usd") or Decimal("0")) * factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     product.price_lyd_override = cd.get("price_lyd_override")
     product.track_stock = True
     product.save()
+    if cd.get("machine_models"):
+        product.machine_models.add(*cd["machine_models"])
     return product
 
 
@@ -187,15 +200,18 @@ class ProductListView(ScopedListView):
         from automotive.product_form import FITMENT_PERMS
         from automotive.settings import automotive_enabled
 
+        from machinery.settings import machinery_enabled
         user = self.request.user
-        if automotive_enabled() and user.has_perm("automotive.view_productfitment"):
-            strings = get_strings(get_current_language_code(self.request))
-            actions.append({
-                "label": strings.get("ui_browse_by_vehicle", "Browse by vehicle"),
-                "icon": "bi bi-car-front",
-                "url": reverse("automotive:browse"),
-                "css_class": "btn btn-outline-primary rounded-pill",
-            })
+        vehicles_on, machines_on = automotive_enabled(), machinery_enabled()
+        strings = get_strings(get_current_language_code(self.request))
+        if vehicles_on and user.has_perm("automotive.view_productfitment"):
+            if not machines_on:
+                actions.append({
+                    "label": strings.get("ui_browse_by_vehicle", "Browse by vehicle"),
+                    "icon": "bi bi-car-front",
+                    "url": reverse("automotive:browse"),
+                    "css_class": "btn btn-outline-primary rounded-pill",
+                })
             if user.has_perms(FITMENT_PERMS):
                 label = strings.get("fits_bulk_title", "Assign vehicles")
                 actions.append({
@@ -207,6 +223,12 @@ class ProductListView(ScopedListView):
                         "data-modal-title": label,
                     },
                 })
+        if machines_on and user.has_perm("machinery.view_machinemodel"):
+            if not vehicles_on and user.has_perms(("machinery.view_machinetype", "machinery.view_manufacturer")):
+                actions.append({"label": strings.get("page_machine_browser", "Browse machinery"), "icon": "bi bi-gear-wide-connected", "url": reverse("machinery:browse"), "css_class": "btn btn-outline-primary rounded-pill"})
+            if user.has_perms(("catalog.view_product", "catalog.change_product")):
+                label = strings.get("machine_assign", "Assign machines")
+                actions.append({"label": label, "icon": "bi bi-diagram-3", "css_class": "btn btn-outline-primary rounded-pill", "attrs": {"data-dynamic-modal": reverse("machinery:bulk_assign"), "data-modal-title": label}})
         return actions + list(super().get_ribbon_action_specs())
 
     @property
@@ -257,6 +279,9 @@ class ProductCardView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
             automotive["enabled"]
             and self.request.user.has_perm("automotive.view_productfitment")
         )
+        from machinery.settings import machinery_enabled
+        if machinery_enabled() and self.request.user.has_perm("machinery.view_machinemodel"):
+            ctx["machine_models"] = scope_filtered_queryset(self.object.machine_models.select_related("machine_type", "manufacturer"), self.request.user)
         ctx["show_automotive_fitments"] = show_fitments
         ctx["can_change_automotive_fitments"] = (
             show_fitments
@@ -519,17 +544,14 @@ class InventoryValuationView(RibbonPageMixin, LoginRequiredMixin, PermissionRequ
         return self._rate
 
     def get_ribbon_action_specs(self):
-        """The live pricing-currency → LYD rate every figure on the page is priced at."""
         strings = self.get_page_strings()
         return [{
             "html": format_html(
                 '<span class="badge rounded-pill text-bg-light border">'
                 '<i class="bi bi-currency-exchange me-1"></i>{}: 1 {} = {} LYD</span>',
-                strings.get("ui_rate", "Rate"),
-                pricing_currency(),
-                self.get_rate(),
+                strings.get("ui_rate", "Rate"), currency, get_current_rate(currency),
             ),
-        }]
+        } for currency in ("USD", "EUR")]
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -537,14 +559,18 @@ class InventoryValuationView(RibbonPageMixin, LoginRequiredMixin, PermissionRequ
         rows = []
         total_usd = Decimal("0.00")
         total_sale_lyd = Decimal("0.00")
+        total_lyd = Decimal("0.00")
+        foreign_totals = {"USD": Decimal("0"), "EUR": Decimal("0")}
         for p in Product.objects.filter(is_active=True, track_stock=True).order_by("name"):
             qty = p.stock_qty or Decimal("0")
             value_usd = qty * (p.cost_usd or Decimal("0"))
-            value_lyd = usd_to_lyd(value_usd, rate)
+            value_lyd = usd_to_lyd(value_usd, get_current_rate(p.currency))
             # Today's shelf price: a manual LYD override wins, else price_usd at the live rate.
             price_lyd = p.selling_price_lyd(rate)
             sale_lyd = quantize_lyd(qty * price_lyd)
-            total_usd += value_usd
+            total_usd += value_lyd / rate
+            foreign_totals[p.currency] += value_usd
+            total_lyd += value_lyd
             total_sale_lyd += sale_lyd
             rows.append({
                 "product": p,
@@ -556,7 +582,7 @@ class InventoryValuationView(RibbonPageMixin, LoginRequiredMixin, PermissionRequ
                 "sale_lyd": sale_lyd,
                 "profit_lyd": sale_lyd - value_lyd,
             })
-        total_lyd = usd_to_lyd(total_usd, rate)
+        ctx["foreign_totals"] = foreign_totals
         total_profit_lyd = total_sale_lyd - total_lyd
         ctx["rows"] = rows
         ctx["total_usd"] = total_usd
@@ -621,13 +647,13 @@ class OpeningStockEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if _opening_stock_used():
             messages.info(request, _("Opening stock has already been applied."))
             return redirect("catalog:opening_stock_detail")
-        return render(request, self.template_name, self._context(OpeningStockLineFormSet()))
+        return render(request, self.template_name, self._context(OpeningStockLineFormSet(form_kwargs={"user": request.user})))
 
     def post(self, request):
         if _opening_stock_used():
             messages.error(request, _("Opening stock can only be applied once."))
             return redirect("catalog:opening_stock_detail")
-        formset = OpeningStockLineFormSet(request.POST)
+        formset = OpeningStockLineFormSet(request.POST, form_kwargs={"user": request.user})
         if formset.is_valid():
             kept = 0
             with transaction.atomic():
@@ -758,12 +784,17 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
     def _context(self, form, formset):
         from automotive.product_form import line_fits_enabled
 
+        currency = form["currency"].value() or pricing_currency()
+        if currency not in ("USD", "EUR"):
+            currency = pricing_currency()
         return {
             "form": form,
             "formset": formset,
             "fits_enabled": line_fits_enabled(self.request.user),
-            "current_rate": get_current_rate(),
-            "product_map_json": _product_autofill_map_json(),
+            "current_rate": get_current_rate(currency),
+            "purchase_currency": currency,
+            "currency_rates_json": json.dumps({code: str(get_current_rate(code)) for code in ("USD", "EUR")}),
+            "product_map_json": _product_autofill_map_json(currency),
             "products": Product.objects.order_by("name"),
             "suppliers": Supplier.objects.filter(is_active=True).order_by("name"),
         }
@@ -795,7 +826,7 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
             self._sync_supplier(invoice)
             invoice.save()
             for cd in kept:
-                product = _save_product_from_intake_line(cd)
+                product = _save_product_from_intake_line(cd, invoice.currency, invoice.exchange_rate)
                 if cd.get("fit_rows"):
                     from automotive.fits import apply_chips
 
@@ -812,9 +843,9 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
                     barcode=product.barcode,
                     color=variant.color or None,
                     size=variant.size or None,
-                    cost_usd=product.cost_usd,
+                    cost_usd=cd.get("cost_usd") or Decimal("0"),
                     markup_percent=product.markup_percent,
-                    price_usd=product.price_usd,
+                    price_usd=cd.get("price_usd") or ((cd.get("cost_usd") or Decimal("0")) * (1 + (cd.get("markup_percent") or Decimal("0")) / 100)).quantize(Decimal("0.01")),
                     price_lyd_override=product.price_lyd_override,
                     quantity=qty,
                 )
@@ -832,13 +863,16 @@ class PurchaseInvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, Vie
         return invoice
 
     def get(self, request):
-        form = PurchaseInvoiceForm()
+        form = PurchaseInvoiceForm(user=request.user)
         formset = PurchaseInvoiceLineFormSet(initial=[{}], form_kwargs={"user": request.user})
         return render(request, self.template_name, self._context(form, formset))
 
     def post(self, request):
-        form = PurchaseInvoiceForm(request.POST, request.FILES)
-        formset = PurchaseInvoiceLineFormSet(request.POST, form_kwargs={"user": request.user})
+        form = PurchaseInvoiceForm(request.POST, request.FILES, user=request.user)
+        currency = request.POST.get("currency", pricing_currency())
+        if currency not in ("USD", "EUR") or form.fields["currency"].disabled:
+            currency = pricing_currency()
+        formset = PurchaseInvoiceLineFormSet(request.POST, form_kwargs={"user": request.user, "invoice_currency": currency})
         if form.is_valid() and formset.is_valid():
             invoice = self._save(request, form, formset)
             if invoice is None:

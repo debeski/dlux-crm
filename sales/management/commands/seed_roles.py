@@ -24,6 +24,7 @@ from django.core.management.base import BaseCommand
 
 # Sells only their own work (no view_all_* → row-scoped to themselves).
 REP_PERMS = [
+    "machinery.view_machinetype", "machinery.view_manufacturer", "machinery.view_machinemodel",
     "sales.use_pos",
     "sales.view_invoice",
     "sales.add_invoice",
@@ -66,6 +67,9 @@ COURIER_PERMS = [
 
 # Sees and assigns everyone's work; the view_all_* grants lift row-scoping.
 MANAGER_PERMS = [
+    "machinery.view_machinetype", "machinery.add_machinetype", "machinery.change_machinetype",
+    "machinery.view_manufacturer", "machinery.add_manufacturer", "machinery.change_manufacturer",
+    "machinery.view_machinemodel", "machinery.add_machinemodel", "machinery.change_machinemodel",
     # Point of sale — the till, and discounts beyond the seller limit
     "sales.use_pos", "sales.pos_unlimited_discount", "sales.view_possale",
     # Invoices — full lifecycle + cross-rep visibility + reassignment

@@ -42,14 +42,16 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="min-width:200px">{{ DLUX_STRINGS.label_product_name|default:"Name" }}</th>
+                                <th style="min-width:160px">{{ DLUX_STRINGS.label_product_alias|default:"Local alias" }}</th>
+                                <th {% if formset.empty_form.currency.is_hidden %}hidden{% endif %} style="min-width:130px">{{ DLUX_STRINGS.label_product_currency|default:"Product currency" }}</th>
                                 <th style="min-width:150px">{{ DLUX_STRINGS.label_product_category|default:"Category" }}</th>
                                 <th style="min-width:110px">{{ DLUX_STRINGS.label_product_unit|default:"Unit" }}</th>
                                 <th style="min-width:130px">{{ DLUX_STRINGS.label_product_barcode|default:"Barcode" }}</th>
                                 <th style="min-width:150px">{{ DLUX_STRINGS.label_product_color|default:"Color" }}</th>
                                 <th style="min-width:150px">{{ DLUX_STRINGS.label_product_size|default:"Size / Spec" }}</th>
-                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</th>
+                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }}</th>
                                 <th class="text-end" style="width:90px">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup %" }}</th>
-                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.label_product_price_usd|default:"Price (USD)" }}</th>
+                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.ui_doc_price|default:"Selling price" }}</th>
                                 <th class="text-end" style="min-width:120px">{{ DLUX_STRINGS.label_product_price_lyd_override|default:"Manual LYD" }}</th>
                                 <th class="text-end" style="width:100px">{{ DLUX_STRINGS.label_openingstockline_quantity|default:"In Storage" }}</th>
                                 <th style="width:48px"></th>
@@ -59,7 +61,9 @@
                             {% for itemform in formset %}
                             <tr class="line-row" data-price-sync-row>
                                 {{ itemform.id }}{{ itemform.product.as_hidden }}
-                                <td>{{ itemform.name }}</td>
+                                <td>{{ itemform.name }}{% if itemform.machine_models %}{% include "machinery/line_models.html" with machine_field=itemform.machine_models %}{% endif %}</td>
+                                <td>{{ itemform.alias }}{{ itemform.alias.errors }}</td>
+                                <td {% if itemform.currency.is_hidden %}hidden{% endif %}>{{ itemform.currency }}{{ itemform.currency.errors }}</td>
                                 <td>{{ itemform.category }}</td>
                                 <td>{{ itemform.unit }}</td>
                                 <td>{{ itemform.barcode }}</td>
@@ -85,6 +89,7 @@
                 <datalist id="product-datalist">
                     {% for p in products %}
                     <option value="{{ p.name }}" data-id="{{ p.pk }}"></option>
+                    {% if p.alias %}<option value="{{ p.alias }}" data-id="{{ p.pk }}">{{ p.name }}</option>{% endif %}
                     {% endfor %}
                 </datalist>
             </div>
@@ -161,8 +166,10 @@
 <template id="empty-form-row">
     <tr class="line-row" data-price-sync-row>
         {{ formset.empty_form.id }}{{ formset.empty_form.product.as_hidden }}
-        <td>{{ formset.empty_form.name }}</td>
-        <td>{{ formset.empty_form.category }}</td>
+        <td>{{ formset.empty_form.name }}{% if formset.empty_form.machine_models %}{% include "machinery/line_models.html" with machine_field=formset.empty_form.machine_models %}{% endif %}</td>
+        <td>{{ formset.empty_form.alias }}{{ formset.empty_form.alias.errors }}</td>
+                                <td {% if formset.empty_form.currency.is_hidden %}hidden{% endif %}>{{ formset.empty_form.currency }}{{ formset.empty_form.currency.errors }}</td>
+                                <td>{{ formset.empty_form.category }}</td>
         <td>{{ formset.empty_form.unit }}</td>
         <td>{{ formset.empty_form.barcode }}</td>
         <td>{{ formset.empty_form.color }}</td>
@@ -200,7 +207,8 @@
     // Match a typed/selected name against the datalist to find the product id.
     function matchId(value) {
         const v = (value || '').trim().toLowerCase();
-        const opt = options.find((o) => o.value.trim().toLowerCase() === v);
+        const matches = options.filter((o) => o.value.trim().toLowerCase() === v);
+        const opt = matches.length === 1 ? matches[0] : null;
         return opt ? (opt.dataset.id || '') : '';
     }
 
@@ -228,6 +236,9 @@
         if (hiddenFk) hiddenFk.value = id;  // blank id → a new product is created on apply
         if (id && products[id]) {
             const d = products[id];
+            setAuto(q(row, 'alias'), d.alias);
+            setAuto(q(row, 'currency'), d.currency);
+            q(row, 'currency').dispatchEvent(new Event('change', {bubbles: true}));
             setAuto(q(row, 'cost_usd'), d.cost);
             setAuto(q(row, 'markup_percent'), d.markup);
             setAuto(q(row, 'price_usd'), d.price_usd);
@@ -248,7 +259,7 @@
         }
         // Clear the autofilled flag once the user edits a field by hand.
         [
-            'cost_usd', 'markup_percent', 'price_usd', 'price_lyd_override', 'barcode',
+            'alias', 'currency', 'cost_usd', 'markup_percent', 'price_usd', 'price_lyd_override', 'barcode',
             'color', 'size', 'category', 'unit'
         ].forEach((f) => {
             const el = q(row, f);

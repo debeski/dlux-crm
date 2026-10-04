@@ -12,7 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from catalog.models import StockMovement
+from catalog.models import Product, ProductVariant, StockMovement
 from finance.models import ExchangeRate
 from finance.services import quantize_lyd
 
@@ -44,16 +44,37 @@ def issue_invoice(invoice, user):
     # checked against their own color/size bucket; legacy/no-variant lines still
     # fall back to the aggregate product quantity.
     needs = defaultdict(lambda: Decimal("0"))
-    stock_refs = {}
+    product_needs = defaultdict(lambda: Decimal("0"))
     for item in invoice.items.select_related("product", "variant"):
         if item.kind == item.KIND_PRODUCT and item.product_id and item.product.track_stock:
             variant = _item_variant(item)
             key = ("variant", variant.pk) if variant else ("product", item.product_id)
             needs[key] += item.quantity
-            stock_refs[key] = variant or item.product
+            product_needs[item.product_id] += item.quantity
+
+    locked_products = {
+        product.pk: product
+        for product in Product.all_objects.select_for_update().filter(pk__in=product_needs).order_by("pk")
+    }
+    variant_ids = [pk for kind, pk in needs if kind == "variant"]
+    locked_variants = {
+        variant.pk: variant
+        for variant in ProductVariant.objects.select_for_update().filter(pk__in=variant_ids).order_by("pk")
+    }
+    stock_refs = {
+        key: locked_variants[key[1]] if key[0] == "variant" else locked_products[key[1]]
+        for key in needs
+    }
 
     shortages = []
+    for pk, qty in product_needs.items():
+        product = locked_products[pk]
+        if product.stock_qty < qty:
+            shortages.append(_("%(name)s (need %(need)s, have %(have)s)")
+                             % {"name": product.name, "need": qty, "have": product.stock_qty})
     for key, qty in needs.items():
+        if key[0] != "variant":
+            continue
         ref = stock_refs[key]
         have = ref.stock_qty
         if have < qty:

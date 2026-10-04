@@ -253,8 +253,10 @@ def build_financial_report(date_from, date_to):
     # COGS = qty × frozen unit cost (fallback: current product cost) × frozen rate.
     cogs_expr = ExpressionWrapper(
         F("quantity")
-        * Coalesce(F("unit_cost_usd"), F("product__cost_usd"))
-        * F("invoice__exchange_rate"),
+        * Coalesce(F("unit_cost_lyd"), ExpressionWrapper(
+            Coalesce(F("unit_cost_usd"), F("product__cost_usd")) * F("invoice__exchange_rate"),
+            output_field=_MONEY,
+        )),
         output_field=_MONEY,
     )
     cogs = (
@@ -287,14 +289,9 @@ def build_financial_report(date_from, date_to):
     open_agg = open_qs.aggregate(total=Sum("total_lyd"), paid=Sum("amount_paid"))
     receivables = (open_agg["total"] or _Z) - (open_agg["paid"] or _Z)
 
-    # Current closing-stock value (Σ stock × unit cost), USD → LYD at live rate.
-    rate = get_current_rate()
-    inv_value_usd = (
-        Product.objects.filter(is_active=True, track_stock=True).aggregate(
-            v=Sum(ExpressionWrapper(F("stock_qty") * F("cost_usd"), output_field=_MONEY))
-        )["v"]
-    ) or _Z
-    inventory_value = usd_to_lyd(inv_value_usd, rate)
+    inventory_value = sum((usd_to_lyd(
+        (product.stock_qty or _Z) * (product.cost_usd or _Z), get_current_rate(product.currency)
+    ) for product in Product.objects.filter(is_active=True, track_stock=True)), _Z)
 
     # Revenue by month for a trend table.
     monthly = [

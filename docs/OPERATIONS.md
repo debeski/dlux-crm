@@ -1,346 +1,620 @@
-# Switch POS — Operations & Setup
+# Switch POS — Business Rules
 
-## Production-style run (Postgres + Redis, via Docker)
+## Currency
 
-The dlux scaffold ships Docker assets. Bring up the stack:
+- Products keep their own **USD** or **EUR** pricing currency (`Product.currency`).
+  Historical `cost_usd` / `price_usd` column names store amounts in that currency.
+  Local selling prices use the corresponding live rate, or a manual LYD override.
+- CRM options → Currency (`switch_pos.pricing`) offers **USD / EUR / BOTH** in one selector. USD/EUR set the default for new products and invoices. BOTH retains the previous default and
+  allows
+  buyers to choose either currency per purchase invoice. Existing purchase
+  permissions apply; there is no additional currency-selection permission.
+- In single-currency mode, currency controls are hidden in product/intake forms and the purchase header; purchases use the default currency. Posting an
+  alternative currency is rejected. Existing products retain their recorded
+  currency and can still be purchased with conversion.
+- Purchase-line cost and selling-price inputs are in the **invoice currency**.
+  The line's Product currency selects how these amounts are stored in the
+  catalog; existing products default to their own currency, new products to
+  the invoice currency. Cross-currency intake requires available rates for
+  both currencies and converts via LYD, rounded to two decimals. The invoice
+  retains its original foreign amounts and frozen rate.
+- Changing the default does **not** reprice products. Service prices and draft
+  sales documents still convert with confirmation and rates for both currencies;
+  issued documents remain unchanged. Services use the default currency. For example, a EUR product costing €20 and selling at €30 retains these amounts after selecting USD-only; its LYD value continues using the EUR working rate. No parallel USD price is stored. Local alias spans the product-form row when its currency selector is hidden.
+- Rate resolution uses the latest manual rate, then the cached scraped market rate, then cached CBL official rate. Celery refreshes external rates; missing manual entries do not block conversions when a scraped rate is available.
+- USD and EUR exchange rates have independent append-only histories. The
+  Workspace shows each working rate with its source plus scraped reference rates. The exchange-rate list includes a current USD/EUR summary (working/manual/market/CBL and collection timestamps) above manual rate history; collected rates do not create manual overrides. Sales Overview also shows rate references.
+- Opening-stock rows/workbooks support Currency and Local Alias. Older sheets
+  without these columns retain an existing product's currency or use the default
+  for a new item. Costs and prices in each row are in its product currency.
 
-```bash
-./start.sh -d                                  # normal DEV start → http://localhost:84
-./start.sh -d --build                          # rebuild after dependency/Dockerfile changes
-# or directly:
-docker compose --env-file .secrets/.env -f compose.yml -f compose.dev.yml up
+## Pricing model — hybrid (per-product foreign currency + optional LYD override)
+
+Decided with the owner. For each `Product`:
+
+1. Cost is stored in the product's currency (`cost_usd`). A `markup_percent` (or an explicit
+   `price_usd`) yields the **selling price** in the product's currency (`effective_price_usd`).
+   `Product.save()` **persists** this derived `price_usd` when only cost + markup
+   were entered, so the stored record (and its detail view) never shows 0.
+2. The **LYD selling price** is derived live: `effective_price_usd × current_rate`.
+   Changing a currency's rate updates products priced in that currency.
+3. Any item may set a manual **`price_lyd_override`** — a fixed LYD price that
+   bypasses conversion (for odd / unrelated goods Switch occasionally resells).
+   Left blank, the item sells at the live rate (the default).
+
+The create/edit form keeps these fields in step as you type (`catalog/js/price_sync.js`):
+editing markup recomputes the foreign price, editing the foreign price recomputes the markup,
+editing cost recomputes the foreign price (markup held) while the manual LYD override is
+blank, and the live LYD price is shown as the manual-LYD field's **placeholder**.
+Typing a value into that field turns it into a real fixed override (and back-fills
+the foreign price + markup to match); while that override is present, changing the cost keeps the
+LYD price fixed and recalculates the implied foreign price + markup from the new cost.
+The detail view adds a computed **"Selling Price (LYD)"** row (via
+`get_modal_context`) so it matches the list.
+
+`Service` items follow the same override logic and may also be **"per job"**
+(no fixed price — entered on the invoice).
+
+## Local aliases
+
+Products/parts and vehicle/machine models have an optional `alias` field for
+local Libyan names, alongside the official name. Aliases are editable in the
+existing product/model forms and purchase/opening-stock intake for products.
+Product lists, sales picker, till, direct parts search, vehicle suggestions and
+model lists search aliases. Intake suggestions retain the original product ID
+and official name; an ambiguous alias is not automatically matched. Aliases are
+separate from barcodes and OEM/cross-reference numbers.
+
+## Frozen rate per invoice
+
+When an invoice is created it records the pricing currency in `Invoice.currency`
+and captures that currency's current rate into `Invoice.exchange_rate`, and every
+line stores its own frozen `unit_price_lyd`. Product costs are frozen in
+`unit_cost_lyd` at six decimal places using the product currency's rate; financial
+reports use this snapshot so mixed-currency COGS survives subsequent rate and
+product edits. Legacy lines retain their existing foreign-cost/rate fallback. Purchase invoices do the same
+(`PurchaseInvoice.currency`); invoice pages and printouts show the document's own
+currency, not the store's current one. **Later rate changes never
+rewrite a past invoice's totals.** This is correct accounting and matches the owner's
+expectation that an issued invoice is final.
+
+## Invoice lifecycle
+
+```
+draft ──issue──▶ issued ──payment──▶ partial ──payment──▶ paid
+  │                  │
+  └───── (edit) ─────┘ (only drafts are editable)
+issued/partial/paid ──cancel──▶ cancelled  (stock restored)
 ```
 
-`./start.sh -d` runs the `debeski/composer` image, which decrypts `.secrets`,
-starts the stack (db, Redis, Caddy, web, Celery, SMTP relay, socket proxy and the
-Composer agent/executor pair), waits for health, and runs the `migrator`
-post-start task. Use `--build` when `requirements.txt` changes so the image
-actually installs the new pin. In DEV mode the app is served at
-**http://localhost:84**. The development override bind-mounts each local app,
-including `automotive`, into web and Celery for live source changes.
+- **Draft**: editable; no stock impact.
+- **Issue** (`issue_invoice`): snapshots the rate record and **draws down stock**
+  (a `StockMovement` OUT per product line). Requires at least one item. **Blocked**
+  if any tracked product or selected color/size variant would go negative —
+  demand is summed per product for legacy/no-variant lines and per `ProductVariant`
+  for variant lines; the issue is refused (nothing changes) with shortages named.
+- **Payments**: each `Payment` updates `amount_paid` and advances status
+  (`issued → partial → paid`). Payments link optionally to a `CashDeposit`.
+- **Cancel** (`cancel_invoice`): if the invoice had drawn stock, it is **restored**
+  via reversing `StockMovement` IN rows. Cancelled invoices have zero balance
+  due and are excluded from sales revenue/outstanding aggregates. Original
+  totals and payment receipts remain as history. Cancellation opens a payment
+  settlement dialog with three choices: **Refund payments** (record money already
+  returned, with cash/card/bank/cheque method and optional notes), **Customer
+  credit** (requires a linked customer), or **Resolve later** (default). Each
+  original receipt can be resolved exactly once; a partially paid invoice can
+  only refund/credit the money actually received, not its unpaid balance.
+- **Unresolved cancellation payments**: the cancelled invoice shows the amount
+  still owed to the customer and a **Resolve payments** action, including for
+  invoices cancelled before this feature. The migration creates no historical
+  refunds or credits automatically; staff must record the actual disposition.
+- **Customer credit**: available LYD credit appears in the customer list and on
+  eligible issued/partially paid invoices. **Apply customer credit** chooses an
+  original receipt and an amount up to both its available credit and the target
+  invoice balance. It creates a non-cash `CustomerCreditUse`, advances payment
+  status, and contributes to `amount_paid`; it creates no new cash receipt or
+  deposit. Request UUIDs prevent duplicate application, and customer/invoice
+  locks serialize credit use against cancellation and other credit requests.
+- **Cancelling credit-paid invoices**: previous credit allocations remain as
+  history but no longer consume their source credit; they become available to
+  the same customer again. Only actual cash/card/bank/cheque receipts on the
+  cancelled invoice enter its new refund/credit settlement. Repeated cancellation
+  neither restores stock nor resolves a receipt twice.
+- **Financial reporting**: original receipts stay in gross collected cash;
+  refunds are separate outflows dated by `resolved_at`, and net collected is
+  gross receipts minus refunds. Available customer credit and unresolved
+  cancellation payments are current customer liabilities, separate from
+  revenue/expenses. Sales-report Paid includes cash and applied customer credit.
+  Cancellation never rewrites a previously linked cash deposit.
+- **History protection**: `PaymentResolution` and `CustomerCreditUse` are
+  append-only records. Cancelled invoice receipts cannot be edited/deleted or
+  receive new payments through the payment service. Refund recording does not
+  initiate a bank/card transfer; return the money first, then record it.
+- **Draft line removal**: retain each formset index and submit its `DELETE`
+  checkbox, including newly added lines. Deleted line inputs are disabled
+  except for `id`/`DELETE`; validation redisplay keeps deleted lines hidden.
+- In the invoice and payment lists, row actions live in the standard **DjangoLux
+  context menu** (right-click, long-press, or double-click primary action). The
+  invoice number / receipt number columns are display values, not hidden action
+  triggers. Print actions from those menus open in a new browser tab so the
+  current workflow is not replaced.
 
-The repository uses Composer wrapper scaffold v3 and resident commands
-`agent run` / `executor run`. If `./start.sh check` reports scaffold drift, run
-`./start.sh check --fix -y`; the repair preserves replaced files under
-`.xclude/` and validates the resulting Compose configuration.
+## Payment receipts (إيصال قبض)
 
-## Production deploy with a domain + automatic HTTPS
+Every recorded `Payment` has its own durable receipt number
+(`Payment.receipt_number`, generated as `RCT-000001` style and backfilled for
+existing payments by migration `sales/0005`). Staff can print the receipt from
+the row context menu in the invoice's payments table or the standalone payments
+list at `/staff/sales/payments/<id>/receipt/`; receipt print actions open in a new tab.
 
-The edge is a **Caddy** reverse proxy (`.proxy/Caddyfile`, `caddy` service). Caddy
-obtains and renews Let's Encrypt certificates automatically on boot — there is
-no certbot step, no bootstrap command, and no manual reload. A plain
-`./start.sh` is the entire TLS workflow.
+The receipt uses the same official logo from DjangoLux System Settings as the
+printed invoice. It shows the customer/invoice, amount collected, method,
+payment time, receiving user, optional cash-deposit reference, amount paid before
+this receipt, and the invoice balance **after this specific receipt**. It is
+gated by `sales.view_payment` and the same `Payment` row ownership rules as the
+payments list, so a rep cannot open another rep's receipt by guessing the URL.
 
-Caddy serves the canonical public/staff Django app and can redirect the old ERP
-hostname. It does **not** split `/shop/` vs `/staff/`; Django URLconf and DLux
-public-root/auth settings own that split.
+## Catalog images
 
-| Hostname(s)                              | Served by            | Env var             |
-|------------------------------------------|----------------------|---------------------|
-| `switchlibya.ly` `www.switchlibya.ly`    | Django/DLux app (`/`, `/shop/`, `/staff/...`) | `CADDY_SITE_ADDRESS` |
-| `erp.switchlibya.ly`                     | permanent redirect to `CADDY_PRIMARY_URL/staff/` | `CADDY_ERP_ADDRESS` |
+Products and Services carry an optional photo (`image`). It's shown as a thumbnail
+in the catalog lists and enlarged in the item's detail card. On a phone the upload
+field offers the camera or the gallery. Purely descriptive — it never affects
+pricing, stock or invoices.
 
-Each hostname gets its **own** auto-provisioned Let's Encrypt cert. Session and
-CSRF cookies follow `BASE_URL`; with `BASE_URL=https://switchlibya.ly`, staff and
-public paths share the canonical domain.
+## Public catalog
 
-1. Point **A/AAAA records** at the VPS public IP for **all three** names:
-   `@`/apex, `www`, and optionally `erp` for legacy bookmarks. Open **inbound TCP
-   80 and 443** on the host firewall — Caddy needs both for the ACME challenge
-   and to serve traffic. (A name that doesn't resolve yet just fails its own cert
-   and retries; it does not affect the other site.)
-2. In `.secrets/.env` set:
-   ```ini
-   CADDY_SITE_ADDRESS=switchlibya.ly www.switchlibya.ly
-   CADDY_ERP_ADDRESS=erp.switchlibya.ly
-   CADDY_PRIMARY_URL=https://switchlibya.ly
-   ALLOWED_HOSTS=switchlibya.ly,www.switchlibya.ly,erp.switchlibya.ly,web,localhost,127.0.0.1,caddy
-   ALLOWED_URLS=https://switchlibya.ly,https://www.switchlibya.ly
-   BASE_URL=https://switchlibya.ly
-   ```
-   > **Migrating from the older split:** the static `./portfolio` host is no
-   > longer the public site. Apex/www now proxy to Django; `erp.switchlibya.ly`
-   > is only a redirect to `/staff/`.
+The public catalog is a curated read-only projection of internal catalog records.
+`public_catalog.PublicCatalogListing` links exactly one active Product or one active
+Service to a public slug, title, summary/body, optional public image override,
+installation notes, warranty notes, and publish flags.
 
-   No ACME email is required — Caddy issues and auto-renews certs without one. To
-   receive Let's Encrypt expiry notices, add a real address to the `.proxy/Caddyfile`
-   global block (`{ email you@your-domain.tld }`); the domain must contain a dot.
-3. Bring the stack up in production (no `-d`):
-   ```bash
-   ./start.sh
-   ```
-   On first boot Caddy issues a cert per hostname (watch `docker compose logs
-   caddy`); each site is live on HTTPS with HTTP→HTTPS redirect. Certs persist in
-   the `caddy_data` volume and auto-renew.
+Public pages (`/`, `/shop/`, `/shop/items/<slug>/`, and the item modal endpoint)
+may show public title/copy, customer-facing image, LYD selling price, broad
+availability labels (`Available`, `Limited availability`, `Available to order`,
+`By appointment`, `Currently unavailable`), and color/size option labels. They
+render through the public storefront templates and dynamic quick-view modal. They
+must not show SKU, barcode, import cost, markup, exact product/variant stock
+counts, staff modal URLs, or internal staff chrome.
 
-Override the published ports with `HTTP_PORT` / `HTTPS_PORT` (default `80`/`443`)
-and the upload cap with `CADDY_MAX_SIZE` (default `10MB`) if needed.
+The public contact modal (`/contact/modal/`) is allowed to write
+`PublicContactMessage` rows. Each browser attempt carries a stable idempotency
+key, enforced by a database unique constraint, so retries create one message and
+send at most one email. The saved message remains the source of truth even if the
+SMTP side effect fails; staff can inspect `email_status` and `email_error` in
+admin. Future reservation, purchase, checkout, and payment capture paths must
+follow the same rule: database-backed idempotency first, Celery/Redis only for
+retryable side effects, races, or throttling support.
 
-Then migrate, seed roles, and create the owner:
+## Product variant attributes
 
-```bash
-python manage.py migrate
-python manage.py seed_roles
-python manage.py createsuperuser
-```
+Products can have stock-bearing `ProductVariant` buckets identified by `color`
+and `size`. `color` is limited to the 15-color palette exposed in stock-intake
+rows (black, gray, white, red, blue, green, yellow, orange, purple, pink, brown,
+beige, navy, gold, teal). `size` is a free-form **Size / Spec** field for actual
+size, capacity, measurements, model-specific descriptors, or whatever the product
+requires.
 
-On first visit the system runs the DjangoLux **setup wizard** (system name, logo,
-language, theme). Health endpoint: `/health/`.
+`Product.stock_qty` remains the aggregate total. `ProductVariant.stock_qty`
+tracks the available quantity for a specific color/size bucket, so the same
+product can hold orange and blue stock at the same time without either
+overwriting the other. Pricing, cost, valuation, permissions, and low-stock rules
+remain product-level unless a future rule explicitly changes them. Staff create
+or top up variants while posting Opening Stock, Purchase Invoices, or variant
+aware manual Stock Movements; Product create/edit stays focused on identity and
+pricing. Product list/detail views show available variant swatches with
+quantities. Purchase invoice lines and sales invoice item lines snapshot the
+variant values used at intake/sale time, so later catalog changes do not rewrite
+old documents.
 
-The repository's `config.json` is a reusable, brand-neutral settings snapshot.
-It intentionally carries no retailer logo/favicon, contact number, storefront
-copy, or public homepage/catalog app payload. Set those values for each store
-through the setup wizard and Options instead of committing a customer's brand.
+## Inventory
 
-## First-run checklist
+- `Product.stock_qty` is **only** changed through `StockMovement` (the ledger is
+  authoritative); it is not editable on the product form. Use Opening Stock once
+  for first adoption, Purchase Invoices for normal inbound stock, and manual
+  Stock Movements only for one-off corrections/adjustments.
+- Movements are applied atomically (`F()` expression) on insert. When a movement
+  has a `variant`, both `Product.stock_qty` and `ProductVariant.stock_qty` move
+  by the same signed quantity.
+- Low stock = `track_stock and stock_qty ≤ reorder_level` (shown on the Workspace dashboard).
 
-1. Complete the setup wizard (set the Arabic/English system name + logo — these
-   brand the printed sales invoice, payment receipt, and purchase invoice).
-2. For a car-parts store, open **System → Options → Optional enhancements** and
-   enable Automotive Compatibility plus the criteria that store uses. It is off
-   by default on every existing and new installation. Save the profile first;
-   **Manage vehicle data** stays disabled until that enabled state is persisted.
-   Then use it to create makes, models, and the enabled qualifiers. For regular
-   access, add **Automotive Compatibility** (`automotive:hub`) from the Sidebar
-   builder; only this hub is exposed, not its individual management lists.
-   Open a Product Item card and choose **Manage compatibility** to attach one or
-   more vehicle/year ranges. Use **Browse by vehicle** from Products, the vehicle
-   data hub, or a Product card to follow Make → Model → Year and the enabled
-   qualifiers; the URL preserves the selected path and direct search accepts a
-   Product name, SKU or barcode. Non-automotive stores leave the enhancement off.
-3. **Finance → Exchange Rates → Add**: enter the current black-market USD→LYD rate.
-   The Workspace dashboard warns until this is done.
-4. **Catalog → Categories / Products / Services**: add what you sell. For products,
-   enter `cost_usd` + `markup_percent` (or a direct `price_usd`). Product variants
-   are stock-bearing `ProductVariant` buckets (`color` + free-form `size` / spec):
-   set them during Opening Stock, Purchase Invoice intake, or variant-aware manual
-   Stock Movements. Product list/detail screens show available color swatches with
-   quantities.
-   - **Bulk shortcut for first setup:** **Catalog → Stock Movements → Opening
-     Stock (bulk)** loads everything already on the shelf in one grid — one row
-     per item, each a new or existing product, with the quantity currently in
-     storage. Rows can also set optional color and size/spec. Submit to create
-     the items and post the opening stock in one go (the result appears as Stock
-     In movements). It can only be applied once;
-     afterward the button becomes a view-only Opening Stock record. See
-     BUSINESS_RULES → *Opening stock*.
-   - **Normal stock purchases after launch:** use **Catalog → Purchase Invoices**
-     or **Catalog → Stock Movements → Add Stock**. This records supplier details,
-     creates/reuses products, can set product color and size/spec at intake,
-     accepts the supplier invoice scan/photo/PDF, and posts Stock In movements
-     per line.
-5. Build the storefront from **Shop Builder** (`/staff/shop-builder/`): flip the
-   **Publish** switch on any live Product/Service to add it to the public shop,
-   **Feature** the best (drives the landing hero/strip, drag the grip to reorder),
-   and **Customize** each listing (customer-safe public title/summary/body,
-   optional image override, installation/warranty notes, and per-listing show
-   price/availability). The **Storefront live** switch and the builder settings
-   endpoint drive shop availability and featured count; the DLux **Shop settings**
-   modal is limited to shop title/subtitle, contact endpoints, and new-listing
-   price/availability defaults in `switch_pos.public_catalog`. Turning the storefront
-   off serves a coming-soon page (HTTP 503).
-   Public pages show availability bands, not exact stock counts. The full-screen
-   contact modal posts to `/contact/modal/`, saves a `PublicContactMessage` with an
-   idempotency key, and emails the configured contact recipient when SMTP is valid.
-   Design the landing page itself from **Homepage Builder**
-   (`/staff/shop-builder/homepage/`): edit the hero (kicker/title/subtitle, primary
-   button, background mode — featured/logo/custom/gradient — and overlay), toggle and
-   reorder sections (featured, categories, services, story, contact) with per-section
-   copy, and pick an accent colour — all with a **live preview** that also works while
-   the storefront is offline (`?preview=1`). Changes autosave.
-5. Create staff users and add them to one seeded role (`seed_roles` creates Sales
-   Manager, Sales Representative, and Delivery Courier). For delivery people,
-   technicians, or anyone carrying advances/loans/service payouts, create a
-   **Finance → Staff Accounts** row so their ledger and confirmations have a home.
-6. **Sales → New Invoice**: type or pick a customer in the single search box —
-   existing customers autofill phone/address, and a new name is saved as a
-   customer for next time. Add product / service lines (prices auto-fill); product
-   lines expose available color swatches and size/spec choices from live variant
-   stock. Save Draft → **Issue** draws down the selected variant bucket → record
-   payments.
-   **Print / Export** produces a clean printable invoice (Save as PDF from the
-   browser dialog).
+## Workspace dashboard
 
-## Key URLs
+The staff landing page is `/staff/workspace/`. It is not a separate accounting
+source; it is a live operating surface over the same domain records. Tiles are
+created server-side only when the user has the matching permission, and the
+queries use the same dlux scope filtering plus project row ownership as the list
+views. A sales rep therefore sees their own sales/payment/customer tiles, a
+courier sees only assigned delivery work, and a manager/superuser sees the whole
+store.
 
-| Path | Page |
-|------|------|
-| `/` | Public landing page |
-| `/shop/` | Public catalog |
-| `/shop/items/<slug>/` | Public item page |
-| `/contact/modal/` | Public contact dynamic modal endpoint |
-| `/staff/` | Staff entry redirect (to the Workspace dashboard) |
-| `/staff/accounts/login/` | Staff login |
-| `/staff/workspace/` | Workspace dashboard (default DLux Home URL; set Home to `/staff/sales/pos/` or `/staff/automotive/browse/` to open the till or the vehicle browser after login) |
-| `/staff/sales/dashboard/` | Sales Overview |
-| `/staff/sales/invoices/` | Invoices |
-| `/staff/sales/new/` | New invoice editor |
-| `/staff/catalog/` | Products & stock |
-| `/staff/automotive/` | Vehicle reference-data hub (when enabled) |
-| `/staff/automotive/browse/` | Guided vehicle compatibility browser (when enabled) |
-| `/staff/shop-builder/` | Public Catalog Builder (curate the public shop) |
-| `/staff/shop-builder/homepage/` | Public Homepage Builder (design the landing page, live preview) |
-| `/staff/catalog/services/` | Services |
-| `/staff/catalog/suppliers/` | Supplier list |
-| `/staff/catalog/purchase-invoices/` | Purchase invoices / inbound stock invoices |
-| `/staff/catalog/stock-movements/` | Stock ledger (+ Opening Stock / Add Stock buttons) |
-| `/staff/finance/rates/` | Exchange rates |
-| `/staff/finance/deposits/` | Cash deposits |
-| `/staff/finance/expenses/` | Operating expenses |
-| `/staff/finance/staff-accounts/` | Staff accounts / user credit |
-| `/staff/finance/staff-ledger/` | Staff ledger entries |
-| `/staff/sales/report/` | Sales report (XLSX export from here; owner-only) |
-| `/staff/sales/financial/` | Fiscal-year financial report with expenses/net profit |
+The optional enhancements add to it only while they are on and the user can use
+them: the **till** puts *Open the till* first in Quick Actions and a *Point of
+Sale* tile with today's till sales (total and count of `PosSale` invoices the
+user may see); **automotive** adds *Browse by vehicle* to Quick Actions and a
+tile with the number of vehicle models and of active products fitted
+to at least one. Independent **machinery** adds its own browsing action/model tile
+with type → manufacturer → model → nested categories, without changing vehicle wording.
 
-## Point of sale hardware
+Users may hide, reorder, and resize tiles. Those layout preferences are stored
+per user in DjangoLux's reserved app-preferences namespace:
+`Profile.preferences["app"]["switch_pos.workspace_dashboard.v1"]`. Browser
+`localStorage` is kept only as a fallback and one-time migration source for older
+layouts. Layout preferences do not grant access to hidden data, change business
+records, or affect another user's layout. The older `/staff/sales/dashboard/`
+page remains available as **Sales Overview** for a sales-centric screen.
 
-- **Barcode scanners**: any USB or Bluetooth scanner that types like a keyboard
-  works with the till; no driver or setup.
-- **Receipt printers**: choose the paper width in the Point of sale settings
-  and print from the browser; set the printer's margins to none.
-- **Phone camera scanning** needs a secure page. It works on `localhost` and
-  over HTTPS; on the store network the guided certificate install (POS phase 2)
-  is what enables it for phones.
+## Opening stock (one-time bulk intake / رصيد افتتاحي)
 
-## Scheduled tasks (Celery Beat)
+For **first adoption**: load everything already on the shelf in one pass, rather
+than adding each product and then reconstructing history invoice-by-invoice. An
+**opening balance** is *what is physically in storage now* — already net of
+anything sold before go-live — so there's nothing to reconcile. Past sales are
+simply not re-entered; real invoices start drawing down stock from launch on.
 
-The `celery` service runs both a worker and Beat (see `compose.yml`). Scheduled
-jobs are declared in `config/celery.py` under `app.conf.beat_schedule`:
+This is **not a document of its own** — it's a *child of the stock ledger*: a
+one-time bulk way to post Stock In movements. A **trigger button on the Stock
+Movements page** (gated by `add_product` + `add_stockmovement`) opens a full-page
+grid (`/staff/catalog/stock-movements/opening-stock/`) where an admin enters many items
+at once, one per row:
 
-| Task | Schedule | Purpose |
-|------|----------|---------|
-| `finance.tasks.refresh_market_rates` | every 3h | Scrapes USD→LYD and EUR→LYD reference rates and caches them (**no expiry** — replaced only by a later successful scrape): official rates from [cbl.gov.ly](https://cbl.gov.ly/currency-exchange-rates/) (`finance:cbl_official_{usd,eur}_rate`) and black-market rates + trends from [eanlibya.com](https://www.eanlibya.com/exchangerate/) (`finance:ean_black_market_{usd,eur}_rate`). |
+1. Each row is either a **new** item (type a name) or an **existing** one (pick
+   it from the datalist — product details and pricing autofill). Fields: name,
+   category, unit, barcode, optional color and size/spec, import cost and
+   markup %, selling price (both in the pricing currency; headers read USD or EUR), optional manual LYD price, and **quantity in
+   storage**. Purchase shop and date are intentionally omitted (irrelevant for an
+   opening balance).
+   Pricing cells use the same row-scoped live sync as the Product form: markup,
+   foreign selling price, cost, and manual LYD override stay consistent inside that
+   row without changing any neighbouring row. Selecting an existing product
+   overwrites untouched row defaults (`0.00`, default unit) with that product's
+   current values, but preserves fields the user already edited by hand.
+2. **Import Excel** accepts an `.xlsx` workbook with `Name` and `Quantity in
+   Storage` required, plus the same optional category, unit, barcode, variant
+   and price columns as the grid. File selection only validates and stages the
+   data: the modal shows creates versus existing-product updates, changed
+   fields, duplicates, unknown categories and identity conflicts. No stock is
+   written until the user reviews the diff and presses **Finalize import**.
+3. **Submitting** manually or finalizing a verified workbook runs one
+   transaction: each row create-or-reuses its `Product`, corrects its pricing
+   when the admin edited those cells, and posts one **Stock In** `StockMovement`
+   for the stored quantity (`reason="Opening balance"`, `reference="OPENING"`).
+   The row's color/size creates or reuses a matching `ProductVariant`, and the
+   movement points at that variant. Stock still flows only through the ledger. A
+   zero-quantity row reprices its product without posting a movement; blank rows
+   are dropped.
+4. It can only be applied once. After `reference="OPENING"` movements exist, the
+   Stock Movements page switches the action to a read-only Opening Stock record
+   at `/staff/catalog/stock-movements/opening-stock/view/`; the posted movements remain
+   the authoritative audit trail.
 
-The **Workspace dashboard** shows both sources for USD and EUR next to any
-in-house manual rate when the viewer has a rate, sales, or catalog permission.
-Each scrape is server-side (the CSP `connect-src` blocks a browser cross-origin
-fetch) and independent — if one site is down its last cached value is kept while
-the other still updates. This is display-only — invoices always freeze the custom
-USD `ExchangeRate`, never a scraped rate. Adding EUR history does not change the
-USD base used by products or invoices.
+## Purchase invoices / inbound stock invoices
 
-**Networking**: `web` and the rest of the stack sit on the isolated
-`internal` network (`internal: true`, no egress). The scrape therefore
-runs in the **celery** service, which is additionally attached to the egress bridge
-`egress`; the web tier reads the scraped rates **cache-only** from Redis
-(it never makes an outbound call). A `worker_ready` signal warms the cache on
-celery boot so values appear without waiting for the first 3-hourly Beat run.
-Applying the network change needs a recreate (`./start.sh -d`), not just a restart.
+For stock bought **after** launch, use **Catalog → Purchase Invoices** (or the
+**Add Stock** button on Stock Movements). A purchase invoice is the robust
+inbound-stock document that Opening Stock was never meant to be:
 
-The full topology is a **3+1 network model**:
+1. Header fields capture the supplier and invoice metadata. The supplier name is
+   a search-and-add combobox like customer entry on sales invoices: choosing an
+   existing supplier autofills phone/address, while a new name creates a
+   `Supplier` record and snapshots supplier name/phone/address onto the invoice.
+2. The line grid reuses the Opening Stock product behavior. Each row is a new or
+   existing `Product`; selecting an existing item autofills category, unit,
+   barcode, import cost, markup, foreign selling price, and manual LYD price. If the
+   product has exactly one variant, its color/size may autofill; if it has
+   several, color/size stay explicit so the buyer can choose the correct bucket.
+   Edits to cost/markup/USD/manual-LYD use the same row-scoped price-sync rules
+   as the Product form.
+3. Submitting the invoice runs one transaction: it saves a `PurchaseInvoice` +
+   `PurchaseInvoiceLine` snapshots, creates or updates the products, and posts
+   one Stock In `StockMovement` per line with `reference=<purchase invoice no.>`
+   and `purchase_invoice` linked. The line's color/size creates or reuses the
+   matching `ProductVariant`; the purchase line and movement both point to it and
+   snapshot the visible color/size alongside cost/pricing. This keeps
+   `Product.stock_qty` ledger-driven while giving staff an invoice-like document
+   to view/print later.
+4. Purchase invoices may carry the scan/photo/PDF attachment of the supplier's
+   paper invoice (`PurchaseInvoice.attachment`, upload path
+   `purchase_invoices/`). This is record-only and never affects totals or stock.
 
-| Network | Type | Members | Purpose |
-| --- | --- | --- | --- |
-| `frontend` | bridge | `caddy` | Published ingress; bridge so the host reaches the app and Caddy reaches Let's Encrypt/ACME. |
-| `egress` | bridge | `smtp-relay`, `dlux-updater`, `celery`, `composer-updater` | The only services with outbound internet (Gmail, PyPI, rate scrapes, Docker Hub). |
-| `internal` | `internal: true` | `db`, `redis`, `web`, `caddy`, `celery`, `pgadmin`, `db-backup` | No-internet inter-service traffic. |
-| `docker_proxy` | `internal: true` | `composer-updater`, `docker-socket-proxy` | Isolated Docker API path (see below). |
+The product create/reuse operation in step 3 is the same intake helper used by
+Opening Stock. Typing a new item name on a purchase invoice therefore creates
+the missing Product and its selected color/size variant before the purchase line
+and Stock In movement are posted.
 
-## Composer-as-updater (image-level updates)
+## Product item card
 
-The stack ships two services that let an operator (or dlux's in-app UI) roll the
-deployment onto a newer published image without any host shell access:
+Product View and row double-click open an operational item card instead of the
+generic field dump. It shows identity/image, on-hand quantity, cost and selling
+prices, reorder level, every color/size balance, and the 30 newest stock-ledger
+movements. Editing still uses the standard scoped modal.
 
-- **`composer-updater`** (`debeski/composer:latest`, deployed at v1.1.11 or newer,
-  `command: watch`) — a resident
-  process that watches `/opt/dlux-runtime/state/image-update-request.json` on the
-  shared `dlux_runtime` volume. On a request it runs `composer -u` against the
-  host daemon (pull → **version gate** → recreate → health → `post_start` migrator)
-  and atomically writes terminal `deploy-status.json` and a token-matched request
-  acknowledgement even if the child Composer process exits unexpectedly. Runtime
-  Compose overrides are created in a writable system temporary directory, not the
-  host-owned project mount. It talks to the daemon over TCP via the socket proxy
-  (`DOCKER_HOST=tcp://docker-socket-proxy:2375`), never the raw socket. The service
-  uses `:latest`, but `COMPOSER_EXCLUDE_SERVICES` prevents it and its socket proxy
-  from recreating themselves mid-update. It mounts the project at its host path
-  (`${PWD}:${PWD}`) — **so the stack must be started from its root directory** for
-  the `./media`/`./logs` bind mounts to resolve.
-- **`docker-socket-proxy`** (tecnativa) — a least-privilege Docker API gateway that
-  mounts `/var/run/docker.sock:ro` and exposes only the surface Compose needs
-  (containers/images/networks/volumes/exec/POST/info/ping/version). Everything else
-  (build, auth, secrets, swarm) stays denied.
+## Optional enhancements and automotive fitment
 
-**Version gate**: the image is built with `--build-arg DLUX_BAKED_VERSION=<ver>`
-(CI reads the pinned `django-lux[updater]==` from `requirements.txt`) which is
-stamped as `LABEL org.dlux_crm.dlux_baked_version`. The updater
-(`COMPOSER_VERSION_LABEL=org.dlux_crm.dlux_baked_version`) refuses to recreate
-onto an image whose baked version is older than the deployment's active runtime
-version (`/opt/dlux-runtime/state/active.json`).
+Store-specific behavior must extend the generic product catalog rather than add
+industry fields to it. The first extension is Automotive Compatibility, configured
+by a superuser from the **Optional enhancements** System Settings card.
 
-The v0.8.2 requirements retain the exact DjangoLux 1.9.3 pin and expose its
-official `files.pythonhosted.org` wheel as a SHA-256-verified direct candidate.
-This avoids a transient stale PyPI Simple-project cache without changing the
-package source or allowing a different framework version.
+- The master switch defaults off. Missing configuration is treated as off, so an
+  upgraded store sees no new navigation, forms, or query behavior.
+- Make/model/year is the automotive core. Chassis/generation, engine, fuel type,
+  trim, transmission and position are separately configurable criteria.
+- Fuel type depends on Engine. Configuration normalization always enables Engine
+  when Fuel Type is enabled.
+- Disabling the whole enhancement hides it without deleting fitment data.
+  Disabling one criterion is rejected while any fitment uses that constraint;
+  otherwise a hidden engine/chassis value could create unsafe false-positive matches.
+- `VehicleMake`, `VehicleModel`, `VehicleGeneration`, `VehicleEngine`,
+  `VehicleTrim` and `ProductFitment` are scoped extension records. A fitment links
+  one Product to one model and inclusive year range plus optional criteria.
+- Product, ProductVariant, stock balances, purchase lines and sales lines receive
+  no automotive columns. One compatible SKU always retains one stock balance and
+  one purchase/sales history regardless of how many vehicles it fits.
+- The vehicle-data hub manages makes, models and only the qualifier dimensions
+  enabled by the store. Reference values are deactivated rather than deleted.
+- The settings modal stages changes until Save. **Manage vehicle data** is
+  disabled when Automotive Compatibility is not yet persistently enabled, so
+  checking an unsaved switch cannot lead to a feature-gated 404.
+- The automotive hub and **Browse by Vehicle** are the only routes exposed to the
+  sidebar builder, and only while the persisted enhancement switch is on. Turning
+  the enhancement off removes them from discovery and rendering even if they were
+  previously saved in the sidebar; the individual make/model/generation/engine/trim
+  routes remain internal hub destinations. To open the browser after login, set
+  DjangoLux's Home (store-wide, or per user when allowed) to
+  `/staff/automotive/browse/`; enabling automotive does not change where anyone
+  lands.
+- The Product Item card shows its compatible vehicles using enabled criteria
+  only. Managers edit several ranges in one save; exact duplicates are rejected
+  and matching overlapping ranges require explicit confirmation.
+- Product keyword search includes enabled make/model/chassis/engine/fuel/trim
+  text while automotive is on. It returns each Product once and does not alter
+  stock, purchasing or sales history.
+- The guided Vehicle Browser follows Make → Model → Year and then shows only
+  enabled qualifiers that can meaningfully narrow the current result. Blank
+  generation/engine/trim/transmission/position values mean broad/all and remain
+  compatible when a specific qualifier is selected. Counts and results are by
+  distinct Product/SKU, never by fitment-row count or stock units.
+- Browser results include active Products for active makes/models, mark low and
+  out-of-stock items, and open the existing Product Item card. Out-of-stock items
+  are currently shown by default; the retailer pilot must confirm whether that
+  should become a user-controlled or store-wide filter.
+- Direct browser search accepts Product name, SKU, barcode, OEM/cross-reference
+  number or part brand without requiring a vehicle path. The XLSX fitment intake
+  remains a later plan phase.
+- **Quick Fits entry.** The Product add/edit modal carries a *Fits vehicles*
+  search-and-tag picker right after name/category. Typing `camry 2014`, a chassis
+  code (`xv50`) or an engine (`hilux 2.8`) suggests model-year, generation and
+  engine matches; a typed year or `2010-2012` range becomes the row's years, a
+  generation brings its own span. A model with no generations needs a typed year.
+  Tags for existing rows are kept untouched (their engine/position/notes are
+  edited in the full editor, linked as *Advanced*); removing a tag retires that
+  row, new tags create rows. Exact duplicates collapse; overlap confirmation stays
+  a rule of the full editor only.
+- **Same cars as…** copies another product's compatibility as new tags,
+  including its engine/trim/transmission/position values.
+- **Assign vehicles** (Products ribbon) adds the same tags to several products in
+  one save. It is additive: existing compatibility is never removed.
+- **Purchase invoice lines** carry a collapsed *Fits vehicles* picker; on posting,
+  its tags are added to the created or reused Product (additive, same transaction
+  as the stock-in).
+- **Vehicle-first add.** The browser's *Find a vehicle* search reaches any active
+  make/model/year, including one no product fits yet, and its results offer *Add
+  part for this vehicle*, opening the Product modal with that vehicle tagged.
+  The name is suggested as `<category> – <vehicle>` when left blank.
+- **Part identity** lives beside the Product: `PartProfile` holds the part brand,
+  `ProductPartNumber` holds OEM and cross-reference numbers. Numbers are
+  comma-separated in the form and matched by an uppercase alphanumeric form, so
+  `04465-33450` and `0446533450` are the same number. Product keyword search
+  matches them (3+ significant characters).
+- The Products list adds **Vehicle** and **Vehicle year** filters while automotive
+  is on; both must match the *same* fitment row.
+- **Heavy machinery and equipment.** A store can choose *Machines & equipment*
+  wording (Optional enhancements → What the store serves). The switch writes
+  machine wording (آلية/آليات, "Machine") as DLux translation overrides and
+  withdraws only the overrides it wrote, so an admin's own wording survives.
+- **Machine type** (excavator, loader, generator…) is an optional criterion on
+  each model. The browser shows types as chips over the make grid; untyped
+  models stay reachable without a type.
+- **Shared engines.** An engine with no model is shared: it has a manufacturer
+  (Perkins, Cat, Cummins…) and a list of fitted models. A part tagged to a
+  shared engine alone fits every machine that engine is fitted to — it appears
+  in the browser, the Vehicle filter and search for each of them. A part tagged
+  to a model *and* a shared engine is valid only when that engine is fitted to
+  the model.
+- **Years are optional.** A fitment with no years fits all years. Turning the
+  *Model year* criterion off hides year inputs and the browser's year step, and
+  is refused while any fitment still carries years. With the criterion on, the
+  year step is skipped for a model whose fitments have no years.
 
-**Project release metadata**: tagged CI validates root `release-manifest.json`
-against `VERSION` and stamps its compact schema-1 JSON into
-`LABEL org.dlux.project.release-manifest` on both the smoke-tested and published
-images. Composer reads that explicit label through
-`COMPOSER_RELEASE_MANIFEST_LABEL` and publishes the project version, summary,
-highlights, and HTTPS release URL to the DjangoLux application-image review.
+## Point of sale (نقطة البيع)
 
-The pinned DjangoLux v1.4.9 image worker treats only a token-matched Composer
-acknowledgement or fresh terminal status as authoritative. A failed acknowledgement
-immediately terminalizes the image update and lowers maintenance; if neither a
-fresh phase nor acknowledgement appears within 120 seconds, the worker fails the
-handoff instead of leaving the site behind Caddy's 503 page for the full deployment
-timeout. The HTTPS maintenance page then probes same-origin `/` and reloads the
-operator's original path once Caddy can route to the recovered application.
+An optional till for quick walk-in sales, switched on in the *Point of sale*
+section of the **CRM options** settings tile (off by default).
 
-## CI / Docker image
+- A till sale is an ordinary walk-in invoice: created, issued (stock out, with
+  the usual shortage check) and paid in one transaction. Reports, the stock
+  ledger and cash deposits treat it like any other sale. A shortage or any
+  refusal rolls the whole sale back.
+- Every sale carries a till-generated key (`PosSale.key`); resubmitting the same
+  key returns the same invoice, so a double tap or a dropped connection cannot
+  sell twice.
+- Payment: cash, card (the store's own card machine) and bank transfer, as
+  enabled in settings, and split across them. Non-cash amounts may not exceed
+  what is left to pay; cash covers the rest and the change is recorded on the
+  `PosSale` (with the cash given) and printed on the receipt.
+  The payment dialog opens with the total in the chosen method. Amounts the
+  cashier types stay as typed; what is left to pay flows into the chosen method
+  or else cash, never into another card or transfer field. Quick-amount buttons
+  fill the field last focused (cash: the amount due and round-ups; card or
+  transfer: the amount due).
+- Discounts: a lowered line price and a sale discount both count. Their total,
+  against the list price, may not exceed the seller limit (settings, default
+  10%) unless the user holds `sales.pos_unlimited_discount`.
+- Scanning: the always-focused box resolves an extra barcode (per product or
+  per variant), the product barcode, the SKU or a normalized part number as an
+  exact hit and adds it; anything else searches names and part numbers. Keys a
+  hardware scanner types while focus is elsewhere are routed to the box. An
+  unknown code offers **Add a new item with this barcode**; after saving, the
+  till adds it to the still-open cart.
+- Before any search the till shows the **Most sold** grid: best sellers of the
+  last 90 days, topped up with the newest items, leaving out tracked items
+  with no stock (search still finds them). Search hits open in a dropdown
+  over it; clicking elsewhere folds the dropdown and focusing the box reopens
+  it. Picking a vehicle fills the grid with what fits it until **Back to most
+  sold**.
+- Camera scanning uses the browser's built-in barcode reader where available
+  and otherwise the bundled ZXing reader (`sales/static/sales/pos/vendor/`,
+  Apache-2.0, loaded on first use, e.g. iPhone Safari). Either needs a secure
+  page (localhost or HTTPS).
+- Receipts: none, thermal 58 mm / 80 mm, or A4 (settings), printed from the
+  browser.
+- Where users land after login is DjangoLux's Home setting (store-wide, or per
+  user when allowed); set it to `/staff/sales/pos/` for a counter that opens on
+  the till. Enabling the till does not change where anyone lands.
+- **Extra barcodes** (`catalog.ProductBarcode`) are edited in the product form
+  whether or not the till is on; a code already used by another item is refused.
 
-Two workflows (tag-driven model — full details in [RELEASING.md](RELEASING.md)):
+## Sales invoice variant selection
 
-- **`.github/workflows/ci.yml`** — on push/PR to `main`: Django checks + tests
-  (`config.settings_dev_sqlite`) and a Docker build + runtime smoke test (no push).
-- **`.github/workflows/release.yml`** — on a `v*` tag: verifies the tag, `VERSION`,
-  and project release manifest agree,
-  smoke-tests, pushes multi-arch `debeski/dlux-crm:sales-<ver>` + `:sales`, and creates a
-  GitHub Release from the `CHANGELOG.md` section.
+When adding a product line on a sales invoice, the editor reads the selected
+product's in-stock `ProductVariant` rows. Available colors are shown as swatches
+and sizes/specs are shown in the size selector with quantities. Saving the draft
+stores `InvoiceItem.variant` plus `InvoiceItem.color` and `InvoiceItem.size`
+snapshots. Issuing the invoice draws down that exact variant bucket; blue stock
+cannot cover an orange shortage for the same product. Services and custom lines
+keep variant/color/size blank.
 
-Required repository **Secrets**: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (token must
-be a *Secret*, not a *Variable*). Deploy the published image with
-`WEB_IMAGE=debeski/dlux-crm:sales ./start.sh -d`.
+## Stock take (physical inventory count / جرد)
 
-Set **System Settings → Home URL** to `/staff/workspace/` to make the
-project-wide Workspace dashboard the staff landing page. Keep
-`/staff/sales/dashboard/` for the sales-only overview when a sales-centric screen
-is useful.
+The **annual (or periodic) inventory count**. You count what's physically on the
+shelves and reconcile it against what the system thinks you have:
 
-## Local development without Postgres/Redis
+1. Start a count (`StockTake`) — it snapshots the current system quantity for
+   every active stock-tracked product and gives you a sheet to enter the counted
+   quantity per item (blank = not counted). Opens in `open` status.
+2. The count's page shows a **variance report**: system vs counted, the signed
+   variance, and the LYD value of each discrepancy (variance × unit cost).
+3. **Apply** it (needs `apply_stocktake`) — the system posts one **Adjustment**
+   `StockMovement` per real discrepancy on a tracked product, so `stock_qty`
+   becomes the counted figure, and the take locks as `applied` (can't re-apply).
+   Adjustments flow through the same append-only ledger as every other stock
+   change, so the correction is fully auditable.
 
-A dev-only settings overlay runs everything on SQLite + local-memory cache:
+Apply promptly after counting: the adjustment is `counted − system-snapshot`, so
+a sale between the snapshot and applying would skew it.
 
-```bash
-python manage.py migrate       --settings=config.settings_dev_sqlite
-python manage.py seed_roles     --settings=config.settings_dev_sqlite
-python manage.py runserver      --settings=config.settings_dev_sqlite
-```
+## Inventory valuation
 
-`config/settings_dev_sqlite.py` is **not for production** — it only overrides the
-database/cache so checks, migrations and smoke tests run on a laptop.
+A read-only report of **what the stock on hand is worth right now** —
+Σ(`stock_qty` × `cost_usd`), shown in USD and converted to LYD at the live rate.
+This is the closing-stock figure the fiscal-year financial report uses. Gated
+by `view_inventory_valuation`.
 
-## Rich demo dataset
+The same page answers **what the stock would bring in if it all sold**: each
+item's sale value is `stock_qty` × `Product.selling_price_lyd` (the manual LYD
+override when set, else the foreign price at the live rate), and its expected
+profit is sale value − cost value in LYD. The totals add a margin, profit as a
+percentage of sale value. These are today's shelf prices, not a forecast:
+invoice discounts and future rate moves are not applied.
 
-For local demos, screenshots, and business-logic smoke testing, run:
+## Fiscal year & the financial report
 
-```bash
-python manage.py seed_demo --settings=config.settings_dev_sqlite
-python manage.py seed_demo --reset --settings=config.settings_dev_sqlite  # rebuild demo rows
-```
+A **fiscal year** here is the calendar year (Jan 1 – Dec 31), which is the norm
+in Libya. The **financial report** (`/staff/sales/financial/`, gated by
+`view_financial_report`) is a whole-store owner P&L for a chosen year — it is
+never per-rep. It reports:
 
-`seed_demo` now creates a cross-module operating dataset: five demo users
-(`demo_manager`, two sales reps, a courier, and a technician; password
-`demo12345`), five exchange-rate history rows, four suppliers, eight categories,
-24 products with barcode/color/size variant buckets and stock-ledger opening
-balances, 11 services, 12 customers, four posted purchase invoices with linked
-variant stock-in movements, 18 sales invoices across every status, linked cash/bank deposit
-batches, 10 deliveries, posted/draft/void expenses, staff-ledger rows, and both
-open and applied stock takes. Reference rows are idempotent; operational documents are
-created only when no invoices exist, unless `--reset` is used.
+- **Period figures** (for the selected year): **revenue** (issued/partial/paid
+  invoices), **cost of goods**, **gross profit** + margin, **posted operating
+  expenses**, **net profit**, and **cash collected** (payments received in the year).
+- **Current snapshots** (point-in-time, labelled *current*): **outstanding
+  receivables** and **inventory value**.
 
-## Migrations
+**COGS is exact**: each invoice line freezes the product's unit cost at the time
+of sale (`InvoiceItem.unit_cost_usd`), just like it freezes the selling price and
+rate — so a later cost change never rewrites a past invoice's profit. COGS =
+Σ(quantity × frozen unit cost × the invoice's frozen rate). Lines created before
+cost-freezing was added fall back to the product's current cost.
 
-App migrations are committed under `finance/`, `catalog/`, `sales/` `migrations/`.
-After changing a model: `python manage.py makemigrations && python manage.py migrate`.
-Always update `docs/` and `CHANGELOG.md` in the same change.
+## Purchase invoice attachment
+
+Customer-facing sales invoices do **not** carry scan/PDF attachments. The
+supporting scan/photo/PDF belongs to the inbound **Purchase Invoice** because it
+represents the supplier document used to add stock. It is captured with the rich
+file field (drag-drop, phone camera, or desktop scanner) and shown as a link on
+the purchase invoice page.
+
+## Cash deposits (ايداع نقدي)
+
+Technicians and delivery reps **record** the cash they collected (`pending`); an
+admin **confirms** or **rejects** it. Invoice payments may reference the deposit
+that carried their cash so the books reconcile. A staffer sees only the deposits
+they recorded; a manager (`view_all_cashdeposit`) sees all.
+
+## Expenses
+
+Generic operating costs live in `finance.Expense`, grouped optionally by
+`ExpenseCategory`. Posted expenses are the only ones subtracted from the
+financial report; draft expenses are record-in-progress, and void expenses stay
+auditable but inert. Each expense stores amount in LYD, date, payment method,
+optional payer, reference, notes, and an optional receipt/photo/PDF attachment
+using the same dlux archive/scanner widget used elsewhere. Expenses are owned by
+`paid_by` or `created_by`; managers hold `view_all_expense` and `post_expense`.
+
+## Staff accounts and credit
+
+Each relevant user may have one `finance.StaffAccount` for advances, loans, cash
+or item check-outs, reimbursements, service/commission earnings, and payments to
+or from the user. The account balance is derived from posted
+`StaffLedgerEntry` rows only:
+
+- Positive balance means the company owes the user.
+- Negative balance means the user owes the company.
+- Pending rows do not affect balance until confirmed.
+- Disputed and void rows remain visible for audit but do not affect balance.
+
+Managers create ledger entries. By default entries require user confirmation:
+dlux creates a persistent notification for the staff user and the row appears on
+their staff-account page with Confirm/Dispute actions. A manager with
+`resolve_staffledgerentry` can resolve or void entries. This keeps staff credit
+visible and confirmable without turning services, deliveries, loans, and cash
+hand-offs into separate complex subsystems.
+
+## Who sees what (per-employee visibility)
+
+The system is multi-user: each record is owned, and staff see only their own work
+unless they hold the matching `view_all_<model>` permission. Full rules in
+[PERMISSIONS.md](PERMISSIONS.md). In business terms:
+
+- A **sales rep** sees only **their own** invoices, customers and payments. Their
+  customer book is private (two reps can each keep a "Mr. Ali" without collision).
+  Their Workspace/Sales Overview figures and reports cover **only their own sales**.
+- An invoice belongs to its **salesperson** (defaults to whoever created it). Only
+  a **manager** can reassign it to another rep.
+- A **manager** sees and reports on the **whole store**, and assigns work.
+- The **owner** is a superuser and sees everything.
+
+## Deliveries
+
+A **delivery** is a courier job — optionally linked to an invoice, with a
+recipient/address snapshot so it stays intact if the invoice changes. Lifecycle:
+`pending → assigned → out → delivered` (or `failed` / `cancelled`). It
+auto-advances to *assigned* the moment a courier is set, and stamps the delivery
+time on *delivered*. A **courier sees only the jobs assigned to them** and never
+the sales side of the business; a **dispatcher/manager** (`view_all_delivery` +
+`assign_delivery`) sees the whole board and assigns couriers.
+
+### Concurrent invoice issuance
+
+Issuing locks the invoice, then affected products in primary-key order and their variants in primary-key order. It checks fresh locked balances against all demand for each product and each variant before writing any stock-out movement. Two invoices competing for the last unit result in one successful issue and one insufficient-stock rejection. Combined variant and unassigned lines also share the product stock limit. Opening-stock LYD previews use each row’s selected product currency; purchase previews use the invoice currency.
+
+## Client machinery categories
+
+Machinery has an independent enhancement toggle. Parts and services can fit several machine models while retaining one item and stock/pricing history. Model category branches provide the client drill-down; parent category filters include descendants. Repair is a service-only category containing a quoted-per-job maintenance service, with no stock quantity. ZOOM belongs under CIFA as the customer instructed. Only F8 receives the illustrated branches. Full-path workbook categories disambiguate repeated leaf names. See [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md).
+
+## Independent machinery
+
+MachineType, Manufacturer and MachineModel use `machinery.view_*` lookup permissions (Sales Representatives), plus `add_*`/`change_*` for Sales Managers. Product/service compatibility uses existing catalog add/change permissions and `machinery.view_machinemodel`; purchase rows retain the current purchase/product/stock permissions. There is no separate currency or compatibility-edit grant. The legacy migration appends new role permissions without resetting other grants. Disabled machinery blocks its CRUD/browser routes. Choices and detail rows are scoped; products and services require their respective view permissions in the browser.
+
+## Machinery schema rollout
+
+Back up the store database, deploy the `machinery` app with config/catalog/automotive changes, and use `./start.sh` to recreate the development stack (web and Celery now bind `./machinery`). Apply migrations through the normal wrapper startup. Run `seed_machine_categories` in the appropriate scope (`--scope ID`, or no scope for global records). The command creates vocabulary and an unpriced Repair service, never stock or purchase invoices. Migration preserves original machine/engine records while copying simple model compatibility into machinery. Reference: [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md).

@@ -69,7 +69,7 @@ class VehicleModelFilter(django_filters.FilterSet):
         if not value:
             return queryset
         return queryset.filter(
-            Q(name__icontains=value) | Q(make__name__icontains=value)
+            Q(name__icontains=value) | Q(alias__icontains=value) | Q(make__name__icontains=value)
             | Q(equipment_type__name__icontains=value)
         )
 

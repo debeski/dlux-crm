@@ -1,0 +1,22 @@
+{% load dlux_tags %}
+{% if not embedded %}<div class="row g-2 mb-3" aria-label="{{ DLUX_STRINGS.rates_current|default:'Current exchange rates' }}">{% endif %}
+    {% for row in rate_overview %}
+    <div class="{% if embedded %}col-12 col-sm{% else %}col-12 col-md-6{% endif %}">
+        {% dlux_card tag="section" class="dlux-control-card p-3 h-100" %}
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h2 class="h6 mb-0 d-flex align-items-center gap-2"><i class="bi {% if row.code == 'EUR' %}bi-currency-euro{% else %}bi-currency-dollar{% endif %}" aria-hidden="true"></i>{{ row.code }}</h2>
+            <span class="badge rounded-pill border text-body fw-normal" title="{{ DLUX_STRINGS.rates_working|default:'Working rate' }}">{% if row.working_source == "manual" %}{{ DLUX_STRINGS.rates_manual|default:"Manual rate" }}{% elif row.working_source == "market" %}{{ DLUX_STRINGS.rate_card_market|default:"Market (EAN)" }}{% elif row.working_source == "official" %}{{ DLUX_STRINGS.rate_card_official|default:"Official (CBL)" }}{% else %}{{ DLUX_STRINGS.rates_unavailable|default:"No collected rate available" }}{% endif %}</span>
+        </div>
+        <div class="d-flex align-items-baseline gap-2 mb-2">
+            <strong class="fs-3 lh-1" style="font-variant-numeric:tabular-nums">{% if row.working_source == "unavailable" %}—{% else %}{{ row.working|floatformat:'-4' }}{% endif %}</strong>
+            <span class="small text-muted">LYD / 1 {{ row.code }}</span>
+        </div>
+        <div class="row g-2 small border-top pt-2">
+            <div class="col-4" title="{{ row.store_at|date:'Y-m-d H:i' }}"><span class="text-muted d-block">{{ DLUX_STRINGS.rates_manual|default:"Manual rate" }}</span><strong>{{ row.store|floatformat:'-4'|default:"—" }}</strong></div>
+            <div class="col-4" title="{{ row.market_at|date:'Y-m-d H:i' }}"><span class="text-muted d-block">{{ DLUX_STRINGS.rate_card_market|default:"Market (EAN)" }}</span><strong>{{ row.market|floatformat:'-4'|default:"—" }}</strong><small class="d-block text-muted">{{ row.market_at|date:'m-d H:i' }}</small></div>
+            <div class="col-4" title="{{ row.official_at|date:'Y-m-d H:i' }}{% if row.official_date %} · {{ row.official_date }}{% endif %}"><span class="text-muted d-block">{{ DLUX_STRINGS.rate_card_official|default:"Official (CBL)" }}</span><strong>{{ row.official|floatformat:'-4'|default:"—" }}</strong><small class="d-block text-muted">{{ row.official_at|date:'m-d H:i' }}</small></div>
+        </div>
+        {% enddlux_card %}
+    </div>
+    {% endfor %}
+{% if not embedded %}</div>{% endif %}

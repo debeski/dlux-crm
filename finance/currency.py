@@ -1,12 +1,8 @@
-"""The store's pricing currency: the foreign currency catalog prices are kept in.
+"""Default document/service currency and active purchase currencies.
 
-USD (the default, so existing stores are unchanged) or EUR, chosen in the
-*Pricing currency* section of CRM options. Every amount stored in a ``*_usd``
-column is in this currency — the columns keep their historic names — and
-``finance.services`` converts with this currency's rate unless told otherwise.
-Sales and purchase invoices record the currency they were made in, so a switch
-never rewrites a document. Switching re-expresses catalog prices in the new
-currency (``convert_catalog_prices``) so LYD prices stay put.
+Products hold their own currency. Changing the default re-expresses services
+and draft sales documents; product prices and issued documents stay in their
+recorded currencies. Historical ``*_usd`` columns store foreign amounts.
 """
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -14,7 +10,7 @@ PRICING_NS = "switch_pos.pricing"
 CURRENCY_USD = "USD"
 CURRENCY_EUR = "EUR"
 PRICING_CURRENCIES = (CURRENCY_USD, CURRENCY_EUR)
-PRICING_DEFAULTS = {"currency": CURRENCY_USD}
+PRICING_DEFAULTS = {"currency": CURRENCY_USD, "both_active": False}
 CURRENCY_CHOICES = ((CURRENCY_USD, "USD"), (CURRENCY_EUR, "EUR"))
 
 MONEY = Decimal("0.01")
@@ -23,7 +19,8 @@ MONEY = Decimal("0.01")
 def normalize_pricing_config(value):
     source = value if isinstance(value, dict) else {}
     currency = str(source.get("currency") or "").upper()
-    return {"currency": currency if currency in PRICING_CURRENCIES else CURRENCY_USD}
+    return {"currency": currency if currency in PRICING_CURRENCIES else CURRENCY_USD,
+            "both_active": source.get("both_active") is True}
 
 
 def get_pricing_config():
@@ -34,6 +31,11 @@ def get_pricing_config():
 
 def pricing_currency():
     return get_pricing_config()["currency"]
+
+
+def active_currencies():
+    config = get_pricing_config()
+    return PRICING_CURRENCIES if config["both_active"] else (config["currency"],)
 
 
 def stored_pricing_currency(extra_config):
@@ -56,25 +58,17 @@ def conversion_factor(from_currency, to_currency):
 
 
 def priced_catalog_counts():
-    from django.db.models import Q
-
-    from catalog.models import Product, Service
+    from catalog.models import Service
 
     return {
-        "products": Product.objects.filter(Q(cost_usd__gt=0) | Q(price_usd__gt=0)).count(),
+        "products": 0,
         "services": Service.objects.filter(price_usd__isnull=False).count(),
     }
 
 
 def convert_catalog_prices(from_currency, to_currency):
-    """Re-express every product and service price in ``to_currency``.
-
-    Cost and selling price scale by the cross rate, so a product's LYD price is
-    unchanged; markup is a ratio and stays. Manual LYD overrides are already in
-    LYD. Soft-deleted rows convert too, so restoring one never brings back an
-    amount in the old currency. Returns the number of rows changed.
-    """
-    from catalog.models import Product, Service
+    """Re-express service prices and draft sales documents in the new default."""
+    from catalog.models import Service
 
     factor = conversion_factor(from_currency, to_currency)
     if factor == 1:
@@ -83,26 +77,15 @@ def convert_catalog_prices(from_currency, to_currency):
     def scaled(value):
         return None if value is None else (value * factor).quantize(MONEY, rounding=ROUND_HALF_UP)
 
-    products = list(Product.all_objects.only("pk", "cost_usd", "price_usd"))
-    for product in products:
-        product.cost_usd = scaled(product.cost_usd)
-        product.price_usd = scaled(product.price_usd)
-    Product.all_objects.bulk_update(products, ["cost_usd", "price_usd"], batch_size=500)
-
     services = list(Service.all_objects.only("pk", "price_usd"))
     for service in services:
         service.price_usd = scaled(service.price_usd)
     Service.all_objects.bulk_update(services, ["price_usd"], batch_size=500)
-    return len(products) + len(services) + convert_draft_invoices(from_currency, to_currency, factor)
+    return len(services) + convert_draft_invoices(from_currency, to_currency, factor)
 
 
 def convert_draft_invoices(from_currency, to_currency, factor):
-    """Move unissued sales invoices to the new currency with the catalog.
-
-    A draft is re-priced from the catalog while it is edited, so it must speak the
-    catalog's currency. Its LYD figures are frozen per line and do not change;
-    the rate becomes the new currency's live rate. Issued invoices keep theirs.
-    """
+    """Move draft foreign amounts to the new default; frozen LYD stays unchanged."""
     from sales.models import Invoice, InvoiceItem
 
     from .services import get_current_rate
@@ -119,7 +102,7 @@ def convert_draft_invoices(from_currency, to_currency, factor):
 
 
 def convert_on_switch(sender, instance, **kwargs):
-    """pre_save of SystemSettings: convert catalog prices when the currency changes.
+    """Convert services and draft sales documents when the default changes.
 
     Runs on any save of the settings row — the CRM options tile, the setup
     wizard, a configuration import — and before the row is written, so a failed

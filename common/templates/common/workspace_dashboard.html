@@ -103,7 +103,7 @@
             <div class="rate-board">
                 <div class="rate-row rate-head" aria-hidden="true">
                     <span></span>
-                    <small>{{ DLUX_STRINGS.rate_card_store|default:"Store" }}</small>
+                    <small>{{ DLUX_STRINGS.rates_working|default:"Working rate" }}</small>
                     <small>{{ DLUX_STRINGS.rate_card_official|default:"Official (CBL)" }}</small>
                     <small>{{ DLUX_STRINGS.rate_card_market|default:"Market (EAN)" }}</small>
                 </div>
@@ -113,7 +113,7 @@
                         <strong>{{ row.code }}</strong>
                         {% if row.is_pricing %}<em>{{ DLUX_STRINGS.rate_card_pricing|default:"Pricing" }}</em>{% endif %}
                     </span>
-                    <span class="rate-cell"><b>{{ row.store|default:"—" }}</b><small>{{ row.store_age }}</small></span>
+                    <span class="rate-cell"><b>{% if row.working_source == "unavailable" %}—{% else %}{{ row.working }}{% endif %}</b><small>{% if row.working_source == "manual" %}{{ DLUX_STRINGS.rates_manual|default:"Manual rate" }}{% elif row.working_source == "market" %}EAN{% elif row.working_source == "official" %}CBL{% else %}—{% endif %}</small></span>
                     <span class="rate-cell"><b>{{ row.official|default:"—" }}</b><small>{{ row.official_age }}</small></span>
                     <span class="rate-cell">
                         <b>{{ row.market|default:"—" }}{% if row.market_trend == "up" %}<i class="bi bi-arrow-up-short text-danger"></i>{% elif row.market_trend == "down" %}<i class="bi bi-arrow-down-short text-success"></i>{% endif %}</b>

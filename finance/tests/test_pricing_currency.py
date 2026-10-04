@@ -9,7 +9,7 @@ from dlux.models import SystemSettings
 from dlux.options import app_settings_form_prefix
 
 from catalog.models import Product, Service
-from finance.currency import PRICING_NS, pricing_currency
+from finance.currency import PRICING_NS, active_currencies, pricing_currency
 from finance.models import ExchangeRate
 from finance.services import get_current_rate, rate_overview
 from sales.models import Invoice, InvoiceItem
@@ -50,14 +50,14 @@ class PricingCurrencyTests(TestCase):
         self.assertEqual(pricing_currency(), "USD")
         self.assertEqual(get_current_rate(), Decimal("9.5000"))
 
-    def test_switching_converts_catalog_prices_and_keeps_lyd_prices(self):
+    def test_switching_keeps_product_currency_and_converts_services(self):
         lyd_before = self.filter.selling_price_lyd()
         self.assertTrue(self.switch("EUR").get("success"))
         self.assertEqual(pricing_currency(), "EUR")
         self.assertEqual(get_current_rate(), Decimal("10.0000"))
         self.filter.refresh_from_db()
         self.fitting.refresh_from_db()
-        self.assertEqual((self.filter.cost_usd, self.filter.price_usd), (Decimal("95.00"), Decimal("142.50")))
+        self.assertEqual((self.filter.cost_usd, self.filter.price_usd), (Decimal("100.00"), Decimal("150.00")))
         self.assertEqual(self.fitting.price_usd, Decimal("19.00"))
         self.assertEqual(self.filter.selling_price_lyd(), lyd_before)
 
@@ -100,8 +100,8 @@ class PricingCurrencyTests(TestCase):
     def test_labels_follow_the_currency_and_keep_currency_names(self):
         self.switch("EUR")
         overrides = SystemSettings.objects.get(pk=SystemSettings.load().pk).translations_override
-        self.assertEqual(overrides["en"]["label_product_cost_usd"], "Import Cost (EUR)")
-        self.assertEqual(overrides["ar"]["label_product_cost_usd"], "تكلفة الاستيراد (يورو)")
+        self.assertNotIn("label_product_cost_usd", overrides.get("en", {}))
+        self.assertNotIn("label_product_cost_usd", overrides.get("ar", {}))
         self.assertNotIn("currency_usd", overrides["en"])
 
         self.switch("USD")
@@ -115,12 +115,13 @@ class PricingCurrencyTests(TestCase):
         self.switch("EUR")
         self.assertTrue({row["code"]: row for row in rate_overview()}["EUR"]["is_pricing"])
 
-    def test_opening_stock_headers_follow_the_currency(self):
+    def test_opening_stock_headers_are_neutral_and_support_legacy_names(self):
         from catalog.opening_stock_import import _HEADER_ALIASES, import_columns
 
-        self.assertIn("Cost (USD)", [label for _key, label, _required in import_columns()])
+        self.assertIn("Cost", [label for _key, label, _required in import_columns()])
+        self.assertIn("Currency", [label for _key, label, _required in import_columns()])
         self.switch("EUR")
-        self.assertIn("Cost (EUR)", [label for _key, label, _required in import_columns()])
+        self.assertIn("Cost", [label for _key, label, _required in import_columns()])
         self.assertEqual(_HEADER_ALIASES["cost (eur)"], "cost_usd")
 
     def test_workspace_exchange_card_shows_both_currencies(self):
@@ -129,3 +130,58 @@ class PricingCurrencyTests(TestCase):
         self.assertIn("USD", board[:3000])
         self.assertIn("EUR", board[:3000])
         self.assertIn("9.5", board[:3000])
+
+    def test_both_currencies_option_round_trips_without_repricing_products(self):
+        response = self.client.post(self.url, {f"{PREFIX}-currency": "BOTH"})
+        self.assertTrue(response.json().get("success"))
+        cache.clear()
+        self.assertEqual(active_currencies(), ("USD", "EUR"))
+        self.filter.refresh_from_db()
+        self.assertEqual((self.filter.currency, self.filter.cost_usd), ("USD", Decimal("100")))
+
+    def test_market_and_cbl_fallback_allow_switch_without_manual_eur(self):
+        from finance.services import EAN_RATE_CACHE_KEYS, CBL_RATE_CACHE_KEYS, has_configured_rate
+        ExchangeRate.all_objects.filter(currency="EUR").delete()
+        cache.clear()
+        cache.set(EAN_RATE_CACHE_KEYS["EUR"], {"rate": "11.25"}, None)
+        cache.set(CBL_RATE_CACHE_KEYS["EUR"], {"average": "7.10"}, None)
+        self.assertEqual(get_current_rate("EUR"), Decimal("11.25"))
+        self.assertTrue(has_configured_rate("EUR"))
+        self.assertTrue(self.switch("EUR").get("success"))
+        cache.set(CBL_RATE_CACHE_KEYS["EUR"], {"average": "7.10"}, None)
+        cache.delete(EAN_RATE_CACHE_KEYS["EUR"])
+        self.assertEqual(get_current_rate("EUR"), Decimal("7.10"))
+
+    def test_currency_selector_is_hidden_in_single_mode_and_shown_in_both(self):
+        from catalog.forms import PurchaseInvoiceForm, ProductForm, PurchaseInvoiceLineForm
+        from finance.pricing_options_forms import PricingSettingsForm
+        form = PricingSettingsForm(current_value={"currency": "USD", "both_active": True})
+        self.assertEqual(form.initial["currency"], "BOTH")
+        self.assertNotIn("both_active", form.fields)
+        self.assertTrue(PurchaseInvoiceForm(user=self.admin)["currency"].is_hidden)
+        self.assertTrue(ProductForm()["currency"].is_hidden)
+        self.assertTrue(PurchaseInvoiceLineForm()["currency"].is_hidden)
+        self.assertTrue(self.switch("BOTH").get("success"))
+        self.assertFalse(PurchaseInvoiceForm(user=self.admin)["currency"].is_hidden)
+        self.assertFalse(ProductForm()["currency"].is_hidden)
+        self.assertTrue(self.switch("USD").get("success"))
+        self.assertTrue(PurchaseInvoiceForm(user=self.admin)["currency"].is_hidden)
+
+    def test_rate_page_includes_collected_rates_and_working_source(self):
+        from finance.services import EAN_RATE_CACHE_KEYS, CBL_RATE_CACHE_KEYS
+        ExchangeRate.all_objects.all().delete()
+        cache.clear()
+        cache.set(EAN_RATE_CACHE_KEYS["USD"], {"rate": "9.73", "fetched_at": "2026-10-03T12:00:00+00:00"}, None)
+        cache.set(CBL_RATE_CACHE_KEYS["EUR"], {"average": "7.21", "fetched_at": "2026-10-03T12:00:00+00:00"}, None)
+        response = self.client.get(reverse("finance:exchange_rate_list"))
+        self.assertEqual(response.status_code, 200)
+        rows = {row["code"]: row for row in response.context["rate_overview"]}
+        self.assertEqual((rows["USD"]["working"], rows["USD"]["working_source"]), (Decimal("9.73"), "market"))
+        self.assertEqual((rows["EUR"]["working"], rows["EUR"]["working_source"]), (Decimal("7.21"), "official"))
+        self.assertContains(response, "Current exchange rates")
+        self.assertNotContains(response, '<h2 class="h6 mb-2">Manual rate history</h2>')
+        self.assertContains(response, "9.73")
+        ExchangeRate.objects.create(currency="USD", rate=Decimal("9.90"))
+        rows = {row["code"]: row for row in rate_overview()}
+        self.assertEqual((rows["USD"]["working"], rows["USD"]["working_source"]), (Decimal("9.90"), "manual"))
+        self.assertEqual(rows["USD"]["market"], Decimal("9.73"))

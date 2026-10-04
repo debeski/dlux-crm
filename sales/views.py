@@ -153,9 +153,14 @@ def _apply_item_price(item, invoice):
             item.color = item.color or item.product.color
             item.size = item.size or item.product.size
         if item.unit_price_lyd in (None, ""):
-            item.unit_price_lyd = item.product.selling_price_lyd(invoice.exchange_rate) or Decimal("0")
-        item.unit_price_usd = item.product.effective_price_usd
-        item.unit_cost_usd = item.product.cost_usd  # freeze cost for exact COGS
+            item.unit_price_lyd = item.product.selling_price_lyd(invoice.exchange_rate, invoice.currency) or Decimal("0")
+        from finance.services import lyd_to_usd
+
+        product_rate = item.product.pricing_rate(invoice.exchange_rate, invoice.currency)
+        item.unit_price_usd = (item.product.effective_price_usd if item.product.currency == invoice.currency
+                               else lyd_to_usd(item.product.effective_price_usd * product_rate, invoice.exchange_rate))
+        item.unit_cost_lyd = (item.product.cost_usd or Decimal("0")) * product_rate
+        item.unit_cost_usd = item.product.cost_usd if item.product.currency == invoice.currency else lyd_to_usd(item.unit_cost_lyd, invoice.exchange_rate)
     elif item.service_id:
         item.kind = item.KIND_SERVICE
         item.product = None
@@ -163,6 +168,7 @@ def _apply_item_price(item, invoice):
         item.color = None
         item.size = None
         item.unit_cost_usd = None  # services carry no goods cost
+        item.unit_cost_lyd = None
         if item.unit_price_lyd in (None, ""):
             item.unit_price_lyd = item.service.selling_price_lyd(invoice.exchange_rate) or Decimal("0")
         item.unit_price_usd = item.service.price_usd
@@ -195,6 +201,7 @@ class _InvoiceEditorView(DocumentEditorView):
         or its own image). The client renders the tile grid and fills the hidden
         line fields from it; price stays editable in the cart row."""
         from catalog.models import Product, Service, product_color_hex
+        from finance.currency import pricing_currency
 
         products = []
         qs = Product.objects.filter(is_active=True).select_related("category").prefetch_related("variants")
@@ -220,10 +227,11 @@ class _InvoiceEditorView(DocumentEditorView):
             products.append({
                 "id": p.pk,
                 "name": p.name,
+                "alias": p.alias,
                 "category": p.category.name if p.category_id else "",
                 "category_id": p.category_id or 0,
                 "image": p.image_url,
-                "price": float(p.selling_price_lyd(rate) or 0),
+                "price": float(p.selling_price_lyd(rate, self.get_object().currency if self.get_object() else pricing_currency()) or 0),
                 "track_stock": bool(p.track_stock),
                 "stock_qty": float(p.stock_qty or 0),
                 "variants": variants,
@@ -241,7 +249,7 @@ class _InvoiceEditorView(DocumentEditorView):
                 "image": s.image_url,
                 "price": float(price) if price is not None else None,
             })
-        return json.dumps({"products": products, "services": services})
+        return json.dumps({"products": products, "services": services}).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
     def _rate(self, invoice=None):
         return invoice.exchange_rate if invoice else get_current_rate()

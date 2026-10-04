@@ -48,7 +48,7 @@ def _vehicle_models(request):
     from automotive.models import VehicleModel
     from common.views import scope_filtered_queryset
 
-    queryset = VehicleModel.objects.filter(is_active=True, make__is_active=True).select_related("make")
+    queryset = VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True).select_related("make")
     user = getattr(request, "user", None)
     if user is not None:
         queryset = scope_filtered_queryset(queryset, user)
@@ -56,6 +56,11 @@ def _vehicle_models(request):
 
 
 class ProductFilter(django_filters.FilterSet):
+    category = django_filters.ModelChoiceFilter(queryset=Category.objects.all(), method="filter_category")
+
+    def filter_category(self, queryset, name, value):
+        return queryset.filter(category_id__in=value.descendant_ids()) if value else queryset
+
     keyword = django_filters.CharFilter(method="filter_keyword", label="")
     vehicle_model = django_filters.ModelChoiceFilter(
         queryset=_vehicle_models, method="filter_vehicle", label="Vehicle",
@@ -123,7 +128,7 @@ class ProductFilter(django_filters.FilterSet):
         if not value:
             return queryset
         query = (
-            Q(name__icontains=value) | Q(sku__icontains=value) | Q(barcode__icontains=value)
+            Q(name__icontains=value) | Q(alias__icontains=value) | Q(sku__icontains=value) | Q(barcode__icontains=value)
             | Q(size__icontains=value)
             | Q(extra_barcodes__code=value.strip(), extra_barcodes__deleted_at__isnull=True)
         )
@@ -135,6 +140,7 @@ class ProductFilter(django_filters.FilterSet):
             query |= (
                 Q(automotive_fitments__vehicle_model__make__name__icontains=value)
                 | Q(automotive_fitments__vehicle_model__name__icontains=value)
+                | Q(automotive_fitments__vehicle_model__alias__icontains=value)
             )
             if criteria["generation_chassis"]:
                 query |= (

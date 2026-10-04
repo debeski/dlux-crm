@@ -1,0 +1,9 @@
+{% extends "dlux/base.html" %}
+{% load asset_tags dlux_tags %}
+{% block title %}{{ DLUX_STRINGS.page_machinery }}{% endblock %}
+{% block extra_head %}{{ block.super }}<link rel="stylesheet" href="{% asset 'automotive/css/hub.css' %}">{% endblock %}
+{% block content %}<div class="container-fluid py-4 automotive-hub">
+{% dlux_ribbon %}
+<div class="alert alert-light border d-flex gap-3 align-items-start"><i class="bi bi-diagram-3 fs-4 text-primary"></i><div><div class="fw-semibold">{{ DLUX_STRINGS.automotive_management_order|default:"Recommended setup order" }}</div><div class="small text-muted">{{ DLUX_STRINGS.machine_flow }}</div></div></div>
+<div class="row g-3">{% for card in hub_cards %}<div class="col-12 col-md-6 col-xl-4">{% include "automotive/includes/hub_card.html" with url_name=card.route icon=card.icon title=card.title description=card.description border=card.border %}</div>{% endfor %}</div>
+</div>{% endblock %}

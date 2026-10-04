@@ -26,7 +26,7 @@
         <h1 class="h3 mb-0">{{ DLUX_STRINGS.ui_new_purchase_invoice|default:"New Purchase Invoice" }}</h1>
         <span class="badge rounded-pill text-bg-light border">
             <i class="bi bi-currency-exchange me-1"></i>
-            {{ DLUX_STRINGS.ui_rate|default:"Rate" }}: 1 {{ invoice.currency|default:PRICING_CURRENCY }} = {{ current_rate }} LYD
+            {{ DLUX_STRINGS.ui_rate|default:"Rate" }}: 1 <span data-purchase-currency>{{ purchase_currency }}</span> = <span id="purchase-rate">{{ current_rate }}</span> LYD
         </span>
     </div>
 
@@ -37,6 +37,7 @@
         <section class="mb-4">
             <h2 class="h6 fw-semibold mb-3">{{ DLUX_STRINGS.ui_supplier_details|default:"Supplier & Details" }}</h2>
             {% crispy form %}
+            <p class="small text-muted">{{ DLUX_STRINGS.purchase_currency_hint|default:"Enter costs and selling prices in the invoice currency. Product currency controls how those prices are stored in the catalog." }}</p>
             <datalist id="supplier-datalist">
                 {% for s in suppliers %}
                 <option value="{{ s.name }}" data-id="{{ s.pk }}" data-phone="{{ s.phone }}" data-address="{{ s.address }}"></option>
@@ -61,17 +62,19 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="min-width:200px">{{ DLUX_STRINGS.label_product_name|default:"Name" }}</th>
+                                <th style="min-width:160px">{{ DLUX_STRINGS.label_product_alias|default:"Local alias" }}</th>
+                                <th {% if formset.empty_form.currency.is_hidden %}hidden{% endif %} style="min-width:130px">{{ DLUX_STRINGS.label_product_currency|default:"Product currency" }}</th>
                                 <th style="min-width:150px">{{ DLUX_STRINGS.label_product_category|default:"Category" }}</th>
                                 <th style="min-width:110px">{{ DLUX_STRINGS.label_product_unit|default:"Unit" }}</th>
                                 <th style="min-width:130px">{{ DLUX_STRINGS.label_product_barcode|default:"Barcode" }}</th>
                                 <th style="min-width:150px">{{ DLUX_STRINGS.label_product_color|default:"Color" }}</th>
                                 <th style="min-width:150px">{{ DLUX_STRINGS.label_product_size|default:"Size / Spec" }}</th>
-                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</th>
+                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }}</th>
                                 <th class="text-end" style="width:90px">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup %" }}</th>
-                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.label_product_price_usd|default:"Price (USD)" }}</th>
+                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.ui_doc_price|default:"Selling price" }}</th>
                                 <th class="text-end" style="min-width:120px">{{ DLUX_STRINGS.label_product_price_lyd_override|default:"Manual LYD" }}</th>
                                 <th class="text-end" style="width:100px">{{ DLUX_STRINGS.label_purchaseinvoiceline_quantity|default:"Qty Purchased" }}</th>
-                                <th class="text-end" style="min-width:120px">{{ DLUX_STRINGS.ui_total_usd|default:"Total (USD)" }}</th>
+                                <th class="text-end" style="min-width:120px">{{ DLUX_STRINGS.ui_doc_foreign_total|default:"Foreign total" }} (<span data-purchase-currency>{{ purchase_currency }}</span>)</th>
                                 <th class="text-end" style="min-width:120px">{{ DLUX_STRINGS.label_total_lyd|default:"Total (LYD)" }}</th>
                                 <th style="width:48px"></th>
                             </tr>
@@ -80,7 +83,9 @@
                             {% for itemform in formset %}
                             <tr class="line-row" data-price-sync-row>
                                 {{ itemform.id }}{{ itemform.product.as_hidden }}
-                                <td class="{% if itemform.name.errors %}field-invalid{% endif %}">{{ itemform.name }}{{ itemform.name.errors }}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=itemform.fits %}{% endif %}</td>
+                                <td class="{% if itemform.name.errors %}field-invalid{% endif %}">{{ itemform.name }}{{ itemform.name.errors }}{% if itemform.machine_models %}{% include "machinery/line_models.html" with machine_field=itemform.machine_models %}{% endif %}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=itemform.fits %}{% endif %}</td>
+                                <td>{{ itemform.alias }}{{ itemform.alias.errors }}</td>
+                                <td {% if itemform.currency.is_hidden %}hidden{% endif %}>{{ itemform.currency }}{{ itemform.currency.errors }}</td>
                                 <td>{{ itemform.category }}</td>
                                 <td>{{ itemform.unit }}</td>
                                 <td>{{ itemform.barcode }}</td>
@@ -104,7 +109,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="table-light">
-                                <td colspan="12" class="text-end fw-semibold">{{ DLUX_STRINGS.ui_total }}</td>
+                                <td colspan="14" class="text-end fw-semibold">{{ DLUX_STRINGS.ui_total }}</td>
                                 <td class="text-end fw-semibold" id="total-usd-cell">0.00</td>
                                 <td class="text-end fw-semibold" id="total-lyd-cell">0.00</td>
                                 <td></td>
@@ -115,6 +120,7 @@
                 <datalist id="product-datalist">
                     {% for p in products %}
                     <option value="{{ p.name }}" data-id="{{ p.pk }}"></option>
+                    {% if p.alias %}<option value="{{ p.alias }}" data-id="{{ p.pk }}">{{ p.name }}</option>{% endif %}
                     {% endfor %}
                 </datalist>
             </div>
@@ -134,8 +140,10 @@
 <template id="empty-form-row">
     <tr class="line-row" data-price-sync-row>
         {{ formset.empty_form.id }}{{ formset.empty_form.product.as_hidden }}
-        <td>{{ formset.empty_form.name }}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=formset.empty_form.fits %}{% endif %}</td>
-        <td>{{ formset.empty_form.category }}</td>
+        <td>{{ formset.empty_form.name }}{% if formset.empty_form.machine_models %}{% include "machinery/line_models.html" with machine_field=formset.empty_form.machine_models %}{% endif %}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=formset.empty_form.fits %}{% endif %}</td>
+        <td>{{ formset.empty_form.alias }}{{ formset.empty_form.alias.errors }}</td>
+                                <td {% if formset.empty_form.currency.is_hidden %}hidden{% endif %}>{{ formset.empty_form.currency }}{{ formset.empty_form.currency.errors }}</td>
+                                <td>{{ formset.empty_form.category }}</td>
         <td>{{ formset.empty_form.unit }}</td>
         <td>{{ formset.empty_form.barcode }}</td>
         <td>{{ formset.empty_form.color }}</td>
@@ -161,6 +169,7 @@
 {{ block.super }}
 <script src="{% asset 'catalog/js/price_sync.js' %}" nonce="{{ request.csp_nonce }}" defer></script>
 <script src="{% asset 'catalog/js/color_palette.js' %}" nonce="{{ request.csp_nonce }}" defer></script>
+<script id="currency-rates" type="application/json">{{ currency_rates_json|safe }}</script>
 <script id="product-map" type="application/json">{{ product_map_json|safe }}</script>
 <script>
 (function () {
@@ -169,13 +178,18 @@
     const prefix = "{{ formset.prefix }}";
     const totalForms = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
     const body = document.getElementById('items-body');
-    const rate = parseFloat("{{ current_rate|unlocalize }}") || 0;
+    const rates = JSON.parse(document.getElementById('currency-rates').textContent);
+    const currencySelect = document.getElementById('id_currency');
+    const mapCurrency = "{{ purchase_currency }}";
+    let selectedCurrency = currencySelect.value || mapCurrency;
+    let rate = Number(rates[selectedCurrency]);
     const fmt = (n) => (isNaN(n) ? 0 : n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     function q(row, suffix) { return row.querySelector('[name$="-' + suffix + '"]'); }
     function matchId(value) {
         const v = (value || '').trim().toLowerCase();
-        const opt = options.find((o) => o.value.trim().toLowerCase() === v);
+        const matches = options.filter((o) => o.value.trim().toLowerCase() === v);
+        const opt = matches.length === 1 ? matches[0] : null;
         return opt ? (opt.dataset.id || '') : '';
     }
     function setAuto(el, val) {
@@ -215,9 +229,12 @@
         if (hiddenFk) hiddenFk.value = id;
         if (id && products[id]) {
             const d = products[id];
-            setAuto(q(row, 'cost_usd'), d.cost);
+            setAuto(q(row, 'alias'), d.alias);
+            setAuto(q(row, 'currency'), d.currency);
+            q(row, 'currency').dispatchEvent(new Event('change', {bubbles: true}));
+            setAuto(q(row, 'cost_usd'), (d.cost * Number(rates[mapCurrency]) / rate).toFixed(2));
             setAuto(q(row, 'markup_percent'), d.markup);
-            setAuto(q(row, 'price_usd'), d.price_usd);
+            setAuto(q(row, 'price_usd'), (d.price_usd * Number(rates[mapCurrency]) / rate).toFixed(2));
             setAuto(q(row, 'price_lyd_override'), d.price_lyd);
             setAuto(q(row, 'barcode'), d.barcode);
             setAuto(q(row, 'color'), d.color);
@@ -227,14 +244,31 @@
         }
         recalcAll();
     }
+    currencySelect.addEventListener('change', () => {
+        const previousRate = rate;
+        selectedCurrency = currencySelect.value;
+        rate = Number(rates[selectedCurrency]);
+        document.querySelectorAll('[data-purchase-currency]').forEach(el => { el.textContent = selectedCurrency; });
+        document.getElementById('purchase-rate').textContent = rate;
+        body.querySelectorAll('.line-row').forEach(row => {
+            ['cost_usd', 'price_usd'].forEach(name => {
+                const input = q(row, name);
+                if (input && input.value !== '') input.value = (Number(input.value) * previousRate / rate).toFixed(2);
+            });
+            q(row, 'price_lyd_override').setAttribute('data-usd-rate', rate);
+            if (!q(row, 'product').value && q(row, 'currency').dataset.autofilled !== '') q(row, 'currency').value = selectedCurrency;
+        });
+        recalcAll();
+    });
     function wireRow(row) {
+        q(row, 'price_lyd_override').setAttribute('data-usd-rate', rate);
         const nameInput = q(row, 'name');
         if (nameInput) {
             nameInput.addEventListener('input', () => syncRow(row));
             nameInput.addEventListener('change', () => syncRow(row));
         }
         [
-            'cost_usd', 'markup_percent', 'price_usd', 'price_lyd_override', 'barcode',
+            'alias', 'currency', 'cost_usd', 'markup_percent', 'price_usd', 'price_lyd_override', 'barcode',
             'color', 'size', 'category', 'unit'
         ].forEach((f) => {
             const el = q(row, f);
@@ -260,6 +294,7 @@
         const tr = holder.firstElementChild;
         body.appendChild(tr);
         totalForms.value = idx + 1;
+        q(tr, 'currency').value = selectedCurrency;
         wireRow(tr);
         if (window.initCatalogColorPalettes) window.initCatalogColorPalettes();
         if (window.AutomotiveFitsPicker) window.AutomotiveFitsPicker.initAll(tr);

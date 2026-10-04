@@ -51,6 +51,7 @@ start.ps1
 tracker.md
 .secrets/
 .xpose/
+/.xclude/
 .agents
 .claude
 .codex

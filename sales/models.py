@@ -274,9 +274,9 @@ class InvoiceItem(models.Model):
     size = models.CharField(max_length=120, null=True, blank=True, verbose_name="Size / Spec")
     unit_price_lyd = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Unit Price (LYD)")
     unit_price_usd = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Unit Price (USD)")
-    # Frozen unit *cost* (USD) at time of sale, for exact COGS in the financial
-    # report. Product lines only; NULL for services/custom or legacy lines.
+    # Foreign cost in the invoice currency; new product lines also freeze LYD.
     unit_cost_usd = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Unit Cost (USD)")
+    unit_cost_lyd = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True, editable=False, verbose_name="Unit Cost (LYD)")
     quantity = models.DecimalField(
         max_digits=12, decimal_places=2, default=Decimal("1.00"),
         validators=[MinValueValidator(Decimal("0.01"))], verbose_name="Quantity",
@@ -328,7 +328,10 @@ class InvoiceItem(models.Model):
         # Freeze the product's unit cost on first save (fallback for any path
         # that doesn't set it explicitly — the editor sets it via _apply_item_price).
         if self.product_id and self.unit_cost_usd is None:
-            self.unit_cost_usd = self.product.cost_usd
+            from finance.services import lyd_to_usd
+
+            self.unit_cost_lyd = (self.product.cost_usd or Decimal("0")) * self.product.pricing_rate(self.invoice.exchange_rate, self.invoice.currency)
+            self.unit_cost_usd = self.product.cost_usd if self.product.currency == self.invoice.currency else lyd_to_usd(self.unit_cost_lyd, self.invoice.exchange_rate)
         self.line_total_lyd = (Decimal(self.unit_price_lyd) * Decimal(self.quantity)).quantize(
             TWO_PLACES, rounding=ROUND_HALF_UP
         )

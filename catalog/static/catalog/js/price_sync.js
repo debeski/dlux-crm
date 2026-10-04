@@ -42,6 +42,7 @@
 
     function fields(form) {
         return {
+            currency: form.querySelector("[data-product-currency]"),
             cost: form.querySelector("[data-price-cost]"),
             markup: form.querySelector("[data-price-markup]"),
             usd: form.querySelector("[data-price-usd]"),
@@ -58,7 +59,8 @@
 
     function rateOf(f) {
         if (!f.lyd) return NaN;
-        var r = parseFloat(f.lyd.getAttribute("data-usd-rate"));
+        var rates = f.currency ? JSON.parse(f.currency.getAttribute("data-currency-rates") || "{}") : {};
+        var r = parseFloat(f.currency ? rates[f.currency.value] : f.lyd.getAttribute("data-usd-rate"));
         return isNaN(r) || r <= 0 ? NaN : r;
     }
 
@@ -141,6 +143,13 @@
     document.addEventListener("input", function (e) {
         if (e.target && (e.target.matches("[data-price-cost],[data-price-markup],[data-price-usd],[data-price-lyd]"))) {
             handle(e.target);
+        }
+    });
+
+    document.addEventListener("change", function (e) {
+        if (e.target && e.target.matches("[data-product-currency]")) {
+            var scope = scopeFor(e.target);
+            if (scope) refreshLydPreview(fields(scope));
         }
     });
 

@@ -9,7 +9,7 @@ from common.i18n import lazy_t, t
 from common.settings_forms import dependent_block, lock_dependents
 
 from .settings import (
-    AUTOMOTIVE_CRITERIA,
+    REQUIRED_AUTOMOTIVE_CRITERIA,
     TERMINOLOGY_EQUIPMENT,
     TERMINOLOGY_VEHICLE,
     normalize_optional_enhancements,
@@ -18,17 +18,15 @@ from .settings import (
 
 CRITERION_FIELDS = {
     "equipment_type": "criterion_equipment_type",
-    "model_year": "criterion_model_year",
     "generation_chassis": "criterion_generation_chassis",
-    "engine": "criterion_engine",
     "fuel_type": "criterion_fuel_type",
     "trim": "criterion_trim",
-    "transmission": "criterion_transmission",
     "position": "criterion_position",
 }
 
 
 class OptionalEnhancementsSettingsForm(forms.Form):
+    machinery_enabled = forms.BooleanField(required=False, label=lazy_t("optional_machinery_enabled", "Machinery compatibility"), help_text=lazy_t("machine_flow", "Machine type → Manufacturer → Model → Category → Parts or services"))
     automotive_enabled = forms.BooleanField(
         required=False,
         label=lazy_t("optional_automotive_enabled", "Automotive compatibility"),
@@ -57,24 +55,13 @@ class OptionalEnhancementsSettingsForm(forms.Form):
             "Group models by type, such as excavator, loader, or generator.",
         ),
     )
-    criterion_model_year = forms.BooleanField(
-        required=False,
-        label=lazy_t("optional_criterion_model_year", "Model year"),
-        help_text=lazy_t(
-            "optional_criterion_model_year_help",
-            "Match parts by year. Turn off when years do not identify the machine.",
-        ),
-    )
+
     criterion_generation_chassis = forms.BooleanField(
         required=False,
         label=lazy_t("optional_criterion_generation", "Chassis / generation"),
         help_text=lazy_t("optional_criterion_generation_help", "Distinguish platform and chassis generations."),
     )
-    criterion_engine = forms.BooleanField(
-        required=False,
-        label=lazy_t("optional_criterion_engine", "Engine"),
-        help_text=lazy_t("optional_criterion_engine_help", "Use engine code and displacement when matching parts."),
-    )
+
     criterion_fuel_type = forms.BooleanField(
         required=False,
         label=lazy_t("optional_criterion_fuel", "Fuel type"),
@@ -85,11 +72,7 @@ class OptionalEnhancementsSettingsForm(forms.Form):
         label=lazy_t("optional_criterion_trim", "Trim"),
         help_text=lazy_t("optional_criterion_trim_help", "Use trim level when compatibility differs."),
     )
-    criterion_transmission = forms.BooleanField(
-        required=False,
-        label=lazy_t("optional_criterion_transmission", "Transmission"),
-        help_text=lazy_t("optional_criterion_transmission_help", "Distinguish automatic, manual, CVT, and DCT."),
-    )
+
     criterion_position = forms.BooleanField(
         required=False,
         label=lazy_t("optional_criterion_position", "Part position"),
@@ -103,13 +86,17 @@ class OptionalEnhancementsSettingsForm(forms.Form):
         self.current_config = normalize_optional_enhancements(current_value)
         automotive = self.current_config["automotive"]
         initial = dict(kwargs.pop("initial", {}) or {})
+        initial.setdefault("machinery_enabled", self.current_config["machinery"]["enabled"])
         initial.setdefault("automotive_enabled", automotive["enabled"])
         initial.setdefault("terminology", automotive["terminology"])
         for criterion, field_name in CRITERION_FIELDS.items():
             initial.setdefault(field_name, automotive["criteria"][criterion])
         kwargs["initial"] = initial
         super().__init__(*args, **kwargs)
-        lock_dependents(self, "automotive_enabled", ["terminology", *CRITERION_FIELDS.values()])
+        self.fields["terminology"].widget = forms.HiddenInput()
+        self.fields["terminology"].disabled = True
+        self.initial["terminology"] = TERMINOLOGY_VEHICLE
+        lock_dependents(self, "automotive_enabled", list(CRITERION_FIELDS.values()))
 
         self.helper = FormHelper()
         self.helper.form_tag = False
@@ -117,23 +104,36 @@ class OptionalEnhancementsSettingsForm(forms.Form):
             build_settings_toggle_field(self, field_name, css_class="col-12 col-lg-6")
             for field_name in CRITERION_FIELDS.values()
         ]
-        if automotive["enabled"]:
-            manage_vehicle_data = (
-                "<a class='btn btn-sm btn-outline-primary rounded-pill' "
-                "href='/staff/automotive/' data-automotive-manage data-persisted-enabled='true'>"
-                f"<i class='bi bi-sliders me-1'></i>{t('ui_manage_vehicle_data', 'Manage vehicle data')}"
-                "</a>"
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        def manage_action(pack, enabled, label, hint):
+            tag = "a" if enabled else "span"
+            destination = format_html("href='{}'", reverse(f"{pack}:hub")) if enabled else "role='link'"
+            return format_html(
+                "<div class='mt-3'><{tag} class='btn btn-sm btn-outline-primary rounded-pill{disabled}' {destination} "
+                "aria-disabled='{aria}' data-{pack}-manage data-persisted-enabled='{persisted}'>"
+                "<i class='bi bi-sliders me-1'></i>{label}</{tag}>"
+                "<div class='small text-muted mt-2' data-{pack}-manage-hint hidden>{hint}</div></div>",
+                tag=tag, disabled="" if enabled else " disabled", destination=destination,
+                aria="false" if enabled else "true", pack=pack, persisted="true" if enabled else "false",
+                label=label, hint=hint,
             )
-        else:
-            manage_vehicle_data = (
-                "<span class='btn btn-sm btn-outline-primary rounded-pill disabled' role='link' "
-                "aria-disabled='true' data-automotive-manage data-persisted-enabled='false'>"
-                f"<i class='bi bi-sliders me-1'></i>{t('ui_manage_vehicle_data', 'Manage vehicle data')}"
-                "</span>"
-            )
+
+        manage_vehicle_data = manage_action("automotive", automotive["enabled"], t("ui_manage_vehicle_data", "Manage vehicle data"), t("ui_save_vehicle_settings_first", "Save these settings before managing vehicle data."))
+        manage_machinery = manage_action("machinery", self.current_config["machinery"]["enabled"], t("machine_manage", "Manage machinery"), t("machine_save_settings_first", "Save these settings before managing machinery."))
         self.helper.layout = Layout(
             Div(
                 Row(
+                    build_settings_toggle_field(self, "machinery_enabled", css_class="col-12"),
+                    dependent_block(
+                        self, "machinery_enabled",
+                        Div(
+                            HTML(manage_machinery),
+                            css_id="machinery-criteria-fields",
+                        ),
+                        css_class="col-12 mb-3",
+                    ),
                     build_settings_toggle_field(self, "automotive_enabled", css_class="col-12"),
                     css_class="g-3",
                 ),
@@ -143,24 +143,10 @@ class OptionalEnhancementsSettingsForm(forms.Form):
                     Div(
                         HTML(
                             f"<h6 class='fw-semibold mb-1'>{t('optional_automotive_criteria', 'Vehicle criteria')}</h6>"
-                            f"<p class='small text-muted mb-3'>{t('optional_automotive_criteria_help', 'Make, model, and year are always available. Choose the extra criteria this store uses.')}</p>"
+                            f"<p class='small text-muted mb-3'>{t('optional_automotive_criteria_help', 'Make, model, year, engine and transmission are always available. Choose the optional criteria this store uses.')}</p>"
                         ),
                         Row(*criterion_toggles, css_class="g-3"),
-                        HTML(
-                            "<div class='border rounded bg-light p-3 mt-3' data-automotive-workflow-preview "
-                            f"data-core-label='{t('optional_preview_core', 'Make → Model → Year')}' "
-                            f"data-end-label='{t('optional_preview_end', 'Category → Products')}'>"
-                            f"<div class='small text-muted mb-1'>{t('optional_preview_title', 'Staff browsing path')}</div>"
-                            "<div class='fw-semibold' data-automotive-workflow-output></div>"
-                            "</div>"
-                        ),
-                        HTML(
-                            "<div class='mt-3'>"
-                            f"{manage_vehicle_data}"
-                            "<div class='small text-muted mt-2' data-automotive-manage-hint hidden>"
-                            f"{t('ui_save_vehicle_settings_first', 'Save these settings before managing vehicle data.')}"
-                            "</div></div>"
-                        ),
+                        HTML(manage_vehicle_data),
                         css_id="automotive-criteria-fields",
                         css_class="mt-3",
                     ),
@@ -191,14 +177,11 @@ class OptionalEnhancementsSettingsForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get("criterion_fuel_type"):
-            cleaned["criterion_engine"] = True
         if not cleaned.get("automotive_enabled"):
             return cleaned
 
         current_criteria = self.current_config["automotive"]["criteria"]
-        for criterion in AUTOMOTIVE_CRITERIA:
-            field_name = CRITERION_FIELDS[criterion]
+        for criterion, field_name in CRITERION_FIELDS.items():
             if current_criteria[criterion] and not cleaned.get(field_name):
                 count = self._criterion_usage_count(criterion)
                 if count:
@@ -216,11 +199,11 @@ class OptionalEnhancementsSettingsForm(forms.Form):
             criterion: bool(self.cleaned_data.get(field_name))
             for criterion, field_name in CRITERION_FIELDS.items()
         }
-        if criteria["fuel_type"]:
-            criteria["engine"] = True
-        terminology = self.cleaned_data.get("terminology") or TERMINOLOGY_VEHICLE
+        criteria.update({criterion: True for criterion in REQUIRED_AUTOMOTIVE_CRITERIA})
+        terminology = TERMINOLOGY_VEHICLE
         # The wording follows on save of the settings row (terminology.sync_terminology).
         return {
+            "machinery": {"enabled": bool(self.cleaned_data.get("machinery_enabled"))},
             "automotive": {
                 "enabled": bool(self.cleaned_data.get("automotive_enabled")),
                 "terminology": terminology,

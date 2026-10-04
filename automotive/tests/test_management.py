@@ -121,8 +121,8 @@ class AutomotiveManagementTests(TestCase):
             ar_catalog = discover_sidebar_catalog(lang_code="ar")
         en_entry = next(entry for entry in en_catalog if entry["id"] == "automotive:hub")
         ar_entry = next(entry for entry in ar_catalog if entry["id"] == "automotive:hub")
-        self.assertEqual(en_entry["label"], "Automotive Compatibility")
-        self.assertEqual(ar_entry["label"], "توافق قطع السيارات")
+        self.assertEqual(en_entry["label"], "Vehicles Hub")
+        self.assertEqual(ar_entry["label"], "مركز المركبات")
         self.assertEqual(en_entry["permissions"], ["automotive.view_vehiclemake"])
         bump_sidebar_cache_version()
 

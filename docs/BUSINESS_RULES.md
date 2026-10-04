@@ -2,38 +2,42 @@
 
 ## Currency
 
-- A store keeps its costs and prices in one **pricing currency** — **USD**
-  (the default) or **EUR** — and sells locally in **LYD**. The choice is the
-  *Pricing currency* section of **CRM options**, and it applies everywhere:
-  form fields, tables, cards, printouts, the opening-stock workbook and labels
-  («دولار» / «يورو»). The `*_usd` columns keep their names and hold amounts in
-  the pricing currency.
-- LYD prices follow the store's own rate for the pricing currency (usually the
-  **black-market** rate, higher than the official one), set globally by an admin.
-- Manual USD and EUR rates live in `finance.ExchangeRate` as separate
-  **append-only histories**; the newest row for each currency is its live rate.
-- **Switching** the pricing currency converts every product cost and selling
-  price and every service price at the store's cross rate (via LYD), so selling
-  prices in LYD do not move; markup is a ratio and stays. The settings show a
-  preview and require a confirmation tick, and refuse the switch until both a
-  USD and a EUR rate exist. Draft sales invoices move to the new currency with
-  the catalog (their LYD lines unchanged); issued sales invoices and purchase
-  invoices keep the currency they were made in.
-- The Workspace exchange card and the Sales Overview always show **both**
-  currencies: the store's rate (the pricing currency marked), the official CBL
-  and black-market EANLibya rates scraped by Celery, and how long ago each was
-  set or fetched. Scraped rates are references only.
+- Products keep their own **USD** or **EUR** pricing currency (`Product.currency`).
+  Historical `cost_usd` / `price_usd` column names store amounts in that currency.
+  Local selling prices use the corresponding live rate, or a manual LYD override.
+- CRM options → Currency (`switch_pos.pricing`) offers **USD / EUR / BOTH** in one selector. USD/EUR set the default for new products and invoices. BOTH retains the previous default and
+  allows
+  buyers to choose either currency per purchase invoice. Existing purchase
+  permissions apply; there is no additional currency-selection permission.
+- In single-currency mode, currency controls are hidden in product/intake forms and the purchase header; purchases use the default currency. Posting an
+  alternative currency is rejected. Existing products retain their recorded
+  currency and can still be purchased with conversion.
+- Purchase-line cost and selling-price inputs are in the **invoice currency**.
+  The line's Product currency selects how these amounts are stored in the
+  catalog; existing products default to their own currency, new products to
+  the invoice currency. Cross-currency intake requires available rates for
+  both currencies and converts via LYD, rounded to two decimals. The invoice
+  retains its original foreign amounts and frozen rate.
+- Changing the default does **not** reprice products. Service prices and draft
+  sales documents still convert with confirmation and rates for both currencies;
+  issued documents remain unchanged. Services use the default currency. For example, a EUR product costing €20 and selling at €30 retains these amounts after selecting USD-only; its LYD value continues using the EUR working rate. No parallel USD price is stored. Local alias spans the product-form row when its currency selector is hidden.
+- Rate resolution uses the latest manual rate, then the cached scraped market rate, then cached CBL official rate. Celery refreshes external rates; missing manual entries do not block conversions when a scraped rate is available.
+- USD and EUR exchange rates have independent append-only histories. The
+  Workspace shows each working rate with its source plus scraped reference rates. The exchange-rate list includes a current USD/EUR summary (working/manual/market/CBL and collection timestamps) above manual rate history; collected rates do not create manual overrides. Sales Overview also shows rate references.
+- Opening-stock rows/workbooks support Currency and Local Alias. Older sheets
+  without these columns retain an existing product's currency or use the default
+  for a new item. Costs and prices in each row are in its product currency.
 
-## Pricing model — hybrid (pricing-currency base + optional LYD override)
+## Pricing model — hybrid (per-product foreign currency + optional LYD override)
 
 Decided with the owner. For each `Product`:
 
-1. Cost is stored in the pricing currency (`cost_usd`). A `markup_percent` (or an explicit
-   `price_usd`) yields the **selling price** in the pricing currency (`effective_price_usd`).
+1. Cost is stored in the product's currency (`cost_usd`). A `markup_percent` (or an explicit
+   `price_usd`) yields the **selling price** in the product's currency (`effective_price_usd`).
    `Product.save()` **persists** this derived `price_usd` when only cost + markup
    were entered, so the stored record (and its detail view) never shows 0.
 2. The **LYD selling price** is derived live: `effective_price_usd × current_rate`.
-   Change the rate once and every product's LYD price updates everywhere.
+   Changing a currency's rate updates products priced in that currency.
 3. Any item may set a manual **`price_lyd_override`** — a fixed LYD price that
    bypasses conversion (for odd / unrelated goods Switch occasionally resells).
    Left blank, the item sells at the live rate (the default).
@@ -43,7 +47,7 @@ editing markup recomputes the foreign price, editing the foreign price recompute
 editing cost recomputes the foreign price (markup held) while the manual LYD override is
 blank, and the live LYD price is shown as the manual-LYD field's **placeholder**.
 Typing a value into that field turns it into a real fixed override (and back-fills
-USD + markup to match); while that override is present, changing the cost keeps the
+the foreign price + markup to match); while that override is present, changing the cost keeps the
 LYD price fixed and recalculates the implied foreign price + markup from the new cost.
 The detail view adds a computed **"Selling Price (LYD)"** row (via
 `get_modal_context`) so it matches the list.
@@ -51,11 +55,24 @@ The detail view adds a computed **"Selling Price (LYD)"** row (via
 `Service` items follow the same override logic and may also be **"per job"**
 (no fixed price — entered on the invoice).
 
+## Local aliases
+
+Products/parts and vehicle/machine models have an optional `alias` field for
+local Libyan names, alongside the official name. Aliases are editable in the
+existing product/model forms and purchase/opening-stock intake for products.
+Product lists, sales picker, till, direct parts search, vehicle suggestions and
+model lists search aliases. Intake suggestions retain the original product ID
+and official name; an ambiguous alias is not automatically matched. Aliases are
+separate from barcodes and OEM/cross-reference numbers.
+
 ## Frozen rate per invoice
 
 When an invoice is created it records the pricing currency in `Invoice.currency`
 and captures that currency's current rate into `Invoice.exchange_rate`, and every
-line stores its own frozen `unit_price_lyd`. Purchase invoices do the same
+line stores its own frozen `unit_price_lyd`. Product costs are frozen in
+`unit_cost_lyd` at six decimal places using the product currency's rate; financial
+reports use this snapshot so mixed-currency COGS survives subsequent rate and
+product edits. Legacy lines retain their existing foreign-cost/rate fallback. Purchase invoices do the same
 (`PurchaseInvoice.currency`); invoice pages and printouts show the document's own
 currency, not the store's current one. **Later rate changes never
 rewrite a past invoice's totals.** This is correct accounting and matches the owner's
@@ -214,8 +231,9 @@ The optional enhancements add to it only while they are on and the user can use
 them: the **till** puts *Open the till* first in Quick Actions and a *Point of
 Sale* tile with today's till sales (total and count of `PosSale` invoices the
 user may see); **automotive** adds *Browse by vehicle* to Quick Actions and a
-tile with the number of vehicle (machine) models and of active products fitted
-to at least one. Both follow the store's vehicle/machine wording.
+tile with the number of vehicle models and of active products fitted
+to at least one. Independent **machinery** adds its own browsing action/model tile
+with type → manufacturer → model → nested categories, without changing vehicle wording.
 
 Users may hide, reorder, and resize tiles. Those layout preferences are stored
 per user in DjangoLux's reserved app-preferences namespace:
@@ -584,3 +602,11 @@ auto-advances to *assigned* the moment a courier is set, and stamps the delivery
 time on *delivered*. A **courier sees only the jobs assigned to them** and never
 the sales side of the business; a **dispatcher/manager** (`view_all_delivery` +
 `assign_delivery`) sees the whole board and assigns couriers.
+
+### Concurrent invoice issuance
+
+Issuing locks the invoice, then affected products in primary-key order and their variants in primary-key order. It checks fresh locked balances against all demand for each product and each variant before writing any stock-out movement. Two invoices competing for the last unit result in one successful issue and one insufficient-stock rejection. Combined variant and unassigned lines also share the product stock limit. Opening-stock LYD previews use each row’s selected product currency; purchase previews use the invoice currency.
+
+## Client machinery categories
+
+Machinery has an independent enhancement toggle. Parts and services can fit several machine models while retaining one item and stock/pricing history. Model category branches provide the client drill-down; parent category filters include descendants. Repair is a service-only category containing a quoted-per-job maintenance service, with no stock quantity. ZOOM belongs under CIFA as the customer instructed. Only F8 receives the illustrated branches. Full-path workbook categories disambiguate repeated leaf names. See [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md).

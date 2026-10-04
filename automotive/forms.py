@@ -81,7 +81,7 @@ class VehicleMakeForm(AutomotiveModelForm):
 class VehicleModelForm(AutomotiveModelForm):
     class Meta:
         model = VehicleModel
-        fields = ["make", "equipment_type", "name", "is_active"]
+        fields = ["make", "equipment_type", "name", "alias", "is_active"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -94,7 +94,7 @@ class VehicleModelForm(AutomotiveModelForm):
             ).order_by("name")
         else:
             self.fields.pop("equipment_type")
-        self.finish([("make", "equipment_type"), ("name", "is_active")])
+        self.finish([("make", "equipment_type"), ("name", "alias"), ("is_active",)])
 
 
 class VehicleGenerationForm(AutomotiveModelForm):
@@ -105,7 +105,7 @@ class VehicleGenerationForm(AutomotiveModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["vehicle_model"].queryset = _for_user(
-            VehicleModel.objects.filter(is_active=True, make__is_active=True), self.user,
+            VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True), self.user,
         ).select_related("make").order_by("make__name", "name")
         self.finish([
             ("vehicle_model", "name"),
@@ -127,7 +127,7 @@ class VehicleEngineForm(AutomotiveModelForm):
         criteria = get_automotive_config()["criteria"]
         model_id = _selected_id(self, "vehicle_model")
         live_models = _for_user(
-            VehicleModel.objects.filter(is_active=True, make__is_active=True), self.user,
+            VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True), self.user,
         ).select_related("make").order_by("make__name", "name")
         self.fields["vehicle_model"].queryset = live_models
         self.fields["vehicle_model"].help_text = t(
@@ -178,7 +178,7 @@ class VehicleTrimForm(AutomotiveModelForm):
         criteria = get_automotive_config()["criteria"]
         model_id = _selected_id(self, "vehicle_model")
         self.fields["vehicle_model"].queryset = _for_user(
-            VehicleModel.objects.filter(is_active=True, make__is_active=True), self.user,
+            VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True), self.user,
         ).select_related("make").order_by("make__name", "name")
         generations = _for_user(VehicleGeneration.objects.filter(is_active=True), self.user).select_related(
             "vehicle_model", "vehicle_model__make",
@@ -208,7 +208,7 @@ class ProductFitmentForm(AutomotiveModelForm):
         model_id = _selected_id(self, "vehicle_model")
         generation_id = _selected_id(self, "generation")
         models = _for_user(
-            VehicleModel.objects.filter(is_active=True, make__is_active=True), self.user,
+            VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True), self.user,
         ).select_related("make")
         self.fields["vehicle_model"].queryset = models.order_by("make__name", "name")
 

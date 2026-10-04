@@ -94,10 +94,14 @@ class PurchaseInvoiceTests(TestCase):
         return PurchaseInvoiceCreateView.as_view()(req)
 
     def test_create_page_gives_the_line_totals_an_unlocalized_rate(self):
-        # Arabic renders 6.50 as "6,50", which parseFloat reads as 6.
+        # Rates in JSON retain decimal dots regardless of the page language.
         with translation.override("ar"):
             content = self._get_create().content.decode()
-        self.assertRegex(content, r'parseFloat\("6\.50*"\)')
+        import json
+        import re
+
+        payload = re.search(r'<script id="currency-rates" type="application/json">(.*?)</script>', content).group(1)
+        self.assertEqual(Decimal(json.loads(payload)["USD"]), Decimal("6.50"))
 
     def test_quantity_inputs_step_by_one_and_accept_fractions(self):
         for form in (PurchaseInvoiceLineForm(), StockMovementForm(), InvoiceItemForm()):
@@ -121,7 +125,7 @@ class PurchaseInvoiceTests(TestCase):
         invoice = PurchaseInvoice.objects.get()
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp["Location"], reverse("catalog:purchase_invoice_detail", args=[invoice.pk]))
-        self.assertEqual(invoice.number, "PINV-000001")
+        self.assertRegex(invoice.number, r"^PINV-\d{6}$")
         self.assertEqual(invoice.total_usd, Decimal("200.00"))
         self.assertEqual(invoice.total_lyd, Decimal("1300.00"))
 

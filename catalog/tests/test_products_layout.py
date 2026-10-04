@@ -113,7 +113,7 @@ class ProductsLayoutGlobalDefaultTests(TestCase):
 class ProductListViewLayoutTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_superuser("listadmin", "a@example.com", "x")
-        Product.objects.create(name="Widget", cost_usd=Decimal("2.00"), price_usd=Decimal("3.00"))
+        self.product = Product.objects.create(name="Widget", cost_usd=Decimal("2.00"), price_usd=Decimal("3.00"))
 
     def _render(self, user):
         req = _attach(rf.get(reverse("catalog:product_list")), user)
@@ -150,7 +150,7 @@ class ProductListViewLayoutTests(TestCase):
         html = resp.content.decode()
         self.assertIn("data-products-grid", html)
         self.assertIn("dlux-table-shell", html)          # reuses dlux surface
-        self.assertIn("/products/1/card/", html)         # expand → operational item card
+        self.assertIn(reverse("catalog:product_card", args=[self.product.pk]), html)         # expand → operational item card
         self.assertIn("data-products-layout-switch", html)  # toggle still present
 
 

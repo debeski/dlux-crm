@@ -14,11 +14,14 @@ AUTOMOTIVE_CRITERIA = (
     "position",
 )
 
+REQUIRED_AUTOMOTIVE_CRITERIA = ("model_year", "engine", "transmission")
+
 TERMINOLOGY_VEHICLE = "vehicle"
 TERMINOLOGY_EQUIPMENT = "equipment"
 TERMINOLOGIES = (TERMINOLOGY_VEHICLE, TERMINOLOGY_EQUIPMENT)
 
 OPTIONAL_ENHANCEMENTS_DEFAULTS = {
+    "machinery": {"enabled": False},
     "automotive": {
         "enabled": False,
         "terminology": TERMINOLOGY_VEHICLE,
@@ -30,6 +33,8 @@ OPTIONAL_ENHANCEMENTS_DEFAULTS = {
 def normalize_optional_enhancements(value):
     normalized = deepcopy(OPTIONAL_ENHANCEMENTS_DEFAULTS)
     source = value if isinstance(value, dict) else {}
+    machinery = source.get("machinery", {})
+    normalized["machinery"]["enabled"] = isinstance(machinery, dict) and machinery.get("enabled") is True
     automotive = source.get("automotive")
     automotive = automotive if isinstance(automotive, dict) else {}
     criteria = automotive.get("criteria")
@@ -43,10 +48,8 @@ def normalize_optional_enhancements(value):
         if criterion in criteria:
             normalized_automotive["criteria"][criterion] = criteria[criterion] is True
 
-    # Fuel is an engine attribute. A malformed direct JSON write must not leave
-    # the application with fuel filtering enabled while engines are unavailable.
-    if normalized_automotive["criteria"]["fuel_type"]:
-        normalized_automotive["criteria"]["engine"] = True
+    for criterion in REQUIRED_AUTOMOTIVE_CRITERIA:
+        normalized_automotive["criteria"][criterion] = True
     return normalized
 
 

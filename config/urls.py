@@ -47,6 +47,7 @@ staff_urlpatterns = [
     path("finance/", include(("finance.urls", "finance"), namespace="finance")),
     path("catalog/", include(("catalog.urls", "catalog"), namespace="catalog")),
     path("sales/", include(("sales.urls", "sales"), namespace="sales")),
+    path("machinery/", include(("machinery.urls", "machinery"), namespace="machinery")),
     path("automotive/", include(("automotive.urls", "automotive"), namespace="automotive")),
     # DjangoLux generated routes end
 

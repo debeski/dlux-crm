@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from django import forms
@@ -12,7 +13,8 @@ from common.forms import (
     QUANTITY_INPUT_ATTRS, apply_dlux_file_widgets, build_grid_helper, translate_choice_fields,
     translate_help_text,
 )
-from finance.services import get_current_rate
+from finance.services import get_current_rate, has_configured_rate
+from finance.currency import CURRENCY_CHOICES, active_currencies, pricing_currency
 
 from .models import (
     Category, Product, ProductBarcode, PurchaseInvoice, Service, StockMovement, Supplier, PRODUCT_COLOR_SWATCHES,
@@ -121,13 +123,23 @@ class CategoryForm(forms.ModelForm):
 
     class Meta:
         model = Category
-        fields = ["name", "description", "is_active"]
+        fields = ["name", "parent", "is_service", "description", "is_active"]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, request=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        from common.views import scope_filtered_queryset
+        user = user or getattr(request, "user", None)
+        if user is not None:
+            self.fields["parent"].queryset = scope_filtered_queryset(self.fields["parent"].queryset, user)
+            if not self.instance.pk:
+                from dlux.utils import get_user_scope, is_scope_enabled
+                if is_scope_enabled():
+                    self.instance.scope = get_user_scope(user)
+        if self.instance.pk:
+            self.fields["parent"].queryset = self.fields["parent"].queryset.filter(scope_id=self.instance.scope_id).exclude(pk__in=self.instance.descendant_ids())
         set_field_attrs(self)
         translate_help_text(self)
-        build_grid_helper(self, [("name", "is_active"), "description"])
+        build_grid_helper(self, [("name", "is_active"), ("parent", "is_service"), "description"])
 
 
 class SupplierForm(forms.ModelForm):
@@ -156,7 +168,7 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         # stock_qty is intentionally excluded: stock is driven by StockMovement so
         # the ledger stays authoritative. Use a "Stock In" movement to seed quantity.
         fields = [
-            "name", "sku", "category", "barcode", "image_asset", "unit",
+            "name", "alias", "currency", "sku", "category", "barcode", "image_asset", "unit",
             "description",
             "cost_usd", "markup_percent", "price_usd", "price_lyd_override",
             "track_stock", "reorder_level", "is_active",
@@ -168,7 +180,10 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         from automotive.product_form import AutomotiveProductExtension
 
+        self.fields["category"].queryset = self.fields["category"].queryset.filter(is_service=False)
         self.automotive = AutomotiveProductExtension.attach(self, request)
+        from machinery.forms import attach_machine_models
+        self.has_machinery = attach_machine_models(self, user or getattr(request, "user", None), self.instance, request)
         codes = ", ".join(self.instance.extra_barcodes.values_list("code", flat=True)) if self.instance.pk else ""
         self.fields["extra_barcodes"] = forms.CharField(
             required=False, initial=codes, label=get_strings().get("label_extra_barcodes", "Extra barcodes"),
@@ -178,6 +193,14 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         scanned = getattr(request, "GET", {}).get("barcode") if request is not None else None
         if scanned and not self.is_bound and not self.instance.pk:
             self.initial["barcode"] = scanned[:64]
+        self.fields["currency"].required = False
+        if len(active_currencies()) == 1:
+            self.fields["currency"].widget = forms.HiddenInput()
+            self.fields["currency"].disabled = True
+        self.fields["currency"].widget.attrs.update({
+            "data-product-currency": "1",
+            "data-currency-rates": json.dumps({code: str(get_current_rate(code)) for code, _ in CURRENCY_CHOICES}),
+        })
         self.fields["sku"].required = False
         # Data hooks the price-sync JS keys off (see catalog/js/price_sync.js).
         self.fields["cost_usd"].widget.attrs["data-price-cost"] = "1"
@@ -192,8 +215,13 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
         # LYD field's placeholder to show the live derived price, so clear it here.
         self.fields["price_lyd_override"].widget.attrs.pop("placeholder", None)
         _use_dlux_image_widget(self)
+        self.fields["cost_usd"].label = get_strings().get("ui_doc_cost", "Cost")
+        self.fields["price_usd"].label = get_strings().get("ui_doc_price", "Selling price")
+        for name in ("cost_usd", "price_usd"):
+            self.fields[name].widget.attrs["placeholder"] = self.fields[name].label
         rows = [
             ("name", "sku"),
+            ("alias",) if self.fields["currency"].widget.is_hidden else ("alias", "currency"),
             ("category", "unit"),
             ("barcode", "extra_barcodes"),
             ("image_asset",),
@@ -202,9 +230,20 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
             ("track_stock", "is_active"),
             ("description",),
         ]
+        if self.has_machinery:
+            rows.insert(3, ("machine_models",))
         if self.automotive:
             rows = self.automotive.layout(rows)
         build_grid_helper(self, rows)
+
+    def clean_currency(self):
+        currency = self.cleaned_data.get("currency") or self.instance.currency or pricing_currency()
+        if currency != self.instance.currency and currency not in active_currencies():
+            raise forms.ValidationError(get_strings().get("purchase_currency_inactive", "This currency is not active."))
+        if self.instance.pk and currency != self.instance.currency:
+            if not all(has_configured_rate(code) for code in (currency, self.instance.currency)):
+                raise forms.ValidationError(get_strings().get("purchase_currency_rates", "Set exchange rates for both currencies first."))
+        return currency
 
     def clean(self):
         cleaned_data = super().clean()
@@ -233,6 +272,8 @@ class ProductForm(ManagedAssetFormMixin, forms.ModelForm):
 
     def _save_m2m(self):
         super()._save_m2m()
+        from machinery.forms import save_machine_models
+        save_machine_models(self, self.instance)
         if self.automotive:
             self.automotive.save(self.instance)
         wanted = self.cleaned_data.get("extra_barcodes") or []
@@ -252,10 +293,12 @@ class ServiceForm(ManagedAssetFormMixin, forms.ModelForm):
 
     class Meta:
         model = Service
-        fields = ["name", "service_type", "image_asset", "description", "price_usd", "price_lyd_override", "is_active"]
+        fields = ["name", "category", "service_type", "image_asset", "description", "price_usd", "price_lyd_override", "is_active"]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, request=None, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        from machinery.forms import attach_machine_models
+        self.has_machinery = attach_machine_models(self, user or getattr(request, "user", None), self.instance, request)
         self.fields["price_usd"].widget.attrs["data-price-usd"] = "1"
         self.fields["price_lyd_override"].widget.attrs["data-price-lyd"] = "1"
         _tag_lyd_field(self, "price_lyd_override")
@@ -264,12 +307,22 @@ class ServiceForm(ManagedAssetFormMixin, forms.ModelForm):
         translate_help_text(self)
         self.fields["price_lyd_override"].widget.attrs.pop("placeholder", None)
         _use_dlux_image_widget(self)
-        build_grid_helper(self, [
+        rows = [
             ("name", "service_type"),
             ("image_asset",),
             ("price_usd", "price_lyd_override", "is_active"),
             ("description",),
-        ])
+        ]
+        if self.has_machinery:
+            rows.insert(1, ("category", "machine_models"))
+        else:
+            self.fields.pop("category", None)
+        build_grid_helper(self, rows)
+
+    def _save_m2m(self):
+        super()._save_m2m()
+        from machinery.forms import save_machine_models
+        save_machine_models(self, self.instance)
 
 
 class VariantProductSelect(forms.Select):
@@ -321,15 +374,22 @@ class PurchaseInvoiceForm(forms.ModelForm):
         model = PurchaseInvoice
         fields = [
             "supplier", "supplier_name", "supplier_phone", "supplier_address",
-            "invoice_date", "attachment", "notes",
+            "invoice_date", "currency", "attachment", "notes",
         ]
         widgets = {
             "invoice_date": forms.DateInput(attrs={"type": "date"}),
             "supplier": forms.HiddenInput(),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["currency"].required = False
+        self.fields["currency"].initial = pricing_currency()
+        self.can_choose_currency = user is not None and user.has_perm("catalog.add_purchaseinvoice")
+        self.fields["currency"].choices = [(code, code) for code in active_currencies()]
+        self.fields["currency"].disabled = not self.can_choose_currency or len(active_currencies()) == 1
+        if self.fields["currency"].disabled:
+            self.fields["currency"].widget = forms.HiddenInput()
         self.fields["supplier"].required = False
         self.fields["supplier_name"].required = True
         self.fields["supplier_name"].widget.attrs.update({
@@ -343,9 +403,19 @@ class PurchaseInvoiceForm(forms.ModelForm):
         build_grid_helper(self, [
             ("supplier_name", "supplier_phone"),
             ("supplier_address", "invoice_date"),
+            ("currency",),
             ("notes",),
             ("attachment",),
         ])
+
+    def clean_currency(self):
+        currency = self.cleaned_data.get("currency") or pricing_currency()
+        raw = self.data.get(self.add_prefix("currency")) if self.is_bound else None
+        if self.fields["currency"].disabled and raw and raw != pricing_currency():
+            raise forms.ValidationError(get_strings().get("purchase_currency_denied", "You cannot select this purchase currency."))
+        if currency != pricing_currency() and not has_configured_rate(currency):
+            raise forms.ValidationError(get_strings().get("purchase_currency_rates", "Set exchange rates for both currencies first."))
+        return currency
 
 
 class OpeningStockLineForm(forms.Form):
@@ -358,7 +428,9 @@ class OpeningStockLineForm(forms.Form):
 
     product = forms.IntegerField(required=False, widget=forms.HiddenInput())
     name = forms.CharField(required=False, max_length=200)
-    category = forms.ModelChoiceField(queryset=Category.objects.all(), required=False)
+    alias = forms.CharField(required=False, max_length=200)
+    currency = forms.ChoiceField(required=False, choices=CURRENCY_CHOICES)
+    category = forms.ModelChoiceField(queryset=Category.objects.filter(is_service=False), required=False)
     unit = forms.ChoiceField(choices=Product.UNIT_CHOICES, initial=Product.UNIT_PIECE)
     barcode = forms.CharField(required=False, max_length=64)
     color = forms.ChoiceField(required=False, choices=[("", "---------"), *Product.COLOR_CHOICES], widget=ColorPaletteWidget(choices=Product.COLOR_CHOICES))
@@ -369,21 +441,25 @@ class OpeningStockLineForm(forms.Form):
     price_lyd_override = forms.DecimalField(required=False, min_value=0, max_digits=14, decimal_places=2)
     quantity = forms.DecimalField(required=False, min_value=0, max_digits=12, decimal_places=2, initial=Decimal("0"))
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        from machinery.forms import attach_machine_models
+        attach_machine_models(self, user)
         from common.i18n import t
 
         s = get_strings()
         labels = {
             "name": s.get("label_product_name", "Name"),
+            "alias": s.get("label_product_alias", "Local alias"),
+            "currency": s.get("label_product_currency", "Product currency"),
             "category": s.get("label_product_category", "Category"),
             "unit": s.get("label_product_unit", "Unit"),
             "barcode": s.get("label_product_barcode", "Barcode"),
             "color": s.get("label_product_color", "Color"),
             "size": s.get("label_product_size", "Size / Spec"),
-            "cost_usd": s.get("label_product_cost_usd", "Import Cost (USD)"),
+            "cost_usd": s.get("ui_doc_cost", "Cost"),
             "markup_percent": s.get("label_product_markup_percent", "Markup %"),
-            "price_usd": s.get("label_product_price_usd", "Selling Price (USD)"),
+            "price_usd": s.get("ui_doc_price", "Selling price"),
             "price_lyd_override": s.get("label_product_price_lyd_override", "Manual LYD Price"),
             "quantity": s.get("label_openingstockline_quantity", "Qty in Storage"),
         }
@@ -400,6 +476,14 @@ class OpeningStockLineForm(forms.Form):
         self.fields["price_usd"].widget.attrs["data-price-usd"] = "1"
         self.fields["price_lyd_override"].widget.attrs["data-price-lyd"] = "1"
         self.fields["price_lyd_override"].widget.attrs["data-usd-rate"] = str(get_current_rate())
+        if len(active_currencies()) == 1:
+            self.fields["currency"].widget = forms.HiddenInput()
+            self.fields["currency"].initial = pricing_currency()
+        self.fields["currency"].initial = pricing_currency()
+        self.fields["currency"].widget.attrs.update({
+            "data-product-currency": "1",
+            "data-currency-rates": json.dumps({code: str(get_current_rate(code)) for code, _ in CURRENCY_CHOICES}),
+        })
         # Self-contained Bootstrap styling (no ModelForm, so set_field_attrs doesn't apply).
         for name, field in self.fields.items():
             w = field.widget
@@ -414,12 +498,29 @@ class OpeningStockLineForm(forms.Form):
         self.fields["quantity"].widget.attrs.update(QUANTITY_INPUT_ATTRS)
 
 
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("DELETE"):
+            return cleaned
+        product = Product.objects.filter(pk=cleaned.get("product")).first() if cleaned.get("product") else None
+        if product is None and cleaned.get("name"):
+            product = Product.objects.filter(name__iexact=cleaned["name"]).first()
+        currency = cleaned.get("currency")
+        if currency and currency not in active_currencies() and (product is None or currency != product.currency):
+            self.add_error("currency", get_strings().get("purchase_currency_inactive", "This currency is not active."))
+        return cleaned
+
+
 class PurchaseInvoiceLineForm(OpeningStockLineForm):
     """Purchase-line row with the same product autofill/price-sync controls as
     Opening Stock, but a filled row must carry a positive purchased quantity."""
 
-    def __init__(self, *args, user=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, user=None, invoice_currency=None, **kwargs):
+        super().__init__(*args, user=user, **kwargs)
+        self.invoice_currency = invoice_currency or pricing_currency()
+        self.fields["price_lyd_override"].widget.attrs["data-usd-rate"] = str(get_current_rate(self.invoice_currency))
+        self.fields["currency"].widget.attrs.pop("data-product-currency", None)
+        self.fields["currency"].initial = self.invoice_currency
         s = get_strings()
         self.fields["quantity"].label = s.get("label_purchaseinvoiceline_quantity", "Qty Purchased")
         self.fields["quantity"].widget.attrs["placeholder"] = self.fields["quantity"].label
@@ -432,6 +533,12 @@ class PurchaseInvoiceLineForm(OpeningStockLineForm):
         cleaned = super().clean()
         if cleaned.get("DELETE"):
             return cleaned
+        product = Product.objects.filter(pk=cleaned.get("product")).first() if cleaned.get("product") else None
+        currency = cleaned.get("currency") or (product.currency if product else self.invoice_currency)
+        if currency != (product.currency if product else self.invoice_currency) and currency not in active_currencies():
+            self.add_error("currency", get_strings().get("purchase_currency_inactive", "This currency is not active."))
+        if currency != self.invoice_currency and not all(has_configured_rate(code) for code in (currency, self.invoice_currency)):
+            self.add_error("currency", get_strings().get("purchase_currency_rates", "Set exchange rates for both currencies first."))
         if self.fits_enabled:
             from automotive.product_form import clean_line_fits
 

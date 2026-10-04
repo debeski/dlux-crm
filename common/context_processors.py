@@ -51,3 +51,40 @@ def pricing_currency(request):
     from finance.currency import pricing_currency as current
 
     return {"PRICING_CURRENCY": current()}
+
+
+def crm_context(request):
+    """Apply enhancement visibility to discovered and manually saved navigation."""
+    from dlux.context_processors import dlux_context
+    from automotive.settings import get_optional_enhancements_config
+    from django.urls import reverse
+
+    context = dict(dlux_context(request))
+    config = get_optional_enhancements_config()
+    disabled = {name: reverse(f"{name}:hub") for name in ("automotive", "machinery") if not config.get(name, {}).get("enabled", False)}
+
+    def hidden(item):
+        name = str(item.get("url_name") or item.get("id") or "")
+        url = str(item.get("url") or "")
+        return any(name.startswith(f"{app}:") or url.startswith(prefix) for app, prefix in disabled.items())
+
+    def visible(items):
+        result = []
+        for original in items or []:
+            item = dict(original)
+            if item.get("kind") == "group":
+                item["items"] = visible(item.get("items"))
+                if not item["items"]:
+                    continue
+                if hidden(item):
+                    item["url"] = "#"
+                    item["url_name"] = None
+            elif hidden(item):
+                continue
+            result.append(item)
+        return result
+
+    for key in ("sidebar_entries", "sidebar_tree_state", "sidebar_auto_items", "sidebar_extra_groups"):
+        context[key] = visible(context.get(key))
+    context["sidebar"] = {**context.get("sidebar", {}), "entries": context["sidebar_entries"], "auto_items": context["sidebar_auto_items"], "extra_groups": context["sidebar_extra_groups"]}
+    return context

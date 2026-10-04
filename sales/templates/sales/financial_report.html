@@ -3,7 +3,7 @@
 {% block title %}{{ DLUX_STRINGS.page_financial_report|default:"Financial Report" }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="dlux-list-page">
     {% dlux_ribbon %}
 
     <p class="text-muted small mb-3">{{ DLUX_STRINGS.ui_fiscal_year|default:"Fiscal year" }} {{ year }} · {{ report.date_from }} → {{ report.date_to }}</p>

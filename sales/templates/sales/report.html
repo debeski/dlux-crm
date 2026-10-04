@@ -4,10 +4,10 @@
 {% block title %}{{ DLUX_STRINGS.ui_sales_report }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="dlux-list-page">
     {% dlux_ribbon %}
 
-    <form method="get" class="row g-2 align-items-end mb-4">
+    <form data-dlux-entry-clipboard="false" method="get" class="row g-2 align-items-end mb-4">
         <div class="col-auto">
             <label class="form-label small mb-1">{{ DLUX_STRINGS.ui_from }}</label>
             <input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}" class="form-control">

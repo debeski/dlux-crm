@@ -3,7 +3,7 @@
 {% block title %}{{ DLUX_STRINGS.page_inventory_valuation|default:"Inventory Valuation" }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="dlux-list-page">
     {% dlux_ribbon %}
 
     <div class="row g-3 mb-4">
@@ -11,7 +11,7 @@
             <div class="dlux-table-shell h-100 p-3">
                 <div class="text-muted small text-uppercase">{{ DLUX_STRINGS.ui_valuation_cost_value|default:"Stock Value at Cost" }}</div>
                 <div class="h4 mb-0">{{ total_lyd|floatformat:2 }} <span class="fs-6 text-muted">LYD</span></div>
-                <div class="small text-muted">{{ total_usd|floatformat:2 }} {{ PRICING_CURRENCY }}</div>
+                <div class="small text-muted">{% for currency, value in foreign_totals.items %}{{ value|floatformat:2 }} {{ currency }}{% if not forloop.last %} / {% endif %}{% endfor %}</div>
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
@@ -44,8 +44,8 @@
                     <tr>
                         <th>{{ DLUX_STRINGS.label_product_name|default:"Name" }}</th>
                         <th class="text-end">{{ DLUX_STRINGS.ui_system_qty|default:"Stock" }}</th>
-                        <th class="text-end">{{ DLUX_STRINGS.label_product_cost_usd|default:"Cost (USD)" }}</th>
-                        <th class="text-end">{{ DLUX_STRINGS.ui_value_usd|default:"Value (USD)" }}</th>
+                        <th class="text-end">{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }}</th>
+                        <th class="text-end">{{ DLUX_STRINGS.ui_doc_foreign_total|default:"Foreign total" }}</th>
                         <th class="text-end">{{ DLUX_STRINGS.ui_value_lyd|default:"Value (LYD)" }}</th>
                         <th class="text-end">{{ DLUX_STRINGS.label_product_selling_price_lyd|default:"Selling Price (LYD)" }}</th>
                         <th class="text-end">{{ DLUX_STRINGS.ui_valuation_sale_value_lyd|default:"Sale Value (LYD)" }}</th>
@@ -57,8 +57,8 @@
                     <tr>
                         <td>{{ r.product.name }}</td>
                         <td class="text-end text-muted">{{ r.stock_qty|floatformat:"-2" }}</td>
-                        <td class="text-end text-muted">{{ r.cost_usd|floatformat:2 }}</td>
-                        <td class="text-end">{{ r.value_usd|floatformat:2 }}</td>
+                        <td class="text-end text-muted">{{ r.cost_usd|floatformat:2 }} {{ r.product.currency }}</td>
+                        <td class="text-end">{{ r.value_usd|floatformat:2 }} {{ r.product.currency }}</td>
                         <td class="text-end fw-semibold">{{ r.value_lyd|floatformat:2 }}</td>
                         <td class="text-end text-muted">{{ r.price_lyd|floatformat:2 }}</td>
                         <td class="text-end">{{ r.sale_lyd|floatformat:2 }}</td>
@@ -73,7 +73,7 @@
                     <tr>
                         <td>{{ DLUX_STRINGS.ui_total|default:"Total" }}</td>
                         <td></td><td></td>
-                        <td class="text-end">{{ total_usd|floatformat:2 }}</td>
+                        <td class="text-end">{% for currency, value in foreign_totals.items %}{{ value|floatformat:2 }} {{ currency }}{% if not forloop.last %} / {% endif %}{% endfor %}</td>
                         <td class="text-end">{{ total_lyd|floatformat:2 }}</td>
                         <td></td>
                         <td class="text-end">{{ total_sale_lyd|floatformat:2 }}</td>

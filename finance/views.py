@@ -28,6 +28,15 @@ class ExchangeRateListView(ScopedListView):
     permission_required = "finance.view_exchangerate"
     table_class = ExchangeRateTable
     filterset_class = ExchangeRateFilter
+    template_name = "finance/exchange_rate_list.html"
+
+    def get_context_data(self, **kwargs):
+        from .services import rate_overview
+
+        context = super().get_context_data(**kwargs)
+        context["rate_overview"] = rate_overview()
+        return context
+
     page_title_key = "page_exchange_rates"
     page_subtitle_key = "page_exchange_rates_sub"
 

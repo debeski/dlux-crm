@@ -120,13 +120,13 @@ def search_vehicles(query, *, user, criteria, limit=SEARCH_LIMIT, include_shared
 
     live_model = Q(vehicle_model__is_active=True, vehicle_model__make__is_active=True)
     models = _scoped(
-        VehicleModel.objects.filter(is_active=True, make__is_active=True),
+        VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True),
         user,
     ).select_related("make")
     generations = _scoped(VehicleGeneration.objects.filter(live_model, is_active=True), user).select_related(
         "vehicle_model", "vehicle_model__make",
     )
-    model_paths = ["make__name", "name"]
+    model_paths = ["make__name", "name", "alias"]
     if criteria.get("equipment_type"):
         model_paths.append("equipment_type__name")
     name_paths = tuple(f"vehicle_model__{path}" for path in model_paths)
@@ -250,7 +250,7 @@ def parse_chips(raw, *, user, criteria, existing_ids=()):
 
     existing_ids = set(existing_ids)
     kept, rows, seen = set(), [], set()
-    models = _scoped(VehicleModel.objects.filter(is_active=True, make__is_active=True), user)
+    models = _scoped(VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True), user)
     generations = _scoped(VehicleGeneration.objects.filter(is_active=True), user)
     engines = _scoped(VehicleEngine.objects.filter(is_active=True), user)
     trims = _scoped(VehicleTrim.objects.filter(is_active=True), user)
@@ -412,7 +412,7 @@ def products_with_fitments(query, *, user, limit=15):
     text = (query or "").strip()
     if text:
         products = products.filter(
-            Q(name__icontains=text) | Q(sku__icontains=text) | Q(barcode__icontains=text)
+            Q(name__icontains=text) | Q(alias__icontains=text) | Q(sku__icontains=text) | Q(barcode__icontains=text)
             | part_number_q(text),
         )
     products = products.annotate(

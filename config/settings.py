@@ -108,6 +108,7 @@ INSTALLED_APPS = [
     "finance",
     "catalog",
     "automotive",
+    "machinery",
     "sales",
     "public_catalog",
     # DjangoLux generated apps end
@@ -224,3 +225,11 @@ dlux_settings(globals())
 # DjangoLux integration
 from dlux.utils import dlux_settings
 dlux_settings(globals())
+
+# Keep saved navigation subject to the same enhancement switches as its routes.
+for template_backend in TEMPLATES:
+    processors = template_backend.get("OPTIONS", {}).get("context_processors", [])
+    template_backend["OPTIONS"]["context_processors"] = [
+        "common.context_processors.crm_context" if processor == "dlux.context_processors.dlux_context" else processor
+        for processor in processors
+    ]

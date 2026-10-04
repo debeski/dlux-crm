@@ -98,7 +98,7 @@ def lookup(query, *, user):
         return {"exact": True, "items": [_item(exact[0], None, rate)]}
 
     matches = products.filter(
-        Q(name__icontains=text) | Q(sku__icontains=text) | Q(barcode__icontains=text)
+        Q(name__icontains=text) | Q(alias__icontains=text) | Q(sku__icontains=text) | Q(barcode__icontains=text)
         | Q(pk__in=_part_number_products(text, products).values("pk"))
     ).order_by("name")[:LOOKUP_LIMIT]
     return {"exact": False, "items": [_item(product, None, rate) for product in matches]}

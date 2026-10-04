@@ -111,7 +111,7 @@
             list.forEach(function (item) {
                 if (mode === "products") {
                     if (cat && String(item.category_id) !== String(cat)) return;
-                    if (term && item.name.toLowerCase().indexOf(term) === -1
+                    if (term && item.name.toLowerCase().indexOf(term) === -1 && (item.alias || "").toLowerCase().indexOf(term) === -1
                         && (item.category || "").toLowerCase().indexOf(term) === -1) return;
                     grid.appendChild(productTile(item));
                 } else {

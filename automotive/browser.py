@@ -79,6 +79,7 @@ class VehicleBrowser:
             | Q(vehicle_model__isnull=True, engine__isnull=False),
             product__is_active=True,
         )
+        self.fitments = self.fitments.exclude(vehicle_model__migrated_machine__isnull=False)
         if self.criteria["generation_chassis"]:
             self.fitments = self.fitments.filter(
                 Q(generation__isnull=True) | Q(generation__is_active=True),
@@ -95,6 +96,8 @@ class VehicleBrowser:
     def _queryset(self, model):
         """Apply the browser's soft-delete and scope policy once per request."""
         queryset = model.all_objects.filter(deleted_at__isnull=True)
+        if model is VehicleModel:
+            queryset = queryset.filter(migrated_machine__isnull=True)
         if not self.scope_enabled or getattr(self.user, "is_superuser", False):
             return queryset
         try:
@@ -229,6 +232,7 @@ class VehicleBrowser:
     def _direct_search(self, query):
         queryset = self.products.filter(
             Q(name__icontains=query)
+            | Q(alias__icontains=query)
             | Q(sku__icontains=query)
             | Q(barcode__icontains=query)
             | Q(extra_barcodes__code=query, extra_barcodes__deleted_at__isnull=True)

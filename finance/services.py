@@ -79,7 +79,8 @@ def get_current_rate(currency=None):
     """Return the live currency->LYD rate (the pricing currency by default).
 
     Cached to keep product-list price computations from issuing one query per row.
-    Returns ``DEFAULT_RATE`` if no rate has ever been configured.
+    Falls back to cached market and CBL rates; ``DEFAULT_RATE`` is only
+    used when all real sources are unavailable.
     """
     currency = str(currency or pricing_currency()).upper()
     if currency not in dict(ExchangeRate.CURRENCY_CHOICES):
@@ -94,15 +95,30 @@ def get_current_rate(currency=None):
         .values_list("rate", flat=True)
         .first()
     )
-    rate = Decimal(latest) if latest is not None else DEFAULT_RATE
-    cache.set(cache_key, rate, 60 * 60)
-    return rate
+    if latest is not None:
+        rate = Decimal(latest)
+        cache.set(cache_key, rate, 60 * 60)
+        return rate
+    return scraped_rate(currency) or DEFAULT_RATE
 
 
 def has_configured_rate(currency=None):
-    """True once an admin has entered at least one real exchange rate."""
+    """Whether a manual, scraped market or official CBL rate is available."""
     currency = str(currency or pricing_currency()).upper()
-    return ExchangeRate.objects.filter(currency=currency).exists()
+    return ExchangeRate.objects.filter(currency=currency).exists() or scraped_rate(currency) is not None
+
+
+def scraped_rate(currency):
+    """Use cached parallel-market rates first, then official CBL rates."""
+    for key, field in ((EAN_RATE_CACHE_KEYS[currency], "rate"), (CBL_RATE_CACHE_KEYS[currency], "average")):
+        data = cache.get(key) or {}
+        try:
+            rate = Decimal(str(data.get(field)))
+            if rate.is_finite() and rate > 0:
+                return rate
+        except (ArithmeticError, ValueError, TypeError):
+            continue
+    return None
 
 
 def usd_to_lyd(amount_usd, rate=None):
@@ -340,6 +356,8 @@ def rate_overview():
         reference = market if market is not None else official
         rows.append({
             "code": code,
+            "working": get_current_rate(code),
+            "working_source": "manual" if store is not None else "market" if market is not None else "official" if official is not None else "unavailable",
             "is_pricing": code == current,
             "store": store,
             "store_at": latest.created_at if latest else None,

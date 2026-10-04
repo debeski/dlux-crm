@@ -11,6 +11,14 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.11.0 currency and machinery
+
+DjangoLux stays pinned to latest stable 1.10.1 (PyPI checked 2026-10-04). This release adds concurrent USD/EUR purchase entry, per-product currencies and aliases, frozen invoice costs, independent machinery compatibility and service-only category branches. Normal startup applies `automotive.0004`, `catalog.0010–0012`, `sales.0011` and `machinery.0001–0002`. Back up the database before upgrading. The machinery data migration preserves original vehicle records and copies legacy equipment compatibility; it does not erase stock or invoices.
+
+For the client-specific CIFA diagram, run the idempotent `python manage.py seed_machine_categories` after migration if that vocabulary is wanted. It creates the illustrated F8 branches and quoted Repair service, with no invented stock or prices. Vehicle year/engine/transmission criteria are always enabled; the five extra criteria remain configurable. Both enhancements can coexist, and saved sidebar entries obey their switches.
+
+Release validation on 2026-10-04 passes all 428 project PostgreSQL tests and both Node invoice-editor checks. The fresh image passes `scripts/smoke-test.sh` (system checks, migration drift, complete fresh migrations and Gunicorn startup); all 423 packaged stable-wheel SQLite tests pass (4 PostgreSQL-only cases skipped, covered by the PostgreSQL run). Local dev source mounts can expose newer framework features; the published image uses the pinned stable wheel. Docker excludes `.xclude` backups; CI includes machinery tests.
+
 ## v0.10.2 cancellation settlements
 
 DjangoLux remains pinned to the verified latest stable PyPI wheel, 1.10.1.

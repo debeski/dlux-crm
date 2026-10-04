@@ -488,6 +488,15 @@ serial prefixes) are the next candidate criterion.
 
 ## Phase 4 — Bulk Migration, Audit, and Retailer Pilot
 
+### Customer revision (2026-10-03)
+
+- Client diagram received and implemented: independent machinery vocabulary, nested categories, and product/service compatibility. Repair is a service; ZOOM is under CIFA. Vehicle qualifiers remain in the automotive enhancement. See CLIENT_CATEGORIZATION.md.
+- Product/part and VehicleModel/machine now have an `alias` field for local
+  Libyan names alongside their official names, with form entry and keyword search.
+- The current field holds one local name at product/model level. Revisit its
+  aliases also live on the new MachineModel; original aliases are copied during migration.
+  Local-name aliases are distinct from OEM/cross-reference part numbers.
+
 ### Goal
 
 Make launch data practical to load and safe to verify.

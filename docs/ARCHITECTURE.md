@@ -303,20 +303,32 @@ release. Keep `dlux_static` for DjangoLux's own files.
 
 - `get_current_rate(currency=None)` — the live currency→LYD rate (newest
   matching `ExchangeRate` row, cached independently for USD and EUR); without a
-  currency it is the store's **pricing currency** (`finance.currency`).
+  currency it is the store's **default currency** (`finance.currency`).
 - `usd_to_lyd()` / `lyd_to_usd()` / `eur_to_lyd()` / `quantize_lyd()` —
   conversions with consistent 2-dp rounding. The `usd` names are historic: like
-  the `*_usd` columns they mean the pricing currency.
+  the `*_usd` columns they mean the associated record's foreign currency.
 - `rate_overview()` — both currencies' store, CBL and EAN rates with their
   ages, for the Workspace exchange card and the Sales Overview.
 
-`finance/currency.py` holds the pricing currency (`switch_pos.pricing`, a CRM
-options section) and the switch: `convert_on_switch` on `SystemSettings`
-`pre_save` converts catalog prices and draft sales invoices inside a
-transaction before the new currency is written, so the tile, the setup wizard and
-configuration imports all convert, and a failed conversion keeps the old
-currency. `Invoice.currency` / `PurchaseInvoice.currency` default to the pricing
-currency (existing rows were migrated as USD).
+`finance/currency.py` holds the default currency and `both_active` flag under
+`switch_pos.pricing`. Products store their own `currency`; `pricing_rate()` and
+`selling_price_lyd()` resolve the product's rate. Purchase headers expose active
+currencies under the existing `catalog.add_purchaseinvoice` permission, rejecting
+inactive or unauthorized posted choices. Intake converts invoice-currency amounts
+into the target product currency; line snapshots remain in the invoice currency.
+`catalog.0010` backfills existing product currencies from persisted store settings,
+including soft-deleted products, without changing amounts. It removes recognized
+legacy currency-label overrides while preserving custom wording, and adds Product.alias;
+`automotive.0004` adds VehicleModel.alias.
+
+`convert_on_switch` still re-expresses services and draft sales invoices inside a
+transaction before the new default is written. Product currencies/prices remain
+unchanged. `Invoice.currency` and `PurchaseInvoice.currency` default to the store
+currency; issued documents retain their snapshots. `sales.0011` adds six-decimal
+`InvoiceItem.unit_cost_lyd` for product-currency COGS. Financial reports prefer that
+snapshot and retain the legacy fallback for older lines. Stock valuation and
+workspace aggregates convert each product independently; foreign totals are shown
+separately by currency rather than adding USD and EUR amounts together.
 
 ### Store wording
 
@@ -367,3 +379,15 @@ scope target invoices, customers, and source invoices by ownership. Credit
 allocations are separate from `Payment`, preventing reuse from double-counting
 cash/deposits. Financial-report refund outflows use settlement dates, while
 credit and pending-refund liabilities are current snapshots.
+
+The exchange-rate overview extends the scoped DLux list and renders its current-rate summary as two compact USD/EUR `dlux_card` control surfaces using the DLux control-panel stylesheet and theme variables. The scoped-list `scoped_before_ribbon` extension slot places this summary above the ribbon without copying the DLux list shell. The cards share a desktop row and stack on mobile, with working-rate/source badges and manual/market/CBL quotes.
+
+Sales Overview and Exchange Rates share `finance/includes/currency_wall.html`, using the same working-rate source, reference quotes, timestamps and responsive DLux cards. Exchange Rates places them above its ribbon; Sales Overview embeds them in its existing summary-card row with flexible columns that fill available space and stack on narrow screens.
+
+Sales Report date filters use `data-dlux-entry-clipboard="false"` to opt out of the DLux assisted-entry clipboard bar.
+
+Inventory Valuation, Sales Overview, Sales Report and Financial Report use the standard `dlux-list-page` wrapper inside the already padded DLux shell; avoid nested `container-fluid py-4` padding.
+
+## Independent machinery enhancement
+
+`machinery` references catalog products/services through model compatibility M2Ms, alongside the independent `automotive` app. Its type/manufacturer/model vocabulary has no vehicle qualifiers. `catalog.Category.parent` provides nested part branches; service-only leaves use `is_service`, and `Service.category` places Repair in the same browser tree. Legacy machine models/aliases/fitments are copied without deleting their original vehicle records or changing stock/prices. See [client diagram implementation](CLIENT_CATEGORIZATION.md).

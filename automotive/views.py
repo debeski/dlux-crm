@@ -57,6 +57,10 @@ class AutomotiveEnabledMixin:
 
 class OptionalEnhancementModalGuardMixin:
     def dispatch(self, request, *args, **kwargs):
+        if kwargs.get("app_label") == "machinery":
+            from machinery.settings import machinery_enabled
+            if not machinery_enabled():
+                raise Http404
         if kwargs.get("app_label") == "automotive":
             config = get_automotive_config()
             model_name = kwargs.get("model_name", "").lower()
@@ -183,7 +187,7 @@ class VehicleModelListView(AutomotiveListView):
     page_subtitle_key = "page_vehicle_models_sub"
 
     def get_queryset(self):
-        return super().get_queryset().select_related("make", "equipment_type")
+        return super().get_queryset().filter(migrated_machine__isnull=True).select_related("make", "equipment_type")
 
 
 class VehicleGenerationListView(AutomotiveListView):

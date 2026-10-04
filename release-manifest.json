@@ -1,12 +1,15 @@
 {
   "schema_version": 1,
-  "version": "0.10.2",
-  "summary": "Sale invoices save after removing items; cancellation supports refunds, customer credit, and unresolved payments.",
+  "version": "0.11.0",
+  "summary": "Concurrent USD/EUR purchases, per-product pricing currencies, local aliases and independent machinery compatibility.",
   "highlights": [
-    "Removing a sale invoice item no longer blocks saving the draft.",
-    "Cancel a sale with a recorded refund, customer credit for a later invoice, or an amount to resolve later.",
-    "Customer credit can pay later invoices; original receipts and settlement history remain intact.",
-    "Financial reports separate refunds, net collected money, and customer credit from sales."
+    "Enable USD and EUR together and choose a currency when entering a purchase invoice.",
+    "Each product keeps its own pricing currency; purchases convert into it while preserving invoice amounts.",
+    "Mixed-currency sales and stock valuation use the correct product rates and frozen costs.",
+    "Local alias fields make parts and machines searchable by familiar names.",
+    "Independent machinery hub and browser follow manufacturer/model category branches, including repair services.",
+    "Shared vehicle and machinery components, enhancement-aware ribbons/sidebar and corrected optional vehicle criteria.",
+    "Compact working-rate cards include manual, market and central-bank fallback rates."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.10.2"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.11.0"
 }

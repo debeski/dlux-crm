@@ -48,7 +48,7 @@ def prefill_chip(params, user):
     if not model_id:
         return None
     vehicle_model = scope_filtered_queryset(
-        VehicleModel.objects.filter(is_active=True).select_related("make"), user,
+        VehicleModel.objects.filter(is_active=True, migrated_machine__isnull=True).select_related("make"), user,
     ).filter(pk=model_id).first()
     if vehicle_model is None:
         return None
