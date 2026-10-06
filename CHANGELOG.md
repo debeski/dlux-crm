@@ -1,5 +1,8 @@
 # Changelog
 
+## v0.11.1
+- **Maintenance Page Returns On Any End State**: `.proxy/maintenance.html` probes the URL it is shown at on `ready`, `completed` or `rolled_back` (as it already did after `failed`) and reloads it once the app answers. It used to reload blindly on `ready`, and only after seeing a progress phase or 20 seconds, so a reload could land back on the page; the probe also targeted `/` rather than the visitor's page. Mirrors DjangoLux 1.11.0b2's scaffold page.
+
 ## v0.11.0
 - **Release Build Hygiene**: Exclude `.xclude` source backups and superseded files from Docker image contexts; CI includes the new machinery test suite.
 - **Vehicle Criteria Policy**: Optional enhancements exposes only machine type, generation/chassis, fuel type, trim and position switches; normalized vehicle year/engine/transmission are always enabled, including legacy disabled settings. Both settings workflow-preview cards removed and machine Manage section gains bottom spacing; machinery diagram steps remain required.

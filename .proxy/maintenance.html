@@ -36,18 +36,20 @@
     var STATUS_URL = '/_update/status.json', LOG_URL = '/_update/log.txt';
     var PCT = { preparing: 8, starting: 12, pulling: 38, recreating: 62, migrating: 84, restarting: 72, ready: 100, failed: 100 };
     var LABEL = { preparing: 'Preparing…', starting: 'Starting…', pulling: 'Pulling the new image…', recreating: 'Recreating containers…', migrating: 'Applying database migrations…', restarting: 'Restarting services…', ready: 'Done', failed: 'Update failed' };
-    var IN_PROGRESS = { preparing: 1, starting: 1, pulling: 1, recreating: 1, migrating: 1, restarting: 1 };
     var fill = document.getElementById('fill'), phase = document.getElementById('phase'),
         cons = document.getElementById('console'), title = document.getElementById('title'),
         subtitle = document.getElementById('subtitle'), actions = document.getElementById('actions');
-    var sawProgress = false, done = false, started = Date.now(), recoveryTimer = null;
+    var done = false, recoveryTimer = null;
 
     function setBar(p, cls) { fill.style.width = Math.max(0, Math.min(100, p)) + '%'; fill.className = 'fill' + (cls ? ' ' + cls : ''); }
 
+    // The proxy serves this page as a 503 at the URL the visitor asked for: once
+    // the update ends, probe that URL and reload it as soon as the app answers.
+    // A stale end state from an earlier update is harmless; the probe waits.
     function scheduleRecoveryProbe() {
       if (recoveryTimer !== null) return;
       function probeRecovery() {
-        fetch('/', { cache: 'no-store', credentials: 'same-origin' })
+        fetch(window.location.href, { cache: 'no-store', credentials: 'same-origin' })
           .then(function (response) {
             if (response.ok) {
               window.location.reload();
@@ -71,7 +73,6 @@
         var doc = res[0], logText = (res[1] || '').trim();
         if (logText) { cons.hidden = false; cons.textContent = logText; cons.scrollTop = cons.scrollHeight; }
         var st = doc && typeof doc.status === 'string' ? doc.status : '';
-        if (IN_PROGRESS[st]) sawProgress = true;
         if (st) { phase.textContent = LABEL[st] || st; setBar(PCT[st] != null ? PCT[st] : 15); }
 
         if (st === 'failed') {
@@ -80,12 +81,10 @@
           setBar(100, 'failed'); phase.textContent = 'Failed'; actions.hidden = false;
           scheduleRecoveryProbe(); return;
         }
-        // Honor 'ready' only after real progress this session (ignore a stale
-        // 'ready' left over from a previous update) or after a safety timeout.
-        if (st === 'ready' && (sawProgress || Date.now() - started > 20000)) {
+        if (st === 'ready' || st === 'completed' || st === 'rolled_back') {
           done = true; title.textContent = 'Update complete'; subtitle.textContent = 'Reconnecting…';
           setBar(100, 'ok'); phase.textContent = 'Done';
-          setTimeout(function () { window.location.reload(); }, 1200); return;
+          scheduleRecoveryProbe(); return;
         }
         setTimeout(poll, 2000);
       });
