@@ -1,15 +1,9 @@
 {
   "schema_version": 1,
-  "version": "0.11.0",
-  "summary": "Concurrent USD/EUR purchases, per-product pricing currencies, local aliases and independent machinery compatibility.",
+  "version": "0.11.1",
+  "summary": "The update progress page returns to the page you were on as soon as the site is back.",
   "highlights": [
-    "Enable USD and EUR together and choose a currency when entering a purchase invoice.",
-    "Each product keeps its own pricing currency; purchases convert into it while preserving invoice amounts.",
-    "Mixed-currency sales and stock valuation use the correct product rates and frozen costs.",
-    "Local alias fields make parts and machines searchable by familiar names.",
-    "Independent machinery hub and browser follow manufacturer/model category branches, including repair services.",
-    "Shared vehicle and machinery components, enhancement-aware ribbons/sidebar and corrected optional vehicle criteria.",
-    "Compact working-rate cards include manual, market and central-bank fallback rates."
+    "After an image update the progress page returns to your page as soon as the site answers, instead of reloading blindly or waiting up to 20 seconds."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.11.0"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.11.1"
 }

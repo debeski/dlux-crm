@@ -7,7 +7,7 @@
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
-- 2026-09-24 baseline: official PyPI 1.9.3 wheel SHA-256 verified; 285 tests (including automotive) and cached-base ARM64 image smoke pass. Fresh amd64 build blocked by PyPI download failures.
+- v0.11.1 (untagged, on `main`, 2026-10-06): `.proxy/maintenance.html` probes and returns to the visitor's own URL on any end state (was: blind reload on `ready`, gated on a seen progress phase or 20 s, probe to `/`). Browser-checked against a 503->200 stub. Deployed stacks keep their old page until it is copied over; Composer does not auto-replace customised pages.
 ### Current Project Adopted Standards: [Max 5 lines]
 - Scoped models via `dlux.ScopedModel`; lists are `common.ScopedListView` on the dlux Ribbon + `dlux/list_page.html` (non-list pages use `common.RibbonPageMixin`), CRUD through the modal manager.
 - Products retain `currency`; sales freeze `unit_price_lyd` + six-decimal `unit_cost_lyd`, purchases freeze their own currency/rate; finance is dependency root. Decimals fed to JS go through `|unlocalize` (Arabic renders `9,85`).
