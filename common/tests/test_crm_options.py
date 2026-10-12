@@ -45,6 +45,7 @@ class CrmOptionsTileTests(TestCase):
         data = {
             "pricing-currency": "USD",
             "products_layout-default_layout": "grid",
+            "public_catalog-public_enabled": "on",
             "public_catalog-shop_title": "Heavy Parts",
             "public_catalog-shop_subtitle": "",
             "public_catalog-contact_phone": "",
@@ -84,6 +85,21 @@ class CrmOptionsTileTests(TestCase):
         pos = get_app_system_config("switch_pos.point_of_sale")
         self.assertEqual((pos["enabled"], pos["receipt_size"], pos["max_discount_percent"]), (True, "58", "15"))
         self.assertIsNone(get_app_system_config(CRM_OPTIONS_GROUP))
+
+    def test_public_site_switch_locks_its_fields_and_keeps_their_values(self):
+        from public_catalog.settings import set_public_catalog_config
+
+        set_public_catalog_config({"shop_title": "Kept", "homepage_enabled": False, "featured_limit": 7})
+        response = self.post(**{"public_catalog-public_enabled": "", "public_catalog-shop_title": "Ignored"})
+        self.assertTrue(response.json().get("success"), response.json().get("html", "")[:500])
+        public = get_app_system_config("switch_pos.public_catalog")
+        self.assertFalse(public["enabled"])
+        self.assertEqual(public["shop_title"], "Kept", "a locked field keeps its stored value")
+        self.assertEqual((public["homepage_enabled"], public["featured_limit"]), (False, 7), "builder keys are kept")
+
+        html = self.client.get(self.url).json()["html"]
+        self.assertIn(field("public_catalog-public_enabled"), html)
+        self.assertRegex(html, r'name="{}"[^>]*disabled'.format(field("public_catalog-shop_title")))
 
     def test_an_invalid_section_saves_nothing(self):
         response = self.post(**{"point_of_sale-max_discount_percent": "150"})

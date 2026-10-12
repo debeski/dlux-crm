@@ -7,6 +7,8 @@
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
 - Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
+- 2026-10-12 (uncommitted, `main`): 72 Arabic permission-manager labels added; CRM options *Public site* switch (off = staff-only: public URLs -> /staff/, builders hidden); `common/permission_visibility.py` hides Vehicles/Machinery/POS/public-catalog permission cards while off (needs DjangoLux branch `permission-visibility`; skipped on 1.10.1). Translation audit lives in DjangoLux branch `translation-audit` (`manage.py dlux_translations`). Dev :84 runs `main` + DjangoLux `permission-visibility` via scratch overlay; DB backup `/tmp/crm-sales-dev-before-opening-template.dump`.
+- v0.11.1 (untagged, `main`, 2026-10-12): Opening Stock Import Excel gains a Download template (`catalog/opening_stock_template.py`: headers, notes, drop-downs, localized Instructions sheet) and a per-column guide; importer prefers the `Opening Stock` sheet and rejects nameless rows. Uncommitted.
 - v0.11.1 (untagged, on `main`, 2026-10-06): `.proxy/maintenance.html` probes and returns to the visitor's own URL on any end state (was: blind reload on `ready`, gated on a seen progress phase or 20 s, probe to `/`). Browser-checked against a 503->200 stub. Deployed stacks keep their old page until it is copied over; Composer does not auto-replace customised pages.
 ### Current Project Adopted Standards: [Max 5 lines]
 - Scoped models via `dlux.ScopedModel`; lists are `common.ScopedListView` on the dlux Ribbon + `dlux/list_page.html` (non-list pages use `common.RibbonPageMixin`), CRUD through the modal manager.
@@ -25,11 +27,11 @@
 - 2026-07-18: Release/update path audit covers Caddy TLS, Composer recovery, baked Dlux gate, and project manifest metadata.
 - 2026-08-03: Fixed DLUX source resolves 24 nav candidates/0 API; suffix and nested API names reject while `rapid_report` remains valid.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
+- Open from the 2026-10-12 audits: Import Excel preview shows English row errors/`create` badge/raw color codes in Arabic; session cookie still `switch_pos_sessionid`; DjangoLux group form home-page list shows untranslated page names (`dlux/discovery/catalog.py`); `tests/test_scaffold.py` still asserts the pre-v0.11.1 maintenance probe.
 - Live VPS/SSH stays severely slow with Compose down; disk/CPU/kernel logs are clean, narrowing the fault to UFW configuration or the provider network/hypervisor rather than Dlux.
 - Live VM likely runs stale Caddy/Compose: apex/www serve old portfolio while current repo proxies Django and redirects ERP.
 - Deployment SMTP credentials are unset, so contact relay cannot authenticate.
 - Composer 1.4.1 scaffold v3 is active; resident services use `agent run` / `executor run`. Update Composer with `./start.sh self update`.
-- Local reused SQLite has obsolete `sales_invoice.attachment`; fresh migrated databases are correct.
 ### Incomplete Tasks: [Max 20 lines]
 - **Priority 1 — run it:**
   - [x] v0.10.1 released 2026-10-01: `{% asset %}` content-hash versioning for all 31 project CSS/JS links (stale workspace card after update).
@@ -61,7 +63,6 @@
   - [x] Machinery replacement (2026-10-03): new scoped app, client vocabulary, shared model fitments, local aliases, DLux browser and modals; original engines/year/trim records retained for recovery. No engine/trim controls in machine flow.
   - [x] v0.9.0 (untagged) parts-first automotive UX: Fits picker in Product modal, Same cars as…/Assign vehicles, `PartProfile`/`ProductPartNumber` extension (Product unchanged), browser Find a vehicle + Add part, purchase-line fits, `/staff/` → browser, Vehicle/Year product filters (2026-09-28).
   - [x] v0.8.4 (untagged, merged into this branch): public storefront labels, modals, contact form/links and untouched homepage seed copy follow the visitor language (`public_*` / `hp_seed_*` keys) (2026-09-29).
-  - [x] Generated app READMEs now recommend the Dlux Ribbon instead of the deprecated `advanced_filter_helper`; active code has no helper or `AUDIT_FIELD_NAMES` dependency (merged 2026-09-26).
   - [x] DjangoLux runtime pin advanced exactly from 1.8.13 to 1.9.1 for the v0.8.0 release candidate (2026-09-23).
   - [x] Bundled `config.json` made retailer-neutral: removed Switch/SwitchLibya assets, copy, contacts and public-site app payloads; retained a valid generic settings snapshot (2026-09-23).
   - [x] Automotive UX: removed settings notice, save-gated Manage action, enhancement-gated bilingual hub sidebar entry, and consistent hover/focus behavior across all seven hub cards (2026-09-23).
@@ -74,19 +75,17 @@
   - [x] Product/Service/Listing images moved onto dlux 1.8.4 `ManagedAssetField` (namespaces `catalog.product`, `catalog.service`, `public_catalog.publiccataloglisting`), with `image_url` readers, camera capture, and the `adopt_image_assets` dry-run backfill (2026-09-02).
   - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
-  - [x] Scaffold: `composer check --fix` (wrappers v1, executor hardening, obsolete services out, post-start label), image rebuilt on 1.8.3, `dlux-updater` retired, `DLUX_BAKED_VERSION` removed, dev on :84 (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
+- 2026-10-12 (late): 445 CRM tests on DjangoLux `permission-visibility` (labels only; DjangoLux mounted in /app also discovers its own suite) — only `tests.test_scaffold` stale probe fails; public-site switch browser-checked on :84 and restored on.
+- 2026-10-12: SQLite throwaway `sales-web` container on `main`: 431 run, 1 failure = `tests.test_scaffold` still asserts the pre-v0.11.1 maintenance probe to `/` (stale test, not the template work); 8/8 Opening Stock Excel tests incl. Arabic template; check + makemigrations clean.
 - 2026-10-04: 111 targeted PostgreSQL cases validated (12 management/label cases pass on final rerun); released v0.11.0: 428 PostgreSQL + 423 packaged SQLite tests (4 PG-only skips) + 2 Node checks pass; fresh image smoke passes.
-- 2026-09-30: v0.9.0 release check — 358/358 incl. automotive + scaffold on the 1.10.0 image; manifest validated for tag v0.9.0.
 - 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
 - 2026-09-29: 344/344 app tests after v0.8.4 merge + dependent settings; earlier 341/341 (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
-- 2026-09-29: v0.8.4 storefront i18n — CI set 249/249 (SQLite, throwaway `sales-deck-shots` container), migrations clean, manifest validator OK for v0.8.4.
-- 2026-09-26: dlux 1.9.4 — CI test set 248/248 (SQLite), check/migration drift clean, 17 enabled ribbon lists render; hashed 1.9.4 wheel from PyPI.
 ### One-line info about last time edited Docs: [Max 2 lines]
+- 2026-10-12: OPERATIONS/BUSINESS_RULES/PERMISSIONS Import Excel step documents the template, column guide and importer hardening; CHANGELOG v0.11.1.
 - 2026-10-03: CLIENT_CATEGORIZATION/ARCHITECTURE/BUSINESS_RULES/PERMISSIONS/OPERATIONS/QA_WORKFLOWS and changelog document independent machinery, client seed, safe legacy migration and validation.
-- 2026-10-02: BUSINESS_RULES/ARCHITECTURE/PERMISSIONS + RELEASING cover settlements, credit/reporting and verified live dev release procedure; CHANGELOG/manifest/VERSION aligned at v0.10.2.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:
 - No project venv: run tests in `sales-web-1` (`python manage.py test ... --settings=config.settings_dev_sqlite`); new static needs `collectstatic` there before Caddy serves it.

@@ -7,7 +7,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.html import format_html
 from django.utils.translation import gettext as _
@@ -35,8 +35,9 @@ from .models import (
     product_color_hex,
 )
 from .opening_stock_import import (
-    OpeningStockImportError, import_columns, restore_rows, validate_workbook,
+    OpeningStockImportError, column_guide, restore_rows, validate_workbook,
 )
+from .opening_stock_template import build_template
 from .product_layouts import (
     PRODUCTS_LAYOUT_GRID, PRODUCTS_LAYOUT_LIGHT, PRODUCTS_LAYOUT_NS, PRODUCTS_LAYOUTS,
     get_products_layout,
@@ -621,7 +622,7 @@ class OpeningStockEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
             "current_rate": get_current_rate(),
             "product_map_json": self._product_map(),
             "products": Product.objects.order_by("name"),
-            "import_columns": import_columns(),
+            "import_guide": column_guide(),
         }
 
     @staticmethod
@@ -706,6 +707,21 @@ class OpeningStockImportPreviewView(LoginRequiredMixin, PermissionRequiredMixin,
             result.pop("valid_rows", None)
         result["token"] = token
         return JsonResponse(result)
+
+
+class OpeningStockImportTemplateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    """Download the XLSX template the opening-stock importer accepts."""
+
+    permission_required = OpeningStockEditorView.permission_required
+    raise_exception = True
+
+    def get(self, request):
+        response = HttpResponse(
+            build_template(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = 'attachment; filename="opening-stock-template.xlsx"'
+        return response
 
 
 class OpeningStockImportFinalizeView(LoginRequiredMixin, PermissionRequiredMixin, View):

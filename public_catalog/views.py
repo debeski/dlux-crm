@@ -3,7 +3,7 @@ from django.http import Http404, JsonResponse
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.generic import DetailView, TemplateView
@@ -16,7 +16,7 @@ from common.identity import store_name
 from .forms import PublicContactForm
 from .homepage import get_homepage_config, resolve_homepage, resolve_sections
 from .models import PublicCatalogListing, PublicContactMessage
-from .settings import contact_links, get_public_catalog_config
+from .settings import contact_links, get_public_catalog_config, public_site_enabled
 
 HOMEPAGE_PREVIEW_PERM = "public_catalog.view_publiccataloglisting"
 PUBLIC_PREVIEW_LANG_ATTR = "_public_preview_language"
@@ -111,6 +111,9 @@ class _StorefrontGateMixin:
     gate_key = "shop_enabled"
 
     def dispatch(self, request, *args, **kwargs):
+        if not public_site_enabled():
+            # Staff-only install: the site address opens the staff side instead.
+            return redirect("staff_entry")
         _apply_public_language(request)
         cfg = get_public_catalog_config()
         if not cfg.get(self.gate_key, True) and not _is_staff_preview(request):
@@ -266,7 +269,7 @@ class PublicItemDetailView(_StorefrontGateMixin, DetailView):
 
 
 def public_item_modal(request, slug):
-    if not get_public_catalog_config().get("shop_enabled", True):
+    if not public_site_enabled() or not get_public_catalog_config().get("shop_enabled", True):
         raise Http404("Storefront is offline.")
     listing = get_object_or_404(PublicCatalogListing.objects.published(), slug=slug)
     if not listing.show_when_unavailable and not listing.is_available_for_public:
@@ -341,6 +344,8 @@ def _send_contact_email(message):
 
 
 def public_contact_modal(request):
+    if not public_site_enabled():
+        raise Http404("The public site is off.")
     if request.method == "GET":
         sent = bool(request.session.pop("public_contact_sent", False))
         return _render_contact_modal(request, sent=sent)

@@ -42,6 +42,14 @@ financial-report revenue/cash/refund/credit separation. The dev database was
 backed up first; QA records are labelled `Release v0.10.2 QA` and the temporary
 test account is disabled after verification.
 
+## v0.11.1 dependency baseline
+
+v0.11.1 pins `django-lux[updater]==1.11.0` (hash-pinned wheel). It needs 1.11 for
+`register_permission_visibility_filter` (the Public site switch hides public-catalog,
+vehicle, machinery and POS permission cards while off). Upgrading from 1.10.x needs an
+image rebuild (DjangoLux floor `>=1.11.0b7`); DjangoLux migrations 0024/0025 are
+additive. Check PyPI for the latest DjangoLux before every release.
+
 ## v0.10.1 dependency baseline
 
 v0.10.1 pins `django-lux[updater]==1.10.1` (hash-pinned wheel). Same Composer

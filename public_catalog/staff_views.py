@@ -1,6 +1,7 @@
 import functools
 import json
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
@@ -13,7 +14,9 @@ from catalog.models import Product, Service
 from common.views import RibbonPageMixin
 
 from .models import PublicCatalogListing
-from .settings import PUBLIC_CATALOG_NS, get_public_catalog_config, set_public_catalog_config
+from common.i18n import t
+
+from .settings import PUBLIC_CATALOG_NS, get_public_catalog_config, public_site_enabled, set_public_catalog_config
 
 EDIT_PERM = "public_catalog.change_publiccataloglisting"
 
@@ -28,6 +31,8 @@ def mutation_endpoint(view):
     @login_required
     @functools.wraps(view)
     def wrapper(request, *args, **kwargs):
+        if not public_site_enabled():
+            raise Http404("The public site is off.")
         if request.method not in ("POST", "PUT", "PATCH"):
             if request.method == "GET" and _is_navigation_get(request):
                 return redirect("public_catalog_staff:builder")
@@ -148,7 +153,20 @@ def _resolve_listing(request, *, create):
     return listing, True
 
 
-class PublicCatalogBuilderView(RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class _PublicSiteOnMixin:
+    """Builders exist only while the public site is on (System settings → CRM options)."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not public_site_enabled():
+            messages.info(request, t(
+                "public_site_off_notice",
+                "The public site is off. Turn it on in System settings → CRM options → Public catalog.",
+            ))
+            return redirect("staff_entry")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class PublicCatalogBuilderView(_PublicSiteOnMixin, RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "public_catalog/shop_builder.html"
     permission_required = "public_catalog.view_publiccataloglisting"
     ribbon_title_icon = "bi bi-shop-window"
@@ -292,7 +310,7 @@ def _save_homepage_image(uploaded, prefix):
     return default_storage.url(saved)
 
 
-class PublicHomepageBuilderView(RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+class PublicHomepageBuilderView(_PublicSiteOnMixin, RibbonPageMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     template_name = "public_catalog/homepage_builder.html"
     permission_required = "public_catalog.view_publiccataloglisting"
     ribbon_title_icon = "bi bi-easel2"

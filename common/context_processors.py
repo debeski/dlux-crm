@@ -62,6 +62,10 @@ def crm_context(request):
     context = dict(dlux_context(request))
     config = get_optional_enhancements_config()
     disabled = {name: reverse(f"{name}:hub") for name in ("automotive", "machinery") if not config.get(name, {}).get("enabled", False)}
+    from public_catalog.settings import public_site_enabled
+
+    if not public_site_enabled():
+        disabled["public_catalog_staff"] = reverse("public_catalog_staff:builder")
 
     def hidden(item):
         name = str(item.get("url_name") or item.get("id") or "")

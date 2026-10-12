@@ -156,6 +156,7 @@ DLUX_STRINGS = {
         "perm_delete_staffledgerentry": "Can delete Staff Ledger Entry",
         "perm_resolve_staffledgerentry": "Can resolve staff ledger entries",
         "perm_view_all_staffledgerentry": "Can view all staff ledger entries",
+        "perm_view_all_cashdeposit": "Can view all cash deposits (not just own)",
     },
     "ar": {
         "pricing_both_active": "تفعيل الدولار واليورو معاً",
@@ -314,5 +315,6 @@ DLUX_STRINGS = {
         "perm_delete_staffledgerentry": "حذف حركة حساب موظف",
         "perm_resolve_staffledgerentry": "تسوية حركات حسابات الموظفين",
         "perm_view_all_staffledgerentry": "عرض كل حركات حسابات الموظفين",
+        "perm_view_all_cashdeposit": "عرض جميع الإيداعات النقدية (وليس الخاصة فقط)",
     },
 }

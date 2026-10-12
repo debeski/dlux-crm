@@ -7,6 +7,7 @@ from .views import (
     OpeningStockEditorView,  # one-time bulk intake (posts Stock In movements)
     OpeningStockImportFinalizeView,
     OpeningStockImportPreviewView,
+    OpeningStockImportTemplateView,
     ProductCardView,
     ProductListView,
     PurchaseInvoiceCreateView,
@@ -43,6 +44,8 @@ _opening_stock_import_preview = OpeningStockImportPreviewView.as_view()
 _opening_stock_import_preview.sidebar_exclude = True
 _opening_stock_import_finalize = OpeningStockImportFinalizeView.as_view()
 _opening_stock_import_finalize.sidebar_exclude = True
+_opening_stock_import_template = OpeningStockImportTemplateView.as_view()
+_opening_stock_import_template.sidebar_exclude = True
 
 _purchase_invoice_create = PurchaseInvoiceCreateView.as_view()
 _purchase_invoice_create.sidebar_exclude = True
@@ -75,6 +78,11 @@ urlpatterns = [
         "stock-movements/opening-stock/import/finalize/",
         _opening_stock_import_finalize,
         name="opening_stock_import_finalize",
+    ),
+    path(
+        "stock-movements/opening-stock/import/template/",
+        _opening_stock_import_template,
+        name="opening_stock_import_template",
     ),
     path("stock-movements/opening-stock/view/", _opening_stock_detail, name="opening_stock_detail"),
     path("stock-takes/", StockTakeListView.as_view(), name="stock_take_list"),

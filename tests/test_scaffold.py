@@ -32,7 +32,7 @@ class ProjectScaffoldTests(SimpleTestCase):
         page_path = Path(__file__).resolve().parents[1] / ".proxy" / "maintenance.html"
         contents = page_path.read_text(encoding="utf-8")
         self.assertIn("scheduleRecoveryProbe", contents)
-        self.assertIn("fetch('/', { cache: 'no-store', credentials: 'same-origin' })", contents)
+        self.assertIn("fetch(window.location.href, { cache: 'no-store', credentials: 'same-origin' })", contents)
         self.assertIn("window.location.reload()", contents)
 
     def test_dlux_requirement_is_an_exact_pin(self):

@@ -5,7 +5,7 @@ from zipfile import BadZipFile, ZipFile
 
 from django.core.exceptions import ValidationError
 
-from finance.currency import pricing_currency
+from finance.currency import active_currencies, pricing_currency
 
 from .forms import OpeningStockLineForm
 from .models import Category, Product
@@ -14,6 +14,7 @@ from .models import Category, Product
 MAX_IMPORT_BYTES = 2 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 25 * 1024 * 1024
 MAX_IMPORT_ROWS = 1000
+TEMPLATE_SHEET = "Opening Stock"
 
 IMPORT_COLUMNS = (
     ("name", "Name", True),
@@ -84,6 +85,41 @@ def import_columns(currency=None):
     """Neutral money headers; each row carries its product currency."""
     currency = currency or pricing_currency()
     return tuple((key, label.replace("USD", currency), required) for key, label, required in IMPORT_COLUMNS)
+
+
+COLUMN_EXAMPLES = {
+    "name": "Brake Pad",
+    "alias": "فحمات فرامل",
+    "currency": "USD",
+    "category": "Brakes",
+    "unit": "Pair",
+    "barcode": "6241234567890",
+    "color": "Black",
+    "size": "Front",
+    "cost_usd": "12",
+    "markup_percent": "25",
+    "price_usd": "15",
+    "price_lyd_override": "",
+    "quantity": "6",
+}
+
+
+def column_guide():
+    """Columns offered to users (template and import help), described in the active language."""
+    from common.i18n import t
+
+    multi_currency = len(active_currencies()) > 1
+    return [
+        {
+            "key": key,
+            "label": label,
+            "required": required,
+            "description": t(f"opening_col_{key}"),
+            "example": COLUMN_EXAMPLES[key],
+        }
+        for key, label, required in import_columns()
+        if key != "currency" or multi_currency
+    ]
 
 
 class OpeningStockImportError(ValidationError):
@@ -220,7 +256,7 @@ def validate_workbook(upload):
         workbook = load_workbook(
             BytesIO(content), read_only=True, data_only=True, keep_links=False
         )
-        sheet = workbook.active
+        sheet = workbook[TEMPLATE_SHEET] if TEMPLATE_SHEET in workbook.sheetnames else workbook.active
     except OpeningStockImportError:
         raise
     except BadZipFile as exc:
@@ -247,14 +283,16 @@ def validate_workbook(upload):
     seen_variant_keys = set()
     product_values = {}
     for index, cells in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
-        if index > MAX_IMPORT_ROWS + 1:
-            raise OpeningStockImportError(f"A workbook may contain at most {MAX_IMPORT_ROWS} data rows.")
         source = {key: value for key, value in zip(headers, cells) if key}
         if not any(_text(value) for value in source.values()):
             continue
+        if index > MAX_IMPORT_ROWS + 1:
+            raise OpeningStockImportError(f"A workbook may contain at most {MAX_IMPORT_ROWS} data rows.")
 
         errors = []
         name = _text(source.get("name"))
+        if not name:
+            errors.append("Name is required.")
         barcode = _text(source.get("barcode"))
         try:
             category = _category(source.get("category"))

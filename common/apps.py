@@ -22,6 +22,11 @@ class CommonConfig(AppConfig):
 
         register_modal_queryset_filter(apply_ownership)
 
+        # Vehicles, Machinery and POS permissions leave the permission editors while switched off.
+        from .permission_visibility import register as register_permission_visibility
+
+        register_permission_visibility()
+
         # Store wording (machine vs vehicle, EUR vs USD) follows every save of the
         # settings row and every migrate; apps register their axes in their own ready().
         from django.db.models.signals import post_migrate, post_save

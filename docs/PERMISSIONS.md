@@ -163,6 +163,18 @@ pricing, stock or invoices.
 
 ## Public catalog
 
+**Public site switch.** System settings → CRM options → Public catalog starts with a
+*Public site* toggle (`switch_pos.public_catalog.enabled`, default on;
+`public_catalog.options_forms.PublicCatalogSettingsForm`). Off makes the install
+staff-only: `/`, `/shop/` and item pages redirect to `/staff/` (`staff_entry`), the item
+and contact modals return 404, both builders redirect to the staff home with a notice and
+their POST endpoints return 404, the builders leave the sidebar
+(`common.context_processors.crm_context`), and the `public_catalog` permission cards are
+hidden (grants kept). The section's other fields are greyed out and keep their values;
+the builders' homepage/shop live flags and featured limit are preserved, so switching
+back on restores the site as it was.
+
+
 The public catalog is a curated read-only projection of internal catalog records.
 `public_catalog.PublicCatalogListing` links exactly one active Product or one active
 Service to a public slug, title, summary/body, optional public image override,
@@ -270,7 +282,17 @@ at once, one per row:
    current values, but preserves fields the user already edited by hand.
 2. **Import Excel** accepts an `.xlsx` workbook with `Name` and `Quantity in
    Storage` required, plus the same optional category, unit, barcode, variant
-   and price columns as the grid. File selection only validates and stages the
+   and price columns as the grid. **Download template**
+   (`catalog:opening_stock_import_template`, same permissions as the intake)
+   returns a workbook built by `catalog.opening_stock_template.build_template()`:
+   an `Opening Stock` sheet with the accepted headers (required ones highlighted,
+   a note on each), Unit/Color/Category/Currency drop-downs fed by a hidden
+   `Lists` sheet, non-negative number checks, a text-formatted Barcode column,
+   and an `Instructions` sheet in the user's language. Currency appears only when
+   both currencies are active. The modal shows the same per-column guide
+   (`column_guide()`). The importer reads the `Opening Stock` sheet when present,
+   otherwise the active sheet; a row without a name is a blocking conflict, and
+   blank formatted rows do not count toward the 1000-row limit. File selection only validates and stages the
    data: the modal shows creates versus existing-product updates, changed
    fields, duplicates, unknown categories and identity conflicts. No stock is
    written until the user reviews the diff and presses **Finalize import**.
@@ -424,6 +446,18 @@ by a superuser from the **Optional enhancements** System Settings card.
   *Model year* criterion off hides year inputs and the browser's year step, and
   is refused while any fitment still carries years. With the criterion on, the
   year step is skipped for a model whose fitments have no years.
+
+## Permission editor and optional features
+
+While Vehicles (automotive), Machinery, the Point of Sale or the public site is switched off, its
+permissions leave DjangoLux's group and user permission editors
+(`common.permission_visibility.hidden_feature_permissions`, registered in
+`CommonConfig.ready()` through `dlux.access.register_permission_visibility_filter`).
+POS covers `use_pos`, `pos_unlimited_discount` and the `PosSale` model permissions.
+Hiding is display-only: saving a group or user keeps the hidden grants, so switching
+the feature back on shows them exactly as they were. Requires a DjangoLux release with
+permission visibility filters; on older DjangoLux the registration is skipped and every
+card stays visible.
 
 ## Point of sale (نقطة البيع)
 

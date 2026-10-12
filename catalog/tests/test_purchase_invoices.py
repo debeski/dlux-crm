@@ -12,6 +12,7 @@ from django.test import RequestFactory
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import translation
+from openpyxl.utils import get_column_letter
 
 from catalog.forms import PurchaseInvoiceLineForm, StockMovementForm
 from catalog.models import Product, ProductVariant, PurchaseInvoice, StockMovement, Supplier
@@ -20,6 +21,7 @@ from catalog.views import (
     OpeningStockEditorView,
     OpeningStockImportFinalizeView,
     OpeningStockImportPreviewView,
+    OpeningStockImportTemplateView,
     PurchaseInvoiceCreateView,
     StockMovementListView,
 )
@@ -359,6 +361,96 @@ class OpeningStockExcelImportTests(TestCase):
         self.assertIn("opening-stock-import-modal", html)
         self.assertIn("Quantity in Storage", html)
         self.assertIn(reverse("catalog:opening_stock_import_preview"), html)
+        self.assertIn(reverse("catalog:opening_stock_import_template"), html)
+
+    def download_template(self):
+        from openpyxl import load_workbook
+
+        request = _attach_request_state(rf.get(reverse("catalog:opening_stock_import_template")), self.user)
+        response = OpeningStockImportTemplateView.as_view()(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("opening-stock-template.xlsx", response["Content-Disposition"])
+        return load_workbook(BytesIO(response.content))
+
+    def test_template_has_accepted_headers_lists_and_instructions(self):
+        from catalog.models import Category
+
+        Category.objects.create(name="Brakes")
+        workbook = self.download_template()
+
+        self.assertEqual(workbook.sheetnames[:2], ["Opening Stock", "Instructions"])
+        self.assertEqual(workbook["Lists"].sheet_state, "hidden")
+        sheet = workbook["Opening Stock"]
+        headers = [cell.value for cell in sheet[1] if cell.value]
+        self.assertEqual(headers[0], "Name")
+        self.assertEqual(headers[-1], "Quantity in Storage")
+        self.assertNotIn("Currency", headers)
+        self.assertTrue(sheet["A1"].comment.text.startswith("Required."))
+        self.assertTrue(sheet["B1"].comment.text.startswith("Optional."))
+        validated = {str(dv.sqref).split(":")[0] for dv in sheet.data_validations.dataValidation}
+        unit = get_column_letter(headers.index("Unit") + 1)
+        category = get_column_letter(headers.index("Category") + 1)
+        self.assertTrue({f"{unit}2", f"{category}2"} <= validated)
+        self.assertIn("Brakes", [cell.value for cell in workbook["Lists"]["C"]])
+        barcode = get_column_letter(headers.index("Barcode") + 1)
+        self.assertEqual(sheet[f"{barcode}2"].number_format, "@")
+
+    def test_filled_template_previews_and_finalizes_even_when_saved_on_instructions(self):
+        workbook = self.download_template()
+        sheet = workbook["Opening Stock"]
+        headers = [cell.value for cell in sheet[1]]
+        values = {"Name": "Brake Pad", "Unit": "Pair", "Barcode": "0624123", "Color": "Black", "Quantity in Storage": 4}
+        for header, value in values.items():
+            sheet.cell(row=2, column=headers.index(header) + 1, value=value)
+        workbook.active = workbook.sheetnames.index("Instructions")
+        output = BytesIO()
+        workbook.save(output)
+        upload = SimpleUploadedFile("filled.xlsx", output.getvalue())
+        request = _attach_request_state(
+            rf.post(reverse("catalog:opening_stock_import_preview"), {"file": upload}), self.user
+        )
+        payload = json.loads(OpeningStockImportPreviewView.as_view()(request).content)
+
+        self.assertTrue(payload["can_finalize"], payload)
+        self.assertEqual(payload["summary"], {"total": 1, "create": 1, "update": 0, "conflicts": 0})
+
+        request = _attach_request_state(
+            rf.post(reverse("catalog:opening_stock_import_finalize"), {"token": payload["token"]}), self.user
+        )
+        finalized = json.loads(OpeningStockImportFinalizeView.as_view()(request).content)
+        self.assertEqual(finalized["redirect"], reverse("catalog:stock_movement_list"))
+        product = Product.objects.get(name="Brake Pad")
+        self.assertEqual((product.unit, product.barcode, product.stock_qty), ("pair", "0624123", Decimal("4.00")))
+        variant = ProductVariant.objects.get(product=product)
+        self.assertEqual((variant.color, variant.stock_qty), ("black", Decimal("4.00")))
+
+    def test_template_instructions_follow_arabic_session(self):
+        from dlux.models import SystemSettings
+        from openpyxl import load_workbook
+
+        settings = SystemSettings.load()
+        settings.is_configured = True
+        settings.save(update_fields=["is_configured"])
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["lang"] = "ar"
+        session["dlux_force_language_preview"] = True
+        session.save()
+
+        response = self.client.get(reverse("catalog:opening_stock_import_template"))
+        workbook = load_workbook(BytesIO(response.content))
+        instructions = workbook["Instructions"]
+
+        self.assertTrue(instructions.sheet_view.rightToLeft)
+        self.assertEqual(instructions["A1"].value, "قالب استيراد المخزون الافتتاحي")
+        self.assertEqual(workbook["Opening Stock"]["A1"].value, "Name")
+        self.assertTrue(workbook["Opening Stock"]["A1"].comment.text.startswith("مطلوب."))
+
+    def test_row_without_name_is_a_blocking_conflict(self):
+        response, payload = self.preview([["", "", "pair", "BP-009", "", "", 12, 25, 15, "", 3]])
+
+        self.assertFalse(payload["can_finalize"])
+        self.assertIn("Name is required.", payload["rows"][0]["errors"])
 
     def test_preview_then_finalize_creates_products_variants_and_stock(self):
         response, payload = self.preview([[

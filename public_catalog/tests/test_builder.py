@@ -45,8 +45,11 @@ class PublicCatalogBuilderTests(TestCase):
 
         self.assertNotIn("switch_pos.public_homepage", settings)
         self.assertIn("switch_pos.public_catalog", settings)
-        field_names = [field["name"] for field in settings["switch_pos.public_catalog"]["fields"]]
+        from public_catalog.options_forms import PublicCatalogSettingsForm
+
+        field_names = list(PublicCatalogSettingsForm().fields)
         self.assertEqual(field_names, [
+            "public_enabled",
             "shop_title",
             "shop_subtitle",
             "contact_phone",

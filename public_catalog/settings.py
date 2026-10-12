@@ -9,6 +9,7 @@ from common.identity import store_name
 PUBLIC_CATALOG_NS = "switch_pos.public_catalog"
 
 PUBLIC_CATALOG_DEFAULTS = {
+    "enabled": True,           # the whole public site: homepage, shop, builders
     "shop_title": "",          # blank -> the store's system name
     "shop_subtitle": "",
     "contact_phone": "",
@@ -32,6 +33,7 @@ def get_public_catalog_config(*, resolve_names=True):
         legacy = bool(stored.get("storefront_enabled"))
         cfg["homepage_enabled"] = legacy
         cfg["shop_enabled"] = legacy
+    cfg["enabled"] = bool(cfg.get("enabled"))
     cfg["show_price"] = bool(cfg.get("show_price"))
     cfg["show_availability"] = bool(cfg.get("show_availability"))
     cfg["homepage_enabled"] = bool(cfg.get("homepage_enabled"))
@@ -43,6 +45,10 @@ def get_public_catalog_config(*, resolve_names=True):
     if resolve_names and not str(cfg.get("shop_title") or "").strip():
         cfg["shop_title"] = store_name()
     return cfg
+
+
+def public_site_enabled():
+    return get_public_catalog_config(resolve_names=False)["enabled"]
 
 
 def set_public_catalog_config(patch, *, request=None):
