@@ -1,8 +1,8 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-10-12: v0.11.1 committed locally (`2720f6d`, untagged) with the Public site/permission-visibility/opening-stock work and the hash-pinned `django-lux[updater]==1.11.0`; 445 tests, 32 staff pages and a live switch on/off check PASS on the real image. Dev stack still mounts `pkg-django-lux/permission-visibility/dlux`. Push/tag awaits the owner.
-- 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine steps remain required; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
+- 2026-10-13: v0.11.2 pending locally (v0.11.1 is tagged): machine type is the only required machine detail; manufacturer/name optional, migration 0003 added, search/browser/compatibility updated. 447 project SQLite tests pass (4 PostgreSQL-only skips), 2 Node checks and fresh-image smoke pass; release publication pending.
+- 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
 - 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
@@ -76,7 +76,7 @@
   - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-10-12 (late): 445 CRM tests on DjangoLux `permission-visibility` (labels only; DjangoLux mounted in /app also discovers its own suite) — only `tests.test_scaffold` stale probe fails; public-site switch browser-checked on :84 and restored on.
+- 2026-10-13: 447 SQLite tests PASS (4 PostgreSQL-only skips), 2 Node checks PASS; fresh v0.11.2 image smoke and manifest validator PASS.
 - 2026-10-12: SQLite throwaway `sales-web` container on `main`: 431 run, 1 failure = `tests.test_scaffold` still asserts the pre-v0.11.1 maintenance probe to `/` (stale test, not the template work); 8/8 Opening Stock Excel tests incl. Arabic template; check + makemigrations clean.
 - 2026-10-04: 111 targeted PostgreSQL cases validated (12 management/label cases pass on final rerun); released v0.11.0: 428 PostgreSQL + 423 packaged SQLite tests (4 PG-only skips) + 2 Node checks pass; fresh image smoke passes.
 - 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
@@ -84,7 +84,7 @@
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-10-12: OPERATIONS/BUSINESS_RULES/PERMISSIONS Import Excel step documents the template, column guide and importer hardening; CHANGELOG v0.11.1.
+- 2026-10-13: CLIENT_CATEGORIZATION/BUSINESS_RULES/RELEASING document optional machine details and validation; CHANGELOG and release manifest start v0.11.2.
 - 2026-10-03: CLIENT_CATEGORIZATION/ARCHITECTURE/BUSINESS_RULES/PERMISSIONS/OPERATIONS/QA_WORKFLOWS and changelog document independent machinery, client seed, safe legacy migration and validation.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:

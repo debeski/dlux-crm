@@ -208,6 +208,56 @@ class MachineryWorkflowTests(TestCase):
         self.assertTrue(config["machinery"]["enabled"])
         self.assertFalse(config["automotive"]["enabled"])
 
+    def test_machine_form_requires_only_type_and_preserves_unique_identity(self):
+        from machinery.forms import MachineModelForm
+        typ = MachineType.objects.create(name="Unspecified equipment")
+        form = MachineModelForm({"machine_type": typ.pk, "is_active": "on"}, user=self.user)
+        self.assertEqual([name for name, field in form.fields.items() if field.required], ["machine_type"])
+        self.assertTrue(form.is_valid(), form.errors)
+        machine = form.save()
+        self.assertIsNone(machine.manufacturer)
+        self.assertEqual(machine.name, "")
+        self.assertEqual(str(machine), typ.name)
+        duplicate = MachineModelForm({"machine_type": typ.pk}, user=self.user)
+        self.assertFalse(duplicate.is_valid())
+        self.assertIn("__all__", duplicate.errors)
+        missing_type = MachineModelForm({}, user=self.user)
+        self.assertFalse(missing_type.is_valid())
+        self.assertEqual(set(missing_type.errors), {"machine_type"})
+        named = MachineModelForm({"machine_type": typ.pk, "name": "Generic"}, user=self.user)
+        self.assertTrue(named.is_valid(), named.errors)
+        named.save()
+        duplicate = MachineModelForm({"machine_type": typ.pk, "name": "GENERIC"}, user=self.user)
+        self.assertFalse(duplicate.is_valid())
+        with_maker = MachineModelForm({"machine_type": typ.pk, "manufacturer": self.model.manufacturer_id}, user=self.user)
+        self.assertTrue(with_maker.is_valid(), with_maker.errors)
+        self.assertEqual(str(with_maker.save()), f"{typ} / {self.model.manufacturer}")
+
+    def test_machine_without_manufacturer_is_browsable_searchable_and_assignable(self):
+        from machinery.forms import BulkMachineAssignmentForm
+        machine = MachineModel.objects.create(machine_type=self.model.machine_type)
+        product = Product.objects.create(name="Generic machinery part", price_usd=10)
+        product.machine_models.add(machine)
+        for form in (ProductForm(user=self.user), ServiceForm(user=self.user), PurchaseInvoiceLineForm(user=self.user)):
+            self.assertIn(machine, form.fields["machine_models"].queryset)
+        self.assertIn(machine, BulkMachineAssignmentForm(user=self.user).fields["machines"].queryset)
+        response = self.browser(type=machine.machine_type_id, manufacturer="", model="")
+        self.assertIn((str(machine), f"?type={machine.machine_type_id}&model={machine.pk}"), response.context_data["choices"])
+        response = self.browser(type=machine.machine_type_id, manufacturer="", model=machine.pk)
+        self.assertTrue(response.context_data["show_results"])
+        self.assertEqual([entry["object"] for entry in response.context_data["entries"]], [product])
+        self.client.force_login(self.user)
+        results = self.client.get(reverse("machinery:model_search"), {"q": machine.machine_type.name}).json()["results"]
+        match = next(result for result in results if result["browse_params"]["model"] == machine.pk)
+        self.assertEqual(match["label"], str(machine))
+        self.assertNotIn("manufacturer", match["browse_params"])
+        response = self.browser(type="", manufacturer="", model="", q=product.name)
+        self.assertEqual([entry["object"] for entry in response.context_data["entries"]], [product])
+        self.model.manufacturer.is_active = False
+        self.model.manufacturer.save()
+        self.assertNotIn(self.model, ProductForm(user=self.user).fields["machine_models"].queryset)
+        self.assertIn(machine, ProductForm(user=self.user).fields["machine_models"].queryset)
+
     def test_hub_lists_and_modal_forms_use_framework_protocol(self):
         self.client.force_login(self.user)
         for name in ("hub", "type_list", "manufacturer_list", "model_list"):

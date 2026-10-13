@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 from common.forms import build_grid_helper, translate_help_text
 from common.i18n import t
 from dlux.utils import set_field_attrs
@@ -56,7 +57,7 @@ class MachineModelForm(ReferenceForm):
 def attach_machine_models(form, user, instance=None, request=None):
     if not machinery_enabled() or user is None or not user.has_perm("machinery.view_machinemodel"):
         return False
-    qs = scope_filtered_queryset(MachineModel.objects.filter(is_active=True, machine_type__is_active=True, manufacturer__is_active=True), user).select_related("machine_type", "manufacturer")
+    qs = scope_filtered_queryset(MachineModel.objects.filter(Q(manufacturer__isnull=True) | Q(manufacturer__is_active=True), is_active=True, machine_type__is_active=True), user).select_related("machine_type", "manufacturer")
     from dlux.utils import get_user_scope, is_scope_enabled
     target_scope = get_user_scope(user) if is_scope_enabled() else None
     target_scope_id = getattr(target_scope, "pk", None)
@@ -100,7 +101,7 @@ class BulkMachineAssignmentForm(forms.Form):
         super().__init__(*args, **kwargs)
         from catalog.models import Product
         self.fields["products"].queryset = scope_filtered_queryset(Product.objects.filter(is_active=True), user).order_by("name")
-        self.fields["machines"].queryset = scope_filtered_queryset(MachineModel.objects.filter(is_active=True, machine_type__is_active=True, manufacturer__is_active=True), user)
+        self.fields["machines"].queryset = scope_filtered_queryset(MachineModel.objects.filter(Q(manufacturer__isnull=True) | Q(manufacturer__is_active=True), is_active=True, machine_type__is_active=True), user)
         self.fields["products"].label = t("models_product", "Products")
         self.fields["machines"].label = t("machine_compatibility", "Compatible machines")
         for field in self.fields.values():

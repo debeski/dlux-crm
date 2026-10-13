@@ -11,6 +11,12 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.11.2 optional machine details
+
+v0.11.2 keeps the hash-pinned DjangoLux 1.11.0 dependency (PyPI checked 2026-10-13; latest stable is 1.11.1). Machine type is the only required machine detail; manufacturer and model name are optional. Normal startup applies `machinery.0003`, which permits null manufacturers and adds case-insensitive uniqueness for models without one. Existing records are preserved.
+
+Release validation: 447 project SQLite tests pass (4 PostgreSQL-only skips), both Node invoice-editor checks pass, manifest validation passes, and the freshly built image passes `scripts/smoke-test.sh`, including fresh migrations and migration-drift checks.
+
 ## v0.11.0 currency and machinery
 
 v0.11.0 was published on 2026-10-04 from `33df98e`. CI and [Release workflow 37209994905](https://github.com/debeski/dlux-crm/actions/runs/37209994905) passed. [Release notes](https://github.com/debeski/dlux-crm/releases/tag/v0.11.0); image tags are `debeski/dlux-crm:sales-v0.11.0` and `debeski/dlux-crm:sales`.

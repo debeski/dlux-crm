@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.11.2
+- **Optional Machine Details**: `MachineModel` requires only machine type; manufacturer and model name are optional. `machinery.0003` permits null manufacturers and preserves case-insensitive uniqueness without a manufacturer. Browser, search and compatibility selectors retain these machines and omit empty label segments.
+
+- **Release Validation**: 447 project SQLite tests pass (4 PostgreSQL-only skips), both Node invoice-editor checks pass, and the fresh image passes the runtime smoke helper (version, system checks, migration drift, fresh migrations and Gunicorn).
+
 ## v0.11.1
 - **DjangoLux 1.11.0**: Pinned `django-lux[updater]==1.11.0` (hash-pinned wheel, from 1.10.1). Required by the Public site switch's permission visibility filter; also brings incremental, encryption-selectable backups and a backup before every Composer update or rollback. Upgrading requires an image rebuild; DjangoLux migrations are additive.
 - **Opening Stock Excel Template**: New `OpeningStockImportTemplateView` (`catalog:opening_stock_import_template`, intake permissions) serves `catalog.opening_stock_template.build_template()`: an `Opening Stock` sheet with the accepted headers, required columns highlighted, per-column notes, Unit/Color/Category/Currency drop-downs (hidden `Lists` sheet), non-negative number validation and a text Barcode column, plus a localized (RTL in Arabic) `Instructions` sheet. Currency is offered only when both currencies are active.

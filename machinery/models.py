@@ -37,8 +37,9 @@ class Manufacturer(MachineReference):
 
 
 class MachineModel(MachineReference):
+    name = models.CharField(max_length=120, blank=True, verbose_name="Name")
     machine_type = models.ForeignKey(MachineType, on_delete=models.PROTECT, verbose_name="Machine type")
-    manufacturer = models.ForeignKey(Manufacturer, on_delete=models.PROTECT, verbose_name="Manufacturer")
+    manufacturer = models.ForeignKey(Manufacturer, null=True, blank=True, on_delete=models.PROTECT, verbose_name="Manufacturer")
     alias = models.CharField(max_length=200, blank=True, verbose_name="Local alias")
     categories = models.ManyToManyField("catalog.Category", blank=True, related_name="machine_branches", verbose_name="Category branches")
     products = models.ManyToManyField("catalog.Product", blank=True, related_name="machine_models")
@@ -48,10 +49,13 @@ class MachineModel(MachineReference):
     class Meta(MachineReference.Meta):
         verbose_name = "Machine model"
         verbose_name_plural = "Machine models"
-        constraints = [models.UniqueConstraint("machine_type", "manufacturer", Lower("name"), name="machine_model_type_make_name")]
+        constraints = [
+            models.UniqueConstraint("machine_type", "manufacturer", Lower("name"), name="machine_model_type_make_name"),
+            models.UniqueConstraint("machine_type", Lower("name"), condition=models.Q(manufacturer__isnull=True), name="machine_model_type_name_no_make"),
+        ]
 
     def __str__(self):
-        return f"{self.machine_type} / {self.manufacturer} / {self.name}"
+        return " / ".join(str(value) for value in (self.machine_type, self.manufacturer, self.name) if value)
 
     def clean(self):
         super().clean()

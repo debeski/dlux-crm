@@ -116,11 +116,11 @@ class MachineBrowserView(MachineryEnabledMixin, RibbonPageMixin, LoginRequiredMi
         typ = selected(types, "type")
         makers = scoped(Manufacturer.objects.filter(is_active=True, machinemodel__machine_type=typ, machinemodel__is_active=True)).distinct() if typ else Manufacturer.objects.none()
         maker = selected(makers, "manufacturer")
-        models = scoped(MachineModel.objects.filter(is_active=True, machine_type=typ, manufacturer=maker)).select_related("machine_type", "manufacturer") if maker else MachineModel.objects.none()
+        models = scoped(MachineModel.objects.filter(is_active=True, machine_type=typ, manufacturer=maker)).select_related("machine_type", "manufacturer") if typ else MachineModel.objects.none()
         model = selected(models, "model")
         categories = scoped(Category.objects.filter(is_active=True)).select_related("parent")
         query = self.request.GET.get("q", "").strip()
-        products = scoped(Product.objects.filter(is_active=True, machine_models__is_active=True, machine_models__machine_type__is_active=True, machine_models__manufacturer__is_active=True)) if (model or query) and user.has_perm("catalog.view_product") else Product.objects.none()
+        products = scoped(Product.objects.filter(Q(machine_models__manufacturer__isnull=True) | Q(machine_models__manufacturer__is_active=True), is_active=True, machine_models__is_active=True, machine_models__machine_type__is_active=True)) if (model or query) and user.has_perm("catalog.view_product") else Product.objects.none()
         if model:
             products = products.filter(machine_models=model)
         elif query:
@@ -143,7 +143,7 @@ class MachineBrowserView(MachineryEnabledMixin, RibbonPageMixin, LoginRequiredMi
         breadcrumbs = [(t("models_machinetype", "Machine types"), "?")]
         if typ: breadcrumbs.append((str(typ), link(type=typ.pk)))
         if maker: breadcrumbs.append((str(maker), link(type=typ.pk, manufacturer=maker.pk)))
-        if model: breadcrumbs.append((model.name, link(**base)))
+        if model: breadcrumbs.append((model.name or str(model), link(**base)))
         ancestors, current = [], category
         while current:
             ancestors.append(current)
@@ -153,10 +153,11 @@ class MachineBrowserView(MachineryEnabledMixin, RibbonPageMixin, LoginRequiredMi
         choices = []
         if not typ:
             choices = [(str(obj), link(type=obj.pk)) for obj in types]
-        elif not maker:
+        elif not maker and not model:
             choices = [(str(obj), link(type=typ.pk, manufacturer=obj.pk)) for obj in makers]
+            choices += [(str(obj) + (f" · {obj.alias}" if obj.alias else ""), link(type=typ.pk, model=obj.pk)) for obj in models]
         elif not model:
-            choices = [(obj.name + (f" · {obj.alias}" if obj.alias else ""), link(type=typ.pk, manufacturer=maker.pk, model=obj.pk)) for obj in models]
+            choices = [((obj.name or str(obj)) + (f" · {obj.alias}" if obj.alias else ""), link(type=typ.pk, manufacturer=maker.pk, model=obj.pk)) for obj in models]
         else:
             choices = [(obj.name, link(**base, category=obj.pk)) for obj in categories.filter(pk__in=allowed, parent=category)]
         if category:
@@ -177,7 +178,7 @@ class MachineBrowserView(MachineryEnabledMixin, RibbonPageMixin, LoginRequiredMi
             for kind in ("product", "service"):
                 if user.has_perm(f"catalog.add_{kind}") and not (kind == "product" and category and category.is_service):
                     adds.append((kind, reverse("scoped_modal_manager", args=["catalog", kind, "new"]) + "?" + urlencode({"machine_model": model.pk, "category": category.pk if category else ""})))
-        step_number, step_key = (1, "machine_choose_type") if not typ else (2, "machine_choose_manufacturer") if not maker else (3, "vehicle_choose_model") if not model else (4, "models_category")
+        step_number, step_key = (1, "machine_choose_type") if not typ else (2, "machine_choose_manufacturer") if not maker and not model else (3, "vehicle_choose_model") if not model else (4, "models_category")
         ctx.update(choices=choices, breadcrumbs=breadcrumbs, entries=entries, model=model, query=query, adds=adds, selected_params=base, category=category,
                    step_number=step_number, step_title=t(step_key, "Categories"), show_results=bool(model or query), machine_search_url=reverse("machinery:model_search"))
         return ctx
@@ -190,10 +191,10 @@ class MachineSearchView(MachineryEnabledMixin, LoginRequiredMixin, PermissionReq
         query = request.GET.get("q", "").strip()
         if len(query) < 2:
             return JsonResponse({"results": []})
-        models = scope_filtered_queryset(MachineModel.objects.filter(is_active=True, machine_type__is_active=True, manufacturer__is_active=True), request.user).select_related("machine_type", "manufacturer")
+        models = scope_filtered_queryset(MachineModel.objects.filter(Q(manufacturer__isnull=True) | Q(manufacturer__is_active=True), is_active=True, machine_type__is_active=True), request.user).select_related("machine_type", "manufacturer")
         for word in query.split():
             models = models.filter(Q(name__icontains=word) | Q(alias__icontains=word) | Q(manufacturer__name__icontains=word) | Q(machine_type__name__icontains=word))
-        return JsonResponse({"results": [{"label": str(model) + (f" · {model.alias}" if model.alias else ""), "browse_params": {"type": model.machine_type_id, "manufacturer": model.manufacturer_id, "model": model.pk}} for model in models[:20]]})
+        return JsonResponse({"results": [{"label": str(model) + (f" · {model.alias}" if model.alias else ""), "browse_params": {key: value for key, value in {"type": model.machine_type_id, "manufacturer": model.manufacturer_id, "model": model.pk}.items() if value is not None}} for model in models[:20]]})
 
 
 class BulkMachineAssignmentView(MachineryEnabledMixin, LoginRequiredMixin, PermissionRequiredMixin, View):
