@@ -13,6 +13,14 @@ and the image smoke test. Keeping them equal is enforced by
 
 ## v0.11.3 opening-stock drafts and intake layout
 
+v0.11.3 was published on 2026-10-18 from `d4592c4`.
+[CI](https://github.com/debeski/dlux-crm/actions/runs/39140874000) and
+[Release](https://github.com/debeski/dlux-crm/actions/runs/39141196931) passed.
+[Release notes](https://github.com/debeski/dlux-crm/releases/tag/v0.11.3).
+Docker tags `debeski/dlux-crm:sales-v0.11.3` and `debeski/dlux-crm:sales`
+resolve to the same verified AMD64/ARM64 manifest:
+`sha256:0316969f8b32c5d78a584f907f9e4773ce1250b8226fc448173bc91397af0acc`.
+
 v0.11.3 adds persistent scoped opening-stock drafts, Excel rows inserted into the
 editor before finalization, and full-width machine/vehicle compatibility rows
 below the item fields. Purchase totals span exactly the visible item columns in

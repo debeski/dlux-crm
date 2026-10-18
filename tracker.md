@@ -1,7 +1,7 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-10-18: v0.11.3 release validation PASS: opening-stock drafts/Excel staging, full-width machine/vehicle pickers and aligned purchase totals. Migration 0013 adds draft state. Permanent reset procedure is documented; publication underway.
+- 2026-10-18: v0.11.3 published at `d4592c4`: opening-stock drafts/Excel staging, full-width compatibility and aligned totals. CI 39140874000 + Release 39141196931 PASS; versioned/stable Docker tags share the verified AMD64/ARM64 digest. No user data reset performed.
 - 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
 - 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
@@ -85,7 +85,7 @@
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-10-18: OPERATIONS/BUSINESS_RULES/PERMISSIONS/RELEASING document drafts, verified permanent-reset selections and soft-reset limitation; CLIENT_CATEGORIZATION/QA_WORKFLOWS cover compatibility and footer layout; CHANGELOG v0.11.3.
+- 2026-10-18: OPERATIONS/BUSINESS_RULES/PERMISSIONS document permanent-reset selections and soft-reset limitation; RELEASING records v0.11.3 publication/digest; CLIENT_CATEGORIZATION/QA_WORKFLOWS cover picker/footer layouts.
 - 2026-10-03: CLIENT_CATEGORIZATION/ARCHITECTURE/BUSINESS_RULES/PERMISSIONS/OPERATIONS/QA_WORKFLOWS and changelog document independent machinery, client seed, safe legacy migration and validation.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:
