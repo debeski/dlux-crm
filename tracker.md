@@ -1,7 +1,7 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-10-18: v0.11.4 hash-pins DjangoLux 1.12.0; local validation PASS, publication pending. v0.11.3 published at `d4592c4`: opening-stock drafts/Excel staging, full-width compatibility and aligned totals. CI 39140874000 + Release 39141196931 PASS; versioned/stable Docker tags share the verified AMD64/ARM64 digest. No user data reset performed.
+- 2026-10-18: v0.11.4 published at `3de3065`, hash-pinned DjangoLux 1.12.0; CI 39142826820 + Release 39142840872 PASS. Stable/versioned AMD64+ARM64 images share verified digest and 1.12.0 baked labels; no user data reset.
 - 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
 - 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
@@ -28,7 +28,7 @@
 - 2026-08-03: Fixed DLUX source resolves 24 nav candidates/0 API; suffix and nested API names reject while `rapid_report` remains valid.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
 - 2026-10-18: Soft-resetting OpeningStockDraft leaves scope uniqueness on trashed rows, blocking replacement drafts. Permanent reset of Stock Movements + Opening Stock Drafts is verified to reopen intake; soft reset still needs a constraint fix.
-- Open from the 2026-10-12 audits: Import Excel preview shows English row errors/`create` badge/raw color codes in Arabic; session cookie still `switch_pos_sessionid`; DjangoLux group form home-page list shows untranslated page names (`dlux/discovery/catalog.py`); `tests/test_scaffold.py` still asserts the pre-v0.11.1 maintenance probe.
+- 2026-10-18: Release workflow corrupts JSON quoting in optional project-manifest image label highlights; source manifest is valid. Fix build-arg CSV quoting before next release; v0.11.4 tag stays immutable.
 - Live VPS/SSH stays severely slow with Compose down; disk/CPU/kernel logs are clean, narrowing the fault to UFW configuration or the provider network/hypervisor rather than Dlux.
 - Live VM likely runs stale Caddy/Compose: apex/www serve old portfolio while current repo proxies Django and redirects ERP.
 - Deployment SMTP credentials are unset, so contact relay cannot authenticate.

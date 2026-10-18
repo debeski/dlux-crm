@@ -13,6 +13,18 @@ and the image smoke test. Keeping them equal is enforced by
 
 ## v0.11.4 DjangoLux runtime upgrade
 
+v0.11.4 was published on 2026-10-18 from `3de3065`.
+[CI](https://github.com/debeski/dlux-crm/actions/runs/39142826820) and
+[Release](https://github.com/debeski/dlux-crm/actions/runs/39142840872) passed.
+[Release notes](https://github.com/debeski/dlux-crm/releases/tag/v0.11.4).
+Versioned `debeski/dlux-crm:sales-v0.11.4` and stable `:sales` tags share
+AMD64/ARM64 index digest
+`sha256:60ab8e8fe7bee55b3bec484788357dab0758bec91fed3f1e679b25f744eb5618`.
+Both platform images confirm the DjangoLux 1.12.0 baked-version label.
+The optional project-manifest image label has invalid JSON quoting in highlight
+entries; the repository manifest validates, but label-based update previews need
+a release-workflow quoting fix. The published tag is immutable.
+
 v0.11.4 pins `django-lux[updater]==1.12.0` using the published PyPI wheel
 and its SHA-256 digest. Rebuild the application image; normal startup applies
 framework migrations. `seed_demo --reset` explicitly hard-deletes its scoped demo
