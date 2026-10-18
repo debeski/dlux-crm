@@ -1,7 +1,7 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-10-18: v0.11.3 published at `d4592c4`: opening-stock drafts/Excel staging, full-width compatibility and aligned totals. CI 39140874000 + Release 39141196931 PASS; versioned/stable Docker tags share the verified AMD64/ARM64 digest. No user data reset performed.
+- 2026-10-18: v0.11.4 hash-pins DjangoLux 1.12.0; local validation PASS, publication pending. v0.11.3 published at `d4592c4`: opening-stock drafts/Excel staging, full-width compatibility and aligned totals. CI 39140874000 + Release 39141196931 PASS; versioned/stable Docker tags share the verified AMD64/ARM64 digest. No user data reset performed.
 - 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
 - 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
@@ -77,7 +77,7 @@
   - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-10-18: 461 SQLite tests PASS (6 PG-only skips), 19 PostgreSQL tests + 2 Node checks PASS; fresh-image smoke/manifest/drift and packaged Permanent Reset/re-entry PASS; browser layout/draft/import checks PASS.
+- 2026-10-18 v0.11.4/DLux 1.12.0: 456 app + 5 scaffold checks PASS (6 PG-only skips), 19 PG + 2 Node PASS; fresh image smoke and reset/re-entry PASS. Prior v0.11.3: 461 SQLite tests PASS (6 PG-only skips), 19 PostgreSQL tests + 2 Node checks PASS; fresh-image smoke/manifest/drift and packaged Permanent Reset/re-entry PASS; browser layout/draft/import checks PASS.
 - 2026-10-12: SQLite throwaway `sales-web` container on `main`: 431 run, 1 failure = `tests.test_scaffold` still asserts the pre-v0.11.1 maintenance probe to `/` (stale test, not the template work); 8/8 Opening Stock Excel tests incl. Arabic template; check + makemigrations clean.
 - 2026-10-04: 111 targeted PostgreSQL cases validated (12 management/label cases pass on final rerun); released v0.11.0: 428 PostgreSQL + 423 packaged SQLite tests (4 PG-only skips) + 2 Node checks pass; fresh image smoke passes.
 - 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
@@ -85,7 +85,7 @@
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-10-18: OPERATIONS/BUSINESS_RULES/PERMISSIONS document permanent-reset selections and soft-reset limitation; RELEASING records v0.11.3 publication/digest; CLIENT_CATEGORIZATION/QA_WORKFLOWS cover picker/footer layouts.
+- 2026-10-18: RELEASING adds v0.11.4 dependency/validation and demo-reset compatibility; update highlights omit internal reset instructions. OPERATIONS/BUSINESS_RULES/PERMISSIONS document permanent-reset selections and soft-reset limitation; RELEASING records v0.11.3 publication/digest; CLIENT_CATEGORIZATION/QA_WORKFLOWS cover picker/footer layouts.
 - 2026-10-03: CLIENT_CATEGORIZATION/ARCHITECTURE/BUSINESS_RULES/PERMISSIONS/OPERATIONS/QA_WORKFLOWS and changelog document independent machinery, client seed, safe legacy migration and validation.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:

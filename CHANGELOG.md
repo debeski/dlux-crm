@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.11.4
+- **DjangoLux 1.12.0**: Upgrade the hash-pinned `django-lux[updater]` wheel from 1.11.0 to 1.12.0; rebuild the application image to install the new runtime.
+
+- **Release Validation**: 456 application cases (6 PostgreSQL-only skips), 5 scaffold checks, 19 PostgreSQL opening-stock cases and both Node checks pass; fresh-image migration/startup smoke and isolated permanent-reset/re-entry pass.
+
 ## v0.11.3
 - **Purchase Total Alignment**: Match the purchase-invoice total row to the item columns in single- and dual-currency modes, eliminating phantom columns and trailing horizontal scroll space.
 - **Compact Intake Compatibility Pickers**: Opening-stock and purchase-invoice compatibility controls occupy a separate row beneath the item fields and span the available editor width. Searchable DjangoLux chips wrap horizontally in a bounded scrolling area, replacing the tall vertical list without shifting item fields down. Vehicle fitment suggestions and selected chips receive the same compact wrapping and height limit. Styling covers existing and newly added rows, including RTL.

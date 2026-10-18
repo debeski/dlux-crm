@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "version": "0.11.3",
-  "summary": "Save opening-stock drafts, review Excel rows in the editor, and use full-width compatibility pickers.",
+  "version": "0.11.4",
+  "summary": "Updated DjangoLux runtime with opening-stock drafts and improved intake editors.",
   "highlights": [
+    "Updated the application framework to DjangoLux 1.12.0.",
     "Save opening stock as a draft and resume later without changing products or stock.",
     "Check Excel workbooks, add their rows to the editor, and finalize all manual and imported rows together.",
-    "Machine and vehicle compatibility fills the editor width below item fields; purchase totals align without extra scrolling.",
-    "For a fresh setup, permanently reset Stock Movements and Opening Stock Drafts; reset Products afterward only if needed."
+    "Machine and vehicle compatibility fills the editor width below item fields; purchase totals align without extra scrolling."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.11.3"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.11.4"
 }

@@ -665,6 +665,8 @@ class SeedDemoCommandTests(TestCase):
         self.assertEqual(Invoice.objects.count(), count)
         self.assertEqual(Product.objects.count(), 24)
         self.assertEqual(PurchaseInvoice.objects.count(), 4)
+        from finance.models import StaffAccount
+        self.assertEqual(StaffAccount.all_objects.count(), StaffAccount.objects.count())
 
 
 class InvoicePickerTests(TestCase):

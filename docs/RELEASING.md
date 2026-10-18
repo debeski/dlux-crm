@@ -11,6 +11,21 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.11.4 DjangoLux runtime upgrade
+
+v0.11.4 pins `django-lux[updater]==1.12.0` using the published PyPI wheel
+and its SHA-256 digest. Rebuild the application image; normal startup applies
+framework migrations. `seed_demo --reset` explicitly hard-deletes its scoped demo
+tables, preserving its reset/reseed behavior under the framework’s new soft bulk
+deletion default. Opening-stock drafts and intake layout fixes are retained.
+Customer-facing update highlights omit the internal reset procedure; maintenance
+instructions remain in OPERATIONS and BUSINESS_RULES.
+
+Validation: 456 application cases pass (6 PostgreSQL-only skips), plus 5
+source-mounted scaffold checks, 19 PostgreSQL opening-stock cases and 2 Node
+checks. Fresh-image system checks, migration drift/fresh migrations and Gunicorn
+smoke pass. Isolated permanent-reset/re-entry also passes on DjangoLux 1.12.0.
+
 ## v0.11.3 opening-stock drafts and intake layout
 
 v0.11.3 was published on 2026-10-18 from `d4592c4`.
