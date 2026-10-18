@@ -1,0 +1,10 @@
+{% if itemform.machine_models or itemform.fits %}
+<tr class="line-compatibility-row">
+    <td colspan="{% if itemform.currency.is_hidden %}{{ column_count|add:'-1' }}{% else %}{{ column_count }}{% endif %}">
+        <div class="intake-compatibility-panel">
+            {% if itemform.machine_models %}{% include "machinery/line_models.html" with machine_field=itemform.machine_models %}{% endif %}
+            {% if itemform.fits %}{% include "automotive/includes/line_fits.html" with fits_field=itemform.fits %}{% endif %}
+        </div>
+    </td>
+</tr>
+{% endif %}

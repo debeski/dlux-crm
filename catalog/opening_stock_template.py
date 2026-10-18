@@ -39,7 +39,7 @@ def _write_list(sheet, column, title, values):
     return f"=Lists!${column}$2:${column}${max(len(values), 1) + 1}"
 
 
-def build_template():
+def build_template(user=None):
     guide = column_guide()
     workbook = Workbook()
 
@@ -51,7 +51,9 @@ def build_template():
 
     unit_ref = _write_list(lists, "A", "Unit", [label for _code, label in Product.UNIT_CHOICES])
     color_ref = _write_list(lists, "B", "Color", [label for _code, label in Product.COLOR_CHOICES])
-    categories = sorted(str(category) for category in Category.objects.filter(is_service=False).select_related("parent"))
+    from dlux.utils import get_user_scope, is_scope_enabled
+    scope = get_user_scope(user) if is_scope_enabled() else None
+    categories = sorted(str(category) for category in Category.objects.filter(scope=scope, is_service=False).select_related("parent"))
     category_ref = _write_list(lists, "C", "Category", categories) if categories else None
 
     for index, column in enumerate(guide, start=1):

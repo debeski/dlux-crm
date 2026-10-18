@@ -263,9 +263,12 @@ than adding each product and then reconstructing history invoice-by-invoice. An
 anything sold before go-live — so there's nothing to reconcile. Past sales are
 simply not re-entered; real invoices start drawing down stock from launch on.
 
-This is **not a document of its own** — it's a *child of the stock ledger*: a
-one-time bulk way to post Stock In movements. A **trigger button on the Stock
-Movements page** (gated by `add_product` + `add_stockmovement`) opens a full-page
+Opening stock is a one-time bulk intake attached to the stock ledger. Its
+work-in-progress is stored in `OpeningStockDraft` (`catalog.0013`), one shared
+draft per store scope (one global draft when scopes are off). Authorized intake
+staff can save unfinished rows and resume them later; no product, pricing or
+stock mutation occurs while saving a draft. A **trigger button on the Stock
+Movements page** (gated by `add_product` + `change_product` + `add_stockmovement`) opens a full-page
 grid (`/staff/catalog/stock-movements/opening-stock/`) where an admin enters many items
 at once, one per row:
 
@@ -292,22 +295,53 @@ at once, one per row:
    both currencies are active. The modal shows the same per-column guide
    (`column_guide()`). The importer reads the `Opening Stock` sheet when present,
    otherwise the active sheet; a row without a name is a blocking conflict, and
-   blank formatted rows do not count toward the 1000-row limit. File selection only validates and stages the
-   data: the modal shows creates versus existing-product updates, changed
-   fields, duplicates, unknown categories and identity conflicts. No stock is
-   written until the user reviews the diff and presses **Finalize import**.
-3. **Submitting** manually or finalizing a verified workbook runs one
+   blank formatted rows do not count toward the 1000-row limit. Selecting a file
+   sends no request: press **Check workbook** to preview creates versus updates,
+   changed fields and conflicts. **Add rows to editor** appends the verified
+   rows to the editable grid without creating products or stock. Add another
+   workbook or more manual rows as needed. Import previews are not saved drafts;
+   press **Save draft** to persist the combined work.
+3. **Save draft** returns to Stock Movements, where **Resume opening stock
+   draft** reopens the saved rows. Incomplete rows may be saved. A revision check
+   returns HTTP 409 on a stale save/finalization and preserves the submitted
+   entries on screen. Reconcile them against the newer saved draft in another
+   tab; the server never overwrites it silently.
+4. **Finalize opening stock** validates the whole grid and runs one locked
    transaction: each row create-or-reuses its `Product`, corrects its pricing
    when the admin edited those cells, and posts one **Stock In** `StockMovement`
    for the stored quantity (`reason="Opening balance"`, `reference="OPENING"`).
    The row's color/size creates or reuses a matching `ProductVariant`, and the
    movement points at that variant. Stock still flows only through the ledger. A
    zero-quantity row reprices its product without posting a movement; blank rows
-   are dropped.
-4. It can only be applied once. After `reference="OPENING"` movements exist, the
+   are dropped. Drafts are capped at 1,000 rows / 2 MB;
+   `DATA_UPLOAD_MAX_NUMBER_FIELDS=25000` accommodates the full form grid.
+5. It can only be finalized once, including intakes containing only zero-quantity
+   rows. A finalized draft or existing `reference="OPENING"` movements locks the
+   editor. Duplicate item/color/size rows and inconsistent details/prices for one
+   item across rows must be resolved before finalizing. The legacy Excel
+   `/import/finalize/` endpoint returns HTTP 410 and cannot post inventory. The
    Stock Movements page switches the action to a read-only Opening Stock record
    at `/staff/catalog/stock-movements/opening-stock/view/`; the posted movements remain
    the authoritative audit trail.
+
+### Starting opening stock over with Permanent Data Reset
+
+For an initial setup without subsequent sales/purchases, take a backup, then use
+DjangoLux Data Reset in **Permanent** mode and select **Stock Movements** plus
+**Opening Stock Drafts**. This clears the ledger and saved finalization state,
+recalculates product/variant stock to zero when no movements remain, and reopens
+opening-stock entry. Both selections are needed for the new workflow; legacy
+imports may have no draft record. The reset applies across all scopes and clears
+all selected stock movements, not just opening balances.
+
+Products, their current prices/details, and zero-stock variants remain. If the
+catalog should also be emptied, run a second Permanent reset selecting **Products**
+after clearing the movements and drafts; variants cascade with their products.
+Other documents referencing products can block that deletion, so this tested
+procedure is for a clean initial setup. No prior product/pricing snapshot is
+restored. The soft reset of drafts is currently unsupported: trashed drafts retain
+the unique scope key and prevent creation of a replacement draft. Use Permanent
+mode for this procedure.
 
 ## Purchase invoices / inbound stock invoices
 
@@ -648,3 +682,8 @@ Machinery has an independent enhancement toggle. Parts and services can fit seve
 ## Independent machinery
 
 MachineType, Manufacturer and MachineModel use `machinery.view_*` lookup permissions (Sales Representatives), plus `add_*`/`change_*` for Sales Managers. Product/service compatibility uses existing catalog add/change permissions and `machinery.view_machinemodel`; purchase rows retain the current purchase/product/stock permissions. There is no separate currency or compatibility-edit grant. The legacy migration appends new role permissions without resetting other grants. Disabled machinery blocks its CRUD/browser routes. Choices and detail rows are scoped; products and services require their respective view permissions in the browser.
+
+Opening-stock draft save/resume, workbook checking and finalization all require
+`catalog.add_product`, `catalog.change_product` and `catalog.add_stockmovement`.
+Drafts are shared only within the current store scope; no new permission grants
+are needed. `OpeningStockDraft` has no standalone CRUD permissions or sidebar.

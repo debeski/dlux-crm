@@ -1,7 +1,7 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-10-13: v0.11.2 published at tag `99c3ae7`: machine type is the only required machine detail; manufacturer/name optional, migration 0003 added, search/browser/compatibility updated. 447 project SQLite tests pass (4 PostgreSQL-only skips), 2 Node checks and fresh-image smoke pass; CI 38380894198 and Release 38381396512 PASS; GitHub release and multi-arch Docker image published, no deployment performed.
+- 2026-10-18: v0.11.3 release validation PASS: opening-stock drafts/Excel staging, full-width machine/vehicle pickers and aligned purchase totals. Migration 0013 adds draft state. Permanent reset procedure is documented; publication underway.
 - 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
 - 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
@@ -27,6 +27,7 @@
 - 2026-07-18: Release/update path audit covers Caddy TLS, Composer recovery, baked Dlux gate, and project manifest metadata.
 - 2026-08-03: Fixed DLUX source resolves 24 nav candidates/0 API; suffix and nested API names reject while `rapid_report` remains valid.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
+- 2026-10-18: Soft-resetting OpeningStockDraft leaves scope uniqueness on trashed rows, blocking replacement drafts. Permanent reset of Stock Movements + Opening Stock Drafts is verified to reopen intake; soft reset still needs a constraint fix.
 - Open from the 2026-10-12 audits: Import Excel preview shows English row errors/`create` badge/raw color codes in Arabic; session cookie still `switch_pos_sessionid`; DjangoLux group form home-page list shows untranslated page names (`dlux/discovery/catalog.py`); `tests/test_scaffold.py` still asserts the pre-v0.11.1 maintenance probe.
 - Live VPS/SSH stays severely slow with Compose down; disk/CPU/kernel logs are clean, narrowing the fault to UFW configuration or the provider network/hypervisor rather than Dlux.
 - Live VM likely runs stale Caddy/Compose: apex/www serve old portfolio while current repo proxies Django and redirects ERP.
@@ -76,7 +77,7 @@
   - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-10-13: 447 SQLite tests PASS (4 PostgreSQL-only skips), 2 Node checks PASS; fresh v0.11.2 image smoke and manifest validator PASS.
+- 2026-10-18: 461 SQLite tests PASS (6 PG-only skips), 19 PostgreSQL tests + 2 Node checks PASS; fresh-image smoke/manifest/drift and packaged Permanent Reset/re-entry PASS; browser layout/draft/import checks PASS.
 - 2026-10-12: SQLite throwaway `sales-web` container on `main`: 431 run, 1 failure = `tests.test_scaffold` still asserts the pre-v0.11.1 maintenance probe to `/` (stale test, not the template work); 8/8 Opening Stock Excel tests incl. Arabic template; check + makemigrations clean.
 - 2026-10-04: 111 targeted PostgreSQL cases validated (12 management/label cases pass on final rerun); released v0.11.0: 428 PostgreSQL + 423 packaged SQLite tests (4 PG-only skips) + 2 Node checks pass; fresh image smoke passes.
 - 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
@@ -84,7 +85,7 @@
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-10-13: CLIENT_CATEGORIZATION/BUSINESS_RULES/RELEASING document optional machine details and validation; CHANGELOG and release manifest start v0.11.2.
+- 2026-10-18: OPERATIONS/BUSINESS_RULES/PERMISSIONS/RELEASING document drafts, verified permanent-reset selections and soft-reset limitation; CLIENT_CATEGORIZATION/QA_WORKFLOWS cover compatibility and footer layout; CHANGELOG v0.11.3.
 - 2026-10-03: CLIENT_CATEGORIZATION/ARCHITECTURE/BUSINESS_RULES/PERMISSIONS/OPERATIONS/QA_WORKFLOWS and changelog document independent machinery, client seed, safe legacy migration and validation.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:
@@ -94,6 +95,6 @@
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
 - v0.11.0 deployed in currency-switch at :84 via ./start.sh -d --build --skip-config; migrations/static complete, 20 running-image SQLite currency/alias tests + checks pass. DB backup /tmp/crm-sales-dev-before-v0.11.0.dump; source backups .xclude/deploy-before-v0.11.0; no extra currency permission.
-- Live dev is `currency-switch` at :84, fast-forwarded to main for v0.10.2; dev DB backup `/tmp/crm-sales-dev-before-v0.10.2.dump`; labelled QA invoices 6–9 retained, temp QA account disabled. v0.9.0 lives on branch `automotive-parts-first` (worktree `../automotive-parts-first`; branding + Arabic UI fixes committed); the dev stack runs FROM that folder (own copies of `.secrets/`, `media/`). Demo parts: supplier "Demo Parts Supply", invoice PINV-000001 (30 products, 92 fitments). Dev DB holds a 10-make/127-generation vehicle seed; user's Camry "7th" and Accord "4th"/"5th" rows carry placeholder chassis/years. v0.8.3 is released. On PostgreSQL, 2 tests assume fresh IDs (`test_grid_layout_renders_cards`, purchase-invoice numbering); CI's SQLite set passes. Retailer Phase 0/4 remain open.
+- 2026-10-18: Live dev now runs from this `sales_edition/main` checkout at http://localhost:84 via `./start.sh -d --build --skip-config`; existing sales volumes retained, migrations/static completed, HTTP 200 and all 9 services ready. Refreshed to v0.11.3 with opening-stock drafts; startup log `/tmp/crm-opening-draft-dev-refresh.log`.
 ### References and Links:
 - Dlux source: `../../pkg-django-lux`; release guide: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`.

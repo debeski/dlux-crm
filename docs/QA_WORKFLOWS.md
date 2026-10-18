@@ -44,3 +44,8 @@ Sidebar follow-up: 150 common/automotive/machinery cases pass, including saved d
 - 2026-10-04 vehicle criteria policy: 96 automotive/machinery/sidebar regressions pass; 19 foundation cases pass on final rerun, including an invariant for exactly five optional switches and normalization of legacy year/engine/transmission flags. Settings checked enabled/disabled at desktop and 390px, with preview cards removed and Manage machinery spacing.
 
 - v0.11.0 release gate (2026-10-04): all 428 project tests pass on PostgreSQL 17; all 423 packaged-image tests pass on SQLite (4 PostgreSQL-only skips); 2 Node checks pass. Fresh pinned 1.10.1 image passes system/migration/Gunicorn smoke; `.xclude` is absent. Logs: `/tmp/v011-release-postgres.log`, `/tmp/v011-release-stable.log`, `/tmp/v011-release-node.log`, `/tmp/v011-release-smoke.log`.
+
+Purchase-invoice editor: check both single-currency (currency column hidden) and
+dual-currency modes. Scroll fully right: item and footer edges must coincide,
+and the foreign/LYD totals must align with their respective item-total columns
+without trailing empty columns. Repeat after adding a row.

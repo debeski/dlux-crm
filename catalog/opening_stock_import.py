@@ -146,15 +146,16 @@ def _choice(value, choices, field_name):
     raise OpeningStockImportError(f"Unknown {field_name} '{raw}'. Use one of: {valid}.")
 
 
-def _category(value):
+def _category(value, categories=None):
     raw = _text(value)
     if not raw:
         return None
+    categories = Category.objects.all() if categories is None else categories
     if "/" in raw:
         path = " / ".join(part.strip() for part in raw.split("/"))
-        matches = [category for category in Category.objects.select_related("parent") if str(category).casefold() == path.casefold()][:2]
+        matches = [category for category in categories.select_related("parent") if str(category).casefold() == path.casefold()][:2]
     else:
-        matches = list(Category.objects.filter(name__iexact=raw).order_by("pk")[:2])
+        matches = list(categories.filter(name__iexact=raw).order_by("pk")[:2])
     if not matches:
         raise OpeningStockImportError(
             f"Category '{raw}' does not exist. Create it first or leave Category blank."
@@ -164,9 +165,10 @@ def _category(value):
     return matches[0]
 
 
-def _existing_product(name, barcode):
-    name_matches = list(Product.objects.filter(name__iexact=name).order_by("pk")[:2])
-    barcode_matches = list(Product.objects.filter(barcode=barcode).order_by("pk")[:2]) if barcode else []
+def _existing_product(name, barcode, products=None):
+    products = Product.objects.all() if products is None else products
+    name_matches = list(products.filter(name__iexact=name).order_by("pk")[:2])
+    barcode_matches = list(products.filter(barcode=barcode).order_by("pk")[:2]) if barcode else []
     if len(name_matches) > 1:
         raise OpeningStockImportError(f"More than one existing product is named '{name}'.")
     if len(barcode_matches) > 1:
@@ -237,7 +239,7 @@ def _primitive(cleaned):
     }
 
 
-def validate_workbook(upload):
+def validate_workbook(upload, user=None):
     """Return a preview and form-ready primitive rows; never mutates inventory."""
     if not upload:
         raise OpeningStockImportError("Choose an XLSX file.")
@@ -278,6 +280,10 @@ def validate_workbook(upload):
     if missing:
         raise OpeningStockImportError("Missing required columns: " + ", ".join(missing) + ".")
 
+    from dlux.utils import get_user_scope, is_scope_enabled
+    scope = get_user_scope(user) if is_scope_enabled() else None
+    categories = Category.objects.filter(scope=scope)
+    products = Product.objects.filter(scope=scope)
     preview = []
     valid_rows = []
     seen_variant_keys = set()
@@ -295,10 +301,10 @@ def validate_workbook(upload):
             errors.append("Name is required.")
         barcode = _text(source.get("barcode"))
         try:
-            category = _category(source.get("category"))
+            category = _category(source.get("category"), categories)
             unit = _choice(source.get("unit"), Product.UNIT_CHOICES, "unit") or Product.UNIT_PIECE
             color = _choice(source.get("color"), Product.COLOR_CHOICES, "color")
-            product = _existing_product(name, barcode) if name else None
+            product = _existing_product(name, barcode, products) if name else None
         except OpeningStockImportError as exc:
             category = None
             unit = Product.UNIT_PIECE
@@ -322,7 +328,7 @@ def validate_workbook(upload):
             "price_lyd_override": _text(source.get("price_lyd_override")),
             "quantity": _text(source.get("quantity")),
         }
-        form = OpeningStockLineForm(form_data)
+        form = OpeningStockLineForm(form_data, user=user, opening_only=True)
         if not form.is_valid():
             errors.extend(_form_errors(form))
 
@@ -376,16 +382,5 @@ def validate_workbook(upload):
             "update": sum(row["action"] == "update" and not row["errors"] for row in preview),
             "conflicts": blocking,
         },
-        "can_finalize": blocking == 0 and bool(valid_rows),
+        "can_insert": blocking == 0 and bool(valid_rows),
     }
-
-
-def restore_rows(rows):
-    """Revalidate staged primitives immediately before the transaction writes."""
-    cleaned_rows = []
-    for row in rows:
-        form = OpeningStockLineForm(row)
-        if not form.is_valid():
-            raise OpeningStockImportError("The staged import is no longer valid. Preview it again.")
-        cleaned_rows.append(form.cleaned_data)
-    return cleaned_rows

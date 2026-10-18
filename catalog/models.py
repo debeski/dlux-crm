@@ -56,6 +56,22 @@ def product_color_label(color):
     return t(f"color_{color}", dict(Product.COLOR_CHOICES).get(color, color))
 
 
+
+class OpeningStockDraft(ScopedModel):
+    rows = models.JSONField(default=list, blank=True)
+    revision = models.PositiveIntegerField(default=0)
+    finalized_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(fields=["scope"], name="opening_draft_scope"),
+            models.UniqueConstraint(models.Value(1), condition=models.Q(scope__isnull=True), name="opening_draft_global"),
+        ]
+
+    def __str__(self):
+        return "Opening stock"
+
 class ImageAssetMixin(models.Model):
     """A picture held in the dlux asset library, with the old file as a fallback.
 

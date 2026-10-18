@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.3
+- **Purchase Total Alignment**: Match the purchase-invoice total row to the item columns in single- and dual-currency modes, eliminating phantom columns and trailing horizontal scroll space.
+- **Compact Intake Compatibility Pickers**: Opening-stock and purchase-invoice compatibility controls occupy a separate row beneath the item fields and span the available editor width. Searchable DjangoLux chips wrap horizontally in a bounded scrolling area, replacing the tall vertical list without shifting item fields down. Vehicle fitment suggestions and selected chips receive the same compact wrapping and height limit. Styling covers existing and newly added rows, including RTL.
+- **Resumable Opening Stock**: `OpeningStockDraft` (`catalog.0013`) stores unfinished grid rows per store scope; Save draft leaves products and stock unchanged, Stock Movements offers Resume, and revision checks prevent stale tabs from overwriting saved work. Finalization locks the draft and posts once, including all-zero-quantity intakes.
+- **Excel Into The Editor**: Workbook selection no longer starts a request. Check workbook previews rows; Add rows to editor appends editable rows alongside manual entries and further workbooks. Direct Excel finalization returns HTTP 410; only the editor finalizes stock. Combined-grid validation rejects duplicate variants and conflicting product details/prices. Draft and import access use existing intake permissions and scope boundaries; EN/AR guidance and template instructions follow the new flow.
+- **Opening Stock Reset Procedure**: Verified Permanent Data Reset of Stock Movements + Opening Stock Drafts reopens intake and clears derived stock balances; optionally reset Products afterward for a clean initial catalog. Documented the cross-scope reset behavior and the existing soft-reset limitation for draft uniqueness.
+- **Large Opening Stock Forms**: Allow up to 25,000 submitted fields for the bounded 1,000-row grid; drafts remain limited to 2 MB.
+
+- **Release Validation**: 461 project SQLite cases pass (6 PostgreSQL-only skips), 19 PostgreSQL opening-stock cases including concurrent saves/finalization pass, and both Node checks pass. Fresh-image smoke, migration drift, manifest validation and packaged Permanent Data Reset/re-entry checks pass. Browser checks cover draft recovery, Excel insertion, full-width compatibility, row deletion, RTL/mobile layouts and single/dual-currency total alignment.
+
 ## v0.11.2
 - **Optional Machine Details**: `MachineModel` requires only machine type; manufacturer and model name are optional. `machinery.0003` permits null manufacturers and preserves case-insensitive uniqueness without a manufacturer. Browser, search and compatibility selectors retain these machines and omit empty label segments.
 

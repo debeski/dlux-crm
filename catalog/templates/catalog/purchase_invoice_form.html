@@ -6,6 +6,11 @@
 
 {% block title %}{{ DLUX_STRINGS.ui_new_purchase_invoice|default:"New Purchase Invoice" }}{% endblock %}
 
+{% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% asset 'catalog/css/intake_compatibility.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <style>
@@ -57,7 +62,7 @@
                 {% if formset.non_form_errors %}
                     <div class="alert alert-danger m-3">{{ formset.non_form_errors }}</div>
                 {% endif %}
-                <div class="table-responsive">
+                <div class="table-responsive intake-items-scroll">
                     <table class="table align-middle mb-0" id="items-table">
                         <thead class="table-light">
                             <tr>
@@ -83,7 +88,7 @@
                             {% for itemform in formset %}
                             <tr class="line-row" data-price-sync-row>
                                 {{ itemform.id }}{{ itemform.product.as_hidden }}
-                                <td class="{% if itemform.name.errors %}field-invalid{% endif %}">{{ itemform.name }}{{ itemform.name.errors }}{% if itemform.machine_models %}{% include "machinery/line_models.html" with machine_field=itemform.machine_models %}{% endif %}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=itemform.fits %}{% endif %}</td>
+                                <td class="{% if itemform.name.errors %}field-invalid{% endif %}">{{ itemform.name }}{{ itemform.name.errors }}</td>
                                 <td>{{ itemform.alias }}{{ itemform.alias.errors }}</td>
                                 <td {% if itemform.currency.is_hidden %}hidden{% endif %}>{{ itemform.currency }}{{ itemform.currency.errors }}</td>
                                 <td>{{ itemform.category }}</td>
@@ -105,11 +110,12 @@
                                     </button>
                                 </td>
                             </tr>
+                            {% include "catalog/includes/intake_compatibility_row.html" with itemform=itemform column_count=16 %}
                             {% endfor %}
                         </tbody>
                         <tfoot>
                             <tr class="table-light">
-                                <td colspan="14" class="text-end fw-semibold">{{ DLUX_STRINGS.ui_total }}</td>
+                                <td colspan="{% if formset.empty_form.currency.is_hidden %}12{% else %}13{% endif %}" class="text-end fw-semibold">{{ DLUX_STRINGS.ui_total }}</td>
                                 <td class="text-end fw-semibold" id="total-usd-cell">0.00</td>
                                 <td class="text-end fw-semibold" id="total-lyd-cell">0.00</td>
                                 <td></td>
@@ -140,7 +146,7 @@
 <template id="empty-form-row">
     <tr class="line-row" data-price-sync-row>
         {{ formset.empty_form.id }}{{ formset.empty_form.product.as_hidden }}
-        <td>{{ formset.empty_form.name }}{% if formset.empty_form.machine_models %}{% include "machinery/line_models.html" with machine_field=formset.empty_form.machine_models %}{% endif %}{% if fits_enabled %}{% include "automotive/includes/line_fits.html" with fits_field=formset.empty_form.fits %}{% endif %}</td>
+        <td>{{ formset.empty_form.name }}</td>
         <td>{{ formset.empty_form.alias }}{{ formset.empty_form.alias.errors }}</td>
                                 <td {% if formset.empty_form.currency.is_hidden %}hidden{% endif %}>{{ formset.empty_form.currency }}{{ formset.empty_form.currency.errors }}</td>
                                 <td>{{ formset.empty_form.category }}</td>
@@ -162,6 +168,7 @@
             </button>
         </td>
     </tr>
+    {% include "catalog/includes/intake_compatibility_row.html" with itemform=formset.empty_form column_count=16 %}
 </template>
 {% endblock %}
 
@@ -279,6 +286,11 @@
         if (qty) qty.addEventListener('input', recalcAll);
         const del = row.querySelector('.del-line');
         if (del) del.addEventListener('click', () => {
+            const compatibility = row.nextElementSibling;
+            if (compatibility?.classList.contains('line-compatibility-row')) {
+                compatibility.hidden = true;
+                compatibility.querySelectorAll('input,select').forEach((input) => { input.disabled = true; });
+            }
             const delInput = q(row, 'DELETE');
             if (delInput) { delInput.checked = true; row.style.display = 'none'; }
             else { row.remove(); }
@@ -291,13 +303,13 @@
         const html = document.getElementById('empty-form-row').innerHTML.replace(/__prefix__/g, idx);
         const holder = document.createElement('tbody');
         holder.innerHTML = html.trim();
-        const tr = holder.firstElementChild;
-        body.appendChild(tr);
+        const tr = holder.querySelector('.line-row');
+        body.append(...holder.children);
         totalForms.value = idx + 1;
         q(tr, 'currency').value = selectedCurrency;
         wireRow(tr);
         if (window.initCatalogColorPalettes) window.initCatalogColorPalettes();
-        if (window.AutomotiveFitsPicker) window.AutomotiveFitsPicker.initAll(tr);
+        if (window.AutomotiveFitsPicker) window.AutomotiveFitsPicker.initAll(body);
     });
 
     body.querySelectorAll('.line-row').forEach(wireRow);

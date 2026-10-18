@@ -11,6 +11,27 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.11.3 opening-stock drafts and intake layout
+
+v0.11.3 adds persistent scoped opening-stock drafts, Excel rows inserted into the
+editor before finalization, and full-width machine/vehicle compatibility rows
+below the item fields. Purchase totals span exactly the visible item columns in
+single- and dual-currency modes. Normal startup applies `catalog.0013`; existing
+opening-stock movements and product data are preserved.
+
+The release retains hash-pinned DjangoLux 1.11.0, the tested runtime for these
+changes (PyPI checked 2026-10-18; latest stable is 1.12.0). See
+[the opening-stock reset procedure](OPERATIONS.md#starting-opening-stock-over-with-permanent-data-reset)
+for the verified Permanent Data Reset selections and the soft-reset limitation.
+Installing the release itself does not reset data.
+
+Release validation on 2026-10-18: 461 SQLite cases pass (6 PostgreSQL-only
+skips), 19 PostgreSQL opening-stock cases including concurrency pass, and both
+Node checks pass. The fresh image passes `scripts/smoke-test.sh` and the
+Permanent Data Reset/re-entry scenario. Browser checks cover full-width
+compatibility, unchanged field-row height, desktop/mobile/RTL interactions,
+draft save/resume and exact footer alignment in both currency modes.
+
 ## v0.11.2 optional machine details
 
 v0.11.2 was published on 2026-10-13 from `99c3ae7`. [CI](https://github.com/debeski/dlux-crm/actions/runs/38380894198) and [Release](https://github.com/debeski/dlux-crm/actions/runs/38381396512) passed. [Release notes](https://github.com/debeski/dlux-crm/releases/tag/v0.11.2); image tags are `debeski/dlux-crm:sales-v0.11.2` and `debeski/dlux-crm:sales` (AMD64 and ARM64).

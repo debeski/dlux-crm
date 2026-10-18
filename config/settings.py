@@ -183,6 +183,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 25000
 TIME_ZONE = os.getenv("TIME_ZONE", "Africa/Tripoli")
 
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/2")

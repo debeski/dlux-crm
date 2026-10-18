@@ -350,6 +350,19 @@ class OpeningStockExcelImportTests(TestCase):
         response = OpeningStockImportPreviewView.as_view()(request)
         return response, json.loads(response.content)
 
+    def finalize_editor_rows(self, rows, action="finalize", revision=0):
+        data = {"form-TOTAL_FORMS": len(rows), "form-INITIAL_FORMS": 0, "action": action, "revision": revision}
+        for index, row in enumerate(rows):
+            data.update({f"form-{index}-{key}": value for key, value in row.items()})
+        return OpeningStockEditorView.as_view()(_attach_request_state(rf.post(reverse("catalog:opening_stock"), data), self.user))
+
+    def test_legacy_excel_finalize_cannot_post_stock(self):
+        request = _attach_request_state(rf.post(reverse("catalog:opening_stock_import_finalize"), {"token": "old-client"}), self.user)
+        response = OpeningStockImportFinalizeView.as_view()(request)
+        self.assertEqual(response.status_code, 410)
+        self.assertFalse(Product.objects.exists())
+        self.assertFalse(StockMovement.objects.exists())
+
     def test_editor_exposes_the_excel_modal_and_required_headers(self):
         request = _attach_request_state(
             rf.get(reverse("catalog:opening_stock")), self.user
@@ -411,14 +424,12 @@ class OpeningStockExcelImportTests(TestCase):
         )
         payload = json.loads(OpeningStockImportPreviewView.as_view()(request).content)
 
-        self.assertTrue(payload["can_finalize"], payload)
+        self.assertTrue(payload["can_insert"], payload)
         self.assertEqual(payload["summary"], {"total": 1, "create": 1, "update": 0, "conflicts": 0})
 
-        request = _attach_request_state(
-            rf.post(reverse("catalog:opening_stock_import_finalize"), {"token": payload["token"]}), self.user
-        )
-        finalized = json.loads(OpeningStockImportFinalizeView.as_view()(request).content)
-        self.assertEqual(finalized["redirect"], reverse("catalog:stock_movement_list"))
+        self.assertFalse(Product.objects.exists())
+        self.assertFalse(StockMovement.objects.exists())
+        self.finalize_editor_rows(payload["editor_rows"])
         product = Product.objects.get(name="Brake Pad")
         self.assertEqual((product.unit, product.barcode, product.stock_qty), ("pair", "0624123", Decimal("4.00")))
         variant = ProductVariant.objects.get(product=product)
@@ -449,7 +460,7 @@ class OpeningStockExcelImportTests(TestCase):
     def test_row_without_name_is_a_blocking_conflict(self):
         response, payload = self.preview([["", "", "pair", "BP-009", "", "", 12, 25, 15, "", 3]])
 
-        self.assertFalse(payload["can_finalize"])
+        self.assertFalse(payload["can_insert"])
         self.assertIn("Name is required.", payload["rows"][0]["errors"])
 
     def test_preview_then_finalize_creates_products_variants_and_stock(self):
@@ -459,26 +470,36 @@ class OpeningStockExcelImportTests(TestCase):
         ]])
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(payload["can_finalize"])
+        self.assertTrue(payload["can_insert"])
         self.assertEqual(payload["summary"], {"total": 1, "create": 1, "update": 0, "conflicts": 0})
         self.assertEqual(Product.objects.count(), 0)
 
-        request = _attach_request_state(
-            rf.post(
-                reverse("catalog:opening_stock_import_finalize"),
-                {"token": payload["token"]},
-            ),
-            self.user,
-        )
-        finalized = OpeningStockImportFinalizeView.as_view()(request)
-
-        self.assertEqual(finalized.status_code, 200)
+        finalized = self.finalize_editor_rows(payload["editor_rows"])
+        self.assertEqual(finalized.status_code, 302)
         product = Product.objects.get(name="Brake Pad")
         self.assertEqual(product.stock_qty, Decimal("6.00"))
         self.assertEqual(product.cost_usd, Decimal("12.00"))
         variant = ProductVariant.objects.get(product=product)
         self.assertEqual((variant.color, variant.size, variant.stock_qty), ("black", "Front", Decimal("6.00")))
         self.assertTrue(StockMovement.objects.filter(product=product, reference="OPENING").exists())
+
+    def test_multiple_workbooks_join_manual_rows_in_a_resumable_draft(self):
+        _, first = self.preview([["Sheet one", "", "pair", "", "", "", 10, 0, 10, "", 2]])
+        _, second = self.preview([["Sheet two", "", "piece", "", "", "", 8, 0, 8, "", 3]])
+        manual = {"name": "Manual entry", "unit": "piece", "quantity": "4", "cost_usd": "0", "price_usd": "0"}
+        rows = [manual, *first["editor_rows"], *second["editor_rows"]]
+        response = self.finalize_editor_rows(rows, action="save_draft")
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Product.objects.exists())
+        self.assertFalse(StockMovement.objects.exists())
+        from catalog.models import OpeningStockDraft
+        draft = OpeningStockDraft.objects.get()
+        self.assertEqual([row["name"] for row in draft.rows], ["Manual entry", "Sheet one", "Sheet two"])
+        # Simulate resuming and editing the quantity before the final submission.
+        draft.rows[1]["quantity"] = "7"
+        self.finalize_editor_rows(draft.rows, revision=draft.revision)
+        self.assertEqual(Product.objects.get(name="Sheet one").stock_qty, Decimal("7"))
+        self.assertEqual(StockMovement.objects.count(), 3)
 
     def test_unknown_category_is_a_blocking_conflict(self):
         response, payload = self.preview([[
@@ -487,7 +508,7 @@ class OpeningStockExcelImportTests(TestCase):
         ]])
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(payload["can_finalize"])
+        self.assertFalse(payload["can_insert"])
         self.assertEqual(payload["summary"]["conflicts"], 1)
         self.assertIn("does not exist", payload["rows"][0]["errors"][0])
 

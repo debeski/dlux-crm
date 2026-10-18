@@ -1,14 +1,13 @@
 import json
-import secrets
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext as _
 from django.views import View
@@ -19,6 +18,7 @@ from django.urls import reverse
 from dlux.translations import get_current_language_code, get_strings
 from dlux.utils import log_user_action
 
+from common.i18n import t
 from common.editors import sync_party
 from common.views import RibbonPageMixin, ScopedListView, scope_filtered_queryset
 from finance.currency import pricing_currency
@@ -30,13 +30,14 @@ from .filters import (
 )
 from .forms import OpeningStockLineFormSet, PurchaseInvoiceForm, PurchaseInvoiceLineFormSet
 from .models import (
-    Category, Product, ProductVariant, PurchaseInvoice, PurchaseInvoiceLine, Service, StockMovement,
+    Category, OpeningStockDraft, Product, ProductVariant, PurchaseInvoice, PurchaseInvoiceLine, Service, StockMovement,
     StockTake, StockTakeLine, Supplier,
     product_color_hex,
 )
 from .opening_stock_import import (
-    OpeningStockImportError, column_guide, restore_rows, validate_workbook,
+    OpeningStockImportError, column_guide, validate_workbook,
 )
+from .opening_stock import draft_for, draft_rows, locked_draft, opening_scope, resumed_formset
 from .opening_stock_template import build_template
 from .product_layouts import (
     PRODUCTS_LAYOUT_GRID, PRODUCTS_LAYOUT_LIGHT, PRODUCTS_LAYOUT_NS, PRODUCTS_LAYOUTS,
@@ -60,11 +61,12 @@ def _variant_payload(variant):
     }
 
 
-def _product_autofill_map_json(currency=None):
+def _product_autofill_map_json(currency=None, products=None):
     """JSON {pk: {cost, markup, price_usd, price_lyd, category, unit, barcode, ...}}
     used by both Opening Stock and Purchase Invoice grids."""
     data = {}
-    for p in Product.objects.prefetch_related("variants"):
+    products = Product.objects.all() if products is None else products
+    for p in products.prefetch_related("variants"):
         variants = list(p.variants.all().order_by("color", "size", "pk"))
         default_variant = variants[0] if len(variants) == 1 else None
         fallback_color = (p.color or "") if not variants else ""
@@ -87,16 +89,19 @@ def _product_autofill_map_json(currency=None):
     return json.dumps(data).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
 
-def _save_product_from_intake_line(cd, invoice_currency=None, invoice_rate=None):
+def _save_product_from_intake_line(cd, invoice_currency=None, invoice_rate=None, products=None, scope=None):
     """Create or reuse a product from an inbound stock row, then apply the row's
     pricing fields to it. The typed product name is also a no-JS fallback match."""
     name = (cd.get("name") or "").strip()
     pid = cd.get("product")
-    product = Product.objects.filter(pk=pid).first() if pid else None
+    candidates = Product.objects.all() if products is None else products
+    product = candidates.filter(pk=pid).first() if pid else None
     if product is None and name:
-        product = Product.objects.filter(name__iexact=name).first()
+        product = candidates.filter(name__iexact=name).first()
     if product is None:
         product = Product(name=name)
+        if products is not None:
+            product.scope = scope
     if not product.pk or name.casefold() != product.alias.casefold():
         product.name = name or product.name
     product.category = cd.get("category")
@@ -128,8 +133,13 @@ def _variant_from_intake_line(product, cd):
     return ProductVariant.get_or_create_for(product, cd.get("color"), cd.get("size"))
 
 
-def _opening_stock_used():
-    return StockMovement.objects.filter(reference="OPENING").exists()
+def _opening_stock_used(user=None):
+    if user is None:
+        from dlux.middleware import get_current_user
+        user = get_current_user()
+    scope = opening_scope(user)
+    return (StockMovement.objects.filter(scope=scope, reference="OPENING").exists()
+            or OpeningStockDraft.objects.filter(scope=scope, finalized_at__isnull=False).exists())
 
 
 class CategoryListView(ScopedListView):
@@ -335,7 +345,7 @@ class StockMovementListView(ScopedListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["opening_stock_used"] = _opening_stock_used()
+        ctx["opening_stock_used"] = _opening_stock_used(self.request.user)
         return ctx
 
     def get_ribbon_action_specs(self):
@@ -348,8 +358,8 @@ class StockMovementListView(ScopedListView):
         strings = get_strings(get_current_language_code(self.request))
         user = self.request.user
         actions = []
-        if user.has_perm("catalog.add_product") and user.has_perm("catalog.add_stockmovement"):
-            if _opening_stock_used():
+        if all(user.has_perm(permission) for permission in OpeningStockEditorView.permission_required):
+            if _opening_stock_used(user):
                 actions.append({
                     "url": reverse("catalog:opening_stock_detail"),
                     "label": strings.get("ui_view_opening_stock", "View Opening Stock"),
@@ -359,7 +369,7 @@ class StockMovementListView(ScopedListView):
             else:
                 actions.append({
                     "url": reverse("catalog:opening_stock"),
-                    "label": strings.get("ui_new_opening_stock", "Opening Stock (bulk)"),
+                    "label": t("opening_resume_draft") if draft_for(user) else strings.get("ui_new_opening_stock", "Opening Stock (bulk)"),
                     "icon": "bi bi-box-seam",
                     "css_class": "btn btn-primary rounded-pill",
                 })
@@ -602,42 +612,48 @@ class InventoryValuationView(RibbonPageMixin, LoginRequiredMixin, PermissionRequ
 # Opening stock (one-time "ground zero" inventory intake)
 # --------------------------------------------------------------------------- #
 class OpeningStockEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    """One-time bulk intake for first setup — a **child of the stock ledger**, not
-    a document of its own. Reached from a trigger on the Stock Movements page: fill
-    the grid, confirm, and each row create-or-reuses its ``Product`` and posts a
-    Stock In ``StockMovement`` (``reason="Opening balance"``, ``reference="OPENING"``)
-    in a single transaction. The movements are the record; there is no list/detail.
-    """
+    """Save opening-stock drafts; only finalization writes products and stock."""
 
     permission_required = ("catalog.add_product", "catalog.change_product", "catalog.add_stockmovement")
     raise_exception = True
     template_name = "catalog/opening_stock_form.html"
 
     def _product_map(self):
-        return _product_autofill_map_json()
+        return _product_autofill_map_json(products=Product.objects.filter(scope=opening_scope(self.request.user)))
 
-    def _context(self, formset):
+    def _context(self, formset, draft=None, revision=None, error=""):
         return {
             "formset": formset,
+            "draft": draft,
+            "revision": revision if revision is not None else (draft.revision if draft else 0),
+            "editor_error": error,
+            "opening_editor_config": {
+                "confirm": t("ui_opening_apply_confirm"), "verifying": t("ui_verifying_file"),
+                "failed": t("ui_import_failed"), "ready": t("ui_import_ready"), "fix": t("ui_fix_conflicts"),
+                "newItem": t("ui_new_items"), "existingItem": t("ui_existing_items"),
+                "rows": t("ui_rows"), "conflicts": t("ui_conflicts"),
+                "inserted": t("opening_rows_inserted"), "limit": t("opening_row_limit"),
+            },
             "current_rate": get_current_rate(),
             "product_map_json": self._product_map(),
-            "products": Product.objects.order_by("name"),
+            "products": Product.objects.filter(scope=opening_scope(self.request.user)).order_by("name"),
             "import_guide": column_guide(),
         }
 
     @staticmethod
-    def _apply_line(cd):
+    def _apply_line(cd, scope=None):
         """Create-or-reuse the product for a grid row (correcting its pricing from
         the row's figures — the admin may reprice an existing item), then post a
         Stock In movement for the storage quantity. A zero-qty row still (re)prices
         the product without a movement."""
-        product = _save_product_from_intake_line(cd)
+        product = _save_product_from_intake_line(cd, products=Product.objects.filter(scope=scope), scope=scope)
         qty = cd.get("quantity") or Decimal("0")
         if qty > 0:
             variant = _variant_from_intake_line(product, cd)
             StockMovement.objects.create(
                 product=product,
                 variant=variant,
+                scope=scope,
                 movement_type=StockMovement.TYPE_IN,
                 quantity=qty,
                 reason="Opening balance",
@@ -645,67 +661,67 @@ class OpeningStockEditorView(LoginRequiredMixin, PermissionRequiredMixin, View):
             )
 
     def get(self, request):
-        if _opening_stock_used():
+        if _opening_stock_used(request.user):
             messages.info(request, _("Opening stock has already been applied."))
             return redirect("catalog:opening_stock_detail")
-        return render(request, self.template_name, self._context(OpeningStockLineFormSet(form_kwargs={"user": request.user})))
+        draft = draft_for(request.user)
+        return render(request, self.template_name, self._context(resumed_formset(draft, request.user), draft))
 
     def post(self, request):
-        if _opening_stock_used():
+        if _opening_stock_used(request.user):
             messages.error(request, _("Opening stock can only be applied once."))
             return redirect("catalog:opening_stock_detail")
-        formset = OpeningStockLineFormSet(request.POST, form_kwargs={"user": request.user})
-        if formset.is_valid():
-            kept = 0
-            with transaction.atomic():
-                for form in formset:
-                    cd = form.cleaned_data
-                    if not cd or cd.get("DELETE"):
-                        continue
-                    if not (cd.get("name") or "").strip():
-                        continue  # blank row the user added but never filled
-                    self._apply_line(cd)
-                    kept += 1
-                log_user_action(
-                    request, "CREATE", model_name="Opening Stock",
-                    details=f"Opening stock intake: {kept} item(s)",
-                )
-            if kept:
-                messages.success(
-                    request,
-                    _("Opening stock applied — %(n)s item(s) loaded into storage.") % {"n": kept},
-                )
+        formset = OpeningStockLineFormSet(request.POST, form_kwargs={"user": request.user, "opening_only": True})
+        draft = draft_for(request.user)
+        try:
+            revision = int(request.POST.get("revision", "0"))
+            rows = draft_rows(request.POST, request.user)
+        except (ValueError, ValidationError) as exc:
+            error = " ".join(exc.messages) if isinstance(exc, ValidationError) else t("opening_draft_conflict")
+            return render(request, self.template_name, self._context(formset, draft, error=error), status=400)
+        save_draft = request.POST.get("action") == "save_draft"
+        if not save_draft and not formset.is_valid():
+            return render(request, self.template_name, self._context(formset, draft, revision))
+        kept = [form.cleaned_data for form in formset if form.cleaned_data and not form.cleaned_data.get("DELETE") and form.cleaned_data.get("name")] if not save_draft else []
+        if not save_draft and not kept:
+            return render(request, self.template_name, self._context(formset, draft, revision, t("opening_no_items")))
+        with transaction.atomic():
+            draft = locked_draft(request.user)
+            if draft.finalized_at or _opening_stock_used(request.user):
+                return redirect("catalog:opening_stock_detail")
+            if draft.revision != revision:
+                return render(request, self.template_name, self._context(formset, draft, revision, t("opening_draft_conflict")), status=409)
+            if save_draft:
+                draft.rows = rows
             else:
-                messages.warning(request, _("No items were entered."))
-            return redirect("catalog:stock_movement_list")
-        return render(request, self.template_name, self._context(formset))
+                for cleaned in kept:
+                    self._apply_line(cleaned, scope=opening_scope(request.user))
+                draft.rows = []
+                draft.finalized_at = timezone.now()
+            draft.revision += 1
+            draft.save()
+            log_user_action(request, "UPDATE" if save_draft else "CREATE", model_name="Opening Stock",
+                            details=f"Opening stock {'draft saved' if save_draft else 'finalized'}: {len(rows) if save_draft else len(kept)} row(s)")
+        messages.success(request, t("opening_draft_saved") if save_draft else _("Opening stock applied — %(n)s item(s) loaded into storage.") % {"n": len(kept)})
+        return redirect("catalog:stock_movement_list")
 
 
 class OpeningStockImportPreviewView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    """Validate an XLSX upload and stage its rows without touching stock."""
+    """Return reviewed form-ready rows without touching stock or the saved draft."""
 
     permission_required = OpeningStockEditorView.permission_required
     raise_exception = True
 
     def post(self, request):
-        if _opening_stock_used():
+        if _opening_stock_used(request.user):
             return JsonResponse({"error": _("Opening stock has already been applied.")}, status=409)
         try:
-            result = validate_workbook(request.FILES.get("file"))
+            result = validate_workbook(request.FILES.get("file"), user=request.user)
         except OpeningStockImportError as exc:
             return JsonResponse({"error": " ".join(exc.messages)}, status=400)
 
-        token = ""
-        if result["can_finalize"]:
-            token = secrets.token_urlsafe(24)
-            cache.set(
-                f"catalog:opening-stock-import:{token}",
-                {"user_id": request.user.pk, "rows": result.pop("valid_rows")},
-                30 * 60,
-            )
-        else:
-            result.pop("valid_rows", None)
-        result["token"] = token
+        rows = result.pop("valid_rows")
+        result["editor_rows"] = rows if result["can_insert"] else []
         return JsonResponse(result)
 
 
@@ -717,7 +733,7 @@ class OpeningStockImportTemplateView(LoginRequiredMixin, PermissionRequiredMixin
 
     def get(self, request):
         response = HttpResponse(
-            build_template(),
+            build_template(user=request.user),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
         response["Content-Disposition"] = 'attachment; filename="opening-stock-template.xlsx"'
@@ -725,44 +741,13 @@ class OpeningStockImportTemplateView(LoginRequiredMixin, PermissionRequiredMixin
 
 
 class OpeningStockImportFinalizeView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    """Apply a previously previewed XLSX import through the manual intake path."""
+    """Old clients must use the editor rather than apply an import directly."""
 
     permission_required = OpeningStockEditorView.permission_required
     raise_exception = True
 
     def post(self, request):
-        token = (request.POST.get("token") or "").strip()
-        cache_key = f"catalog:opening-stock-import:{token}"
-        staged = cache.get(cache_key) if token else None
-        if not staged or staged.get("user_id") != request.user.pk:
-            return JsonResponse({"error": _("This import preview expired. Select the file again.")}, status=400)
-        if _opening_stock_used():
-            return JsonResponse({"error": _("Opening stock has already been applied.")}, status=409)
-        lock_key = f"{cache_key}:finalizing"
-        if not cache.add(lock_key, request.user.pk, 60):
-            return JsonResponse({"error": _("This import is already being finalized.")}, status=409)
-        try:
-            cleaned_rows = restore_rows(staged["rows"])
-        except OpeningStockImportError as exc:
-            cache.delete(lock_key)
-            return JsonResponse({"error": " ".join(exc.messages)}, status=400)
-
-        try:
-            with transaction.atomic():
-                for cleaned in cleaned_rows:
-                    OpeningStockEditorView._apply_line(cleaned)
-                log_user_action(
-                    request, "CREATE", model_name="Opening Stock",
-                    details=f"Opening stock XLSX intake: {len(cleaned_rows)} item(s)",
-                )
-        finally:
-            cache.delete(lock_key)
-        cache.delete(cache_key)
-        messages.success(
-            request,
-            _("Opening stock applied — %(n)s item(s) loaded from Excel.") % {"n": len(cleaned_rows)},
-        )
-        return JsonResponse({"ok": True, "redirect": reverse("catalog:stock_movement_list")})
+        return JsonResponse({"error": t("opening_import_editor_only")}, status=410)
 
 
 class OpeningStockDetailView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):

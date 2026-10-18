@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 
 from django import forms
-from django.forms import formset_factory
+from django.forms import BaseFormSet, formset_factory
 from django.utils.html import format_html, format_html_join
 
 from dlux.forms import ManagedAssetFormMixin
@@ -421,7 +421,8 @@ class PurchaseInvoiceForm(forms.ModelForm):
 class OpeningStockLineForm(forms.Form):
     """One row of the one-time opening-stock grid. Deliberately **not** a
     ModelForm — a row spans creating/reusing a ``Product`` and posting a Stock In
-    ``StockMovement``, both done in the view; there is no opening-stock model.
+    ``StockMovement``, both done only when the editor is finalized. Drafts keep
+    the raw grid separately without changing either model.
     The visible ``name`` doubles as a new-or-existing product combobox: JS matches
     it against existing products, fills the hidden ``product`` id (blank = a
     brand-new item), and autofills cost/markup/price from the product map."""
@@ -441,10 +442,18 @@ class OpeningStockLineForm(forms.Form):
     price_lyd_override = forms.DecimalField(required=False, min_value=0, max_digits=14, decimal_places=2)
     quantity = forms.DecimalField(required=False, min_value=0, max_digits=12, decimal_places=2, initial=Decimal("0"))
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, opening_only=False, **kwargs):
+        self.opening_only = opening_only
+        self.user = user
         super().__init__(*args, **kwargs)
+        if opening_only:
+            from dlux.utils import get_user_scope, is_scope_enabled
+            scope = get_user_scope(user) if is_scope_enabled() else None
+            self.opening_scope = scope
+            self.fields["category"].queryset = self.fields["category"].queryset.filter(scope=scope)
         from machinery.forms import attach_machine_models
-        attach_machine_models(self, user)
+        if attach_machine_models(self, user):
+            self.fields["machine_models"].widget.selector_variant = "chip"
         from common.i18n import t
 
         s = get_strings()
@@ -502,9 +511,27 @@ class OpeningStockLineForm(forms.Form):
         cleaned = super().clean()
         if cleaned.get("DELETE"):
             return cleaned
-        product = Product.objects.filter(pk=cleaned.get("product")).first() if cleaned.get("product") else None
+        products = Product.objects.all()
+        if self.opening_only:
+            from common.i18n import t
+            products = products.filter(scope=self.opening_scope)
+            meaningful = any(cleaned.get(key) for key in ("alias", "barcode", "color", "size", "category", "quantity", "cost_usd", "markup_percent", "price_usd", "price_lyd_override", "machine_models", "product"))
+            if meaningful and not cleaned.get("name"):
+                self.add_error("name", t("opening_name_required"))
+        product = products.filter(pk=cleaned.get("product")).first() if cleaned.get("product") else None
+        if self.opening_only and cleaned.get("product") and product is None:
+            self.add_error("product", t("opening_invalid_product"))
         if product is None and cleaned.get("name"):
-            product = Product.objects.filter(name__iexact=cleaned["name"]).first()
+            matches = products.filter(name__iexact=cleaned["name"])
+            if self.opening_only and matches.count() > 1:
+                self.add_error("name", t("opening_ambiguous_product"))
+            product = matches.first()
+        if self.opening_only and cleaned.get("barcode"):
+            conflicts = products.filter(barcode=cleaned["barcode"])
+            if product:
+                conflicts = conflicts.exclude(pk=product.pk)
+            if conflicts.exists():
+                self.add_error("barcode", t("opening_barcode_conflict"))
         currency = cleaned.get("currency")
         if currency and currency not in active_currencies() and (product is None or currency != product.currency):
             self.add_error("currency", get_strings().get("purchase_currency_inactive", "This currency is not active."))
@@ -560,8 +587,27 @@ class PurchaseInvoiceLineForm(OpeningStockLineForm):
         return cleaned
 
 
-# Plain formset powering the multi-row opening-stock grid (add-row JS mirrors the
-# invoice item grid). Fully-empty rows are ignored; blank-name rows are dropped
-# in the view.
-OpeningStockLineFormSet = formset_factory(OpeningStockLineForm, extra=1, can_delete=True)
+class OpeningStockFormSet(BaseFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        from common.i18n import t
+        seen = set()
+        details = {}
+        for form in self.forms:
+            row = form.cleaned_data
+            if not row or row.get("DELETE") or not row.get("name"):
+                continue
+            key = row["name"].casefold()
+            variant = (key, row.get("color") or "", (row.get("size") or "").casefold())
+            if variant in seen:
+                raise forms.ValidationError(t("opening_duplicate_row"))
+            seen.add(variant)
+            identity = tuple(str(row.get(field) or "") for field in ("category", "unit", "barcode", "currency", "alias", "cost_usd", "markup_percent", "price_usd", "price_lyd_override"))
+            if details.setdefault(key, identity) != identity:
+                raise forms.ValidationError(t("opening_conflicting_rows"))
+
+
+OpeningStockLineFormSet = formset_factory(OpeningStockLineForm, formset=OpeningStockFormSet, extra=1, can_delete=True, max_num=1000, validate_max=True)
 PurchaseInvoiceLineFormSet = formset_factory(PurchaseInvoiceLineForm, extra=0, can_delete=True)
