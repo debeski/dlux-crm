@@ -36,7 +36,7 @@ chmod 700 "${bundle}/.secrets"
 
 # Consumers ship stable only: no beta images and no prerelease DjangoLux pin.
 if grep -qE ':beta|:v?[0-9]+\.[0-9]+\.[0-9]+b[0-9]+' "${bundle}/compose.yml" \
-  || grep -qE '^django-lux.*[0-9]b[0-9]+' "${root}/requirements.txt"; then
+  || grep -qE '^django-lux[^=@]*==[0-9.]+b[0-9]+|django_lux-[0-9.]+b[0-9]+-' "${root}/requirements.txt"; then
   echo "Refusing to package: compose.yml or requirements.txt references a beta." >&2
   exit 1
 fi

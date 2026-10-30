@@ -711,9 +711,9 @@ from `/media/`, which an image update alone cannot do. In order:
    runs the migrations (DjangoLux `0027`–`0029`; no CRM data changes).
 5. **Update the resident pair** if Options > Updates and maintenance shows an older
    Composer agent: its row's update button, or `./start.sh agent update`.
-6. **Check**: Options > Operations > run the check. It should report stack schema 3
-   and wrapper 6. Composer also proposes pinning `tecnativa/docker-socket-proxy` by
-   digest; apply that only if you want the pin.
+6. **Check**: Options > Operations > run the check, or `./start.sh check`. Every
+   check passes: wrapper 6, the stable channel, and the progress page served by
+   composer-agent.
 
 After step 4, `/media/purchase_invoices/...` and `/media/finance/expenses/...`
 answer 404; attachments open from the app for users who may view the record.

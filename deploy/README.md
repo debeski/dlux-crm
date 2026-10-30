@@ -37,8 +37,7 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
    The first start pulls the images, applies the migrations, imports
    `config.json` and starts every service.
 4. Open `BASE_URL/staff/` and sign in as `admin` with `ADMIN_PASS`.
-5. Run `./start.sh check`. It may propose pinning `tecnativa/docker-socket-proxy`
-   by digest; that is optional.
+5. Run `./start.sh check`. Every check must pass.
 
 ## Updating
 
