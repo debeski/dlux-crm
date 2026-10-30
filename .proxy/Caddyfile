@@ -45,6 +45,10 @@
 	route {
 		# Never serve dlux DB backups over media.
 		respond /media/dlux_backups/* 404
+		# Purchase-invoice attachments and expense receipts are served by the app
+		# behind their record's permissions: /staff/files/<app>/<model>/<pk>/<field>/
+		respond /media/purchase_invoices/* 404
+		respond /media/finance/expenses/* 404
 
 		# Static assets — immutable, cached one year. handle_path strips /static.
 		handle_path /static/* {

@@ -20,6 +20,8 @@ from django.urls import reverse
 
 from dlux.models import ScopedModel
 
+from common.files import ProtectedFileField
+
 # Cache key retained for the live USD->LYD rate; EUR uses its own keyed value.
 CURRENT_RATE_CACHE_KEY = "finance:current_usd_lyd_rate"
 CURRENT_RATE_CACHE_TTL = 60 * 60  # 1h; bounded by explicit invalidation on save.
@@ -248,7 +250,7 @@ class Expense(ScopedModel):
         related_name="paid_expenses", verbose_name="Paid By",
     )
     reference = models.CharField(max_length=120, blank=True, verbose_name="Reference")
-    attachment = models.FileField(upload_to="finance/expenses/", blank=True, verbose_name="Receipt / Attachment")
+    attachment = ProtectedFileField(upload_to="finance/expenses/", blank=True, verbose_name="Receipt / Attachment")
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_POSTED, db_index=True, verbose_name="Status")
     posted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,

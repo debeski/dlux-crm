@@ -359,6 +359,13 @@ See [BUSINESS_RULES.md](BUSINESS_RULES.md) for pricing and the frozen-rate rule,
   and permission-gated.
 - Project security settings (CSP, CSRF/session cookies, HSTS) come from the dlux
   project scaffold in `config/settings.py`.
+- Stored paperwork (`PurchaseInvoice.attachment`, `Expense.attachment`) uses
+  `common.files.ProtectedFileField`: its `.url` is `common:stored_file`
+  (`/staff/files/<app>/<model>/<pk>/<field>/`), which checks login, the record's
+  `view_<model>` permission, scope and `OWNER_FIELDS` ownership, then answers with
+  DjangoLux's `serve_file` (byte ranges, revalidation). Caddy returns 404 for
+  `/media/purchase_invoices/*` and `/media/finance/expenses/*`; product, service
+  and listing images stay public for the storefront.
 
 ## Cancellation payments and customer credit (sales.0010)
 

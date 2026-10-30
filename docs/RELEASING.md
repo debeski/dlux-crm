@@ -20,9 +20,11 @@ the floor; 1.9.1 is the paired stable. Framework migrations `0027`–`0029` are
 additive and run on start; the CRM adds no migrations.
 
 Upgrade order for an existing deployment (see
-[OPERATIONS.md](OPERATIONS.md#upgrading-to-v0120)): back up, update Composer, take
-the image update, then **Options > Operations > Apply repairs** (or
-`./start.sh check --fix`) to move to stack schema 3 and wrapper 6.
+[OPERATIONS.md](OPERATIONS.md#upgrading-to-v0120)): back up, update the Composer
+deployer, install the release's deployment files (`compose.yml`, wrappers,
+`.proxy/Caddyfile`, `relay/`), then `./start.sh update`. The image alone is not
+enough: the new Caddyfile is what stops `/media/` serving purchase-invoice
+attachments and expense receipts to anyone with the URL.
 
 The release workflow now passes the project manifest to the image as a
 `base64:` label (`steps.project_manifest.outputs.label`), so the update review shows

@@ -611,6 +611,11 @@ represents the supplier document used to add stock. It is captured with the rich
 file field (drag-drop, phone camera, or desktop scanner) and shown as a link on
 the purchase invoice page.
 
+The attachment, like an expense receipt, opens only for a signed-in user who may
+view that record (`catalog.view_purchaseinvoice`; for receipts `finance.view_expense`
+plus ownership unless `view_all_expense`). The app serves it at
+`/staff/files/...`; the proxy refuses its `/media/` path.
+
 ## Cash deposits (ايداع نقدي)
 
 Technicians and delivery reps **record** the cash they collected (`pending`); an
@@ -691,24 +696,31 @@ Back up the store database, deploy the `machinery` app with config/catalog/autom
 
 v0.12.0 runs DjangoLux 1.15.2. Its image floor rules out an inline DjangoLux
 install, so an existing v0.11.x deployment moves with an application-image update.
-In order:
+It also changes deployment files: `.proxy/Caddyfile` stops serving attachments
+from `/media/`, which an image update alone cannot do. In order:
 
 1. **Back up**: Options > Backups (the image update also takes one first).
-2. **Update Composer** to 1.9.1: `./start.sh self update` (older wrappers) or
-   `./start.sh update self` (wrapper 5+), then `./start.sh agent update` for the
-   resident agent and executor, or the Composer agent row in Options > Updates and
-   maintenance.
-3. **Update the image**: Options > Updates and maintenance offers the new
-   `debeski/dlux-crm:sales` image once it is published; or run `./start.sh update`.
-   Startup applies DjangoLux migrations `0027`–`0029`; no CRM data changes.
-4. **Retire the CRM's own progress page**: move `.proxy/maintenance.html` into
-   `.xclude/.proxy/`. Composer's page does the same job (it returns visitors to the
-   page they were on). If the file is still there in step 5, Composer keeps it as a
-   project override in `.proxy/maintenance/` and keeps serving the old page.
-5. **Repair the deployment**: Options > Operations > run the check, then **Apply
-   repairs** (or `./start.sh check --fix`). This moves the stack to schema 3, where
-   composer-agent publishes the update progress page, and replaces the wrappers with
-   version 6. The previous files are archived under `.xclude/composer-check/`.
+2. **Update the Composer deployer**: `./start.sh self update` (wrapper 3 or 4).
+3. **Install the release's deployment files** from `crm-sales-0.12.0-deploy.zip`:
+   `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile` and `relay/`. Keep
+   `.secrets/.env`, `media/`, `logs/` and `imports/`. Move the old copies, and
+   `.proxy/maintenance.html`, into `.xclude/` first: Composer now serves the update
+   progress page itself (it also returns visitors to the page they were on).
+4. **Update the stack**: `./start.sh update`. Wrapper 6 refreshes the deployer,
+   pulls `debeski/dlux-crm:sales` and the other images, recreates the services and
+   runs the migrations (DjangoLux `0027`–`0029`; no CRM data changes).
+5. **Update the resident pair** if Options > Updates and maintenance shows an older
+   Composer agent: its row's update button, or `./start.sh agent update`.
+6. **Check**: Options > Operations > run the check. It should report stack schema 3
+   and wrapper 6. Composer also proposes pinning `tecnativa/docker-socket-proxy` by
+   digest; apply that only if you want the pin.
+
+After step 4, `/media/purchase_invoices/...` and `/media/finance/expenses/...`
+answer 404; attachments open from the app for users who may view the record.
+
+If only the image is updated (Options > Updates and maintenance, or `update` with
+the old files), the app works, but the old Caddyfile keeps serving attachments to
+anyone who knows their URL; install the files from step 3 to close that.
 
 A fresh installation from `crm-sales-<version>-deploy.zip` is already at schema 3
 and wrapper 6; see `deploy/README.md`.

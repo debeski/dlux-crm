@@ -20,6 +20,7 @@ from django.utils import timezone
 
 from dlux.models import ManagedAssetField, ScopedModel
 
+from common.files import ProtectedFileField
 from finance.currency import CURRENCY_CHOICES, pricing_currency
 from finance.services import get_current_rate, usd_to_lyd
 
@@ -596,7 +597,7 @@ class PurchaseInvoice(ScopedModel):
     currency = models.CharField(
         max_length=3, choices=CURRENCY_CHOICES, default=pricing_currency, verbose_name="Currency",
     )
-    attachment = models.FileField(
+    attachment = ProtectedFileField(
         upload_to="purchase_invoices/", blank=True, verbose_name="Attachment"
     )
     notes = models.TextField(blank=True, verbose_name="Notes")

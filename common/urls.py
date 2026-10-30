@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import WorkspaceDashboardView
+from .views import StoredFileView, WorkspaceDashboardView
 
 app_name = "common"
 
@@ -33,4 +33,9 @@ _workspace_dashboard.sidebar_permissions = [
 
 urlpatterns = [
     path("workspace/", _workspace_dashboard, name="workspace_dashboard"),
+    path(
+        "files/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/",
+        StoredFileView.as_view(),
+        name="stored_file",
+    ),
 ]

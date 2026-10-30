@@ -37,7 +37,8 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
    The first start pulls the images, applies the migrations, imports
    `config.json` and starts every service.
 4. Open `BASE_URL/staff/` and sign in as `admin` with `ADMIN_PASS`.
-5. Run `./start.sh check`. It must report no findings.
+5. Run `./start.sh check`. It may propose pinning `tecnativa/docker-socket-proxy`
+   by digest; that is optional.
 
 ## Updating
 
@@ -48,12 +49,21 @@ Back up first: **Options > Backups** in the app, or keep a database dump.
 - Or from this folder: `./start.sh update`. It refreshes the Composer deployer,
   pulls the new images and recreates the services; migrations run on start.
 
-Stacks set up before Sales CRM 0.12.0 still serve the update progress page from
-`.proxy/maintenance.html`. After updating, move that file into `.xclude/.proxy/`,
-then open **Options > Operations**, run the deployment check and choose **Apply
-repairs** (or run `./start.sh check --fix`). Composer then serves its own page and
-archives the old files under `.xclude/composer-check/`. Leaving the file in place
-keeps it as a project override instead.
+### From a Sales CRM before 0.12.0
+
+0.12.0 also changes the deployment files: its `.proxy/Caddyfile` stops serving
+purchase-invoice attachments and expense receipts from `/media/` (the app serves
+them to signed-in users who may see the record), and Composer now ships the update
+progress page.
+
+1. Back up, then run `./start.sh self update`.
+2. Move the old `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile`,
+   `.proxy/maintenance.html` and `relay/` into `.xclude/`, and copy this folder's
+   versions in. Keep `.secrets/.env`, `media/`, `logs/` and `imports/`.
+3. Run `./start.sh update`, then `./start.sh check`.
+
+Updating only the image keeps the old Caddyfile, which still serves attachments to
+anyone who knows their URL.
 
 ## Everyday commands
 
