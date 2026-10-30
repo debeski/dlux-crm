@@ -686,3 +686,26 @@ MachineType, Manufacturer and MachineModel use `machinery.view_*` lookup permiss
 ## Machinery schema rollout
 
 Back up the store database, deploy the `machinery` app with config/catalog/automotive changes, and use `./start.sh` to recreate the development stack (web and Celery now bind `./machinery`). Apply migrations through the normal wrapper startup. Run `seed_machine_categories` in the appropriate scope (`--scope ID`, or no scope for global records). The command creates vocabulary and an unpriced Repair service, never stock or purchase invoices. Migration preserves original machine/engine records while copying simple model compatibility into machinery. Reference: [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md).
+
+## Upgrading to v0.12.0
+
+v0.12.0 runs DjangoLux 1.15.2. Its image floor rules out an inline DjangoLux
+install, so an existing v0.11.x deployment moves with an application-image update.
+In order:
+
+1. **Back up**: Options > Backups (the image update also takes one first).
+2. **Update Composer** to 1.9.1: `./start.sh self update` (older wrappers) or
+   `./start.sh update self` (wrapper 5+), then `./start.sh agent update` for the
+   resident agent and executor, or the Composer agent row in Options > Updates and
+   maintenance.
+3. **Update the image**: Options > Updates and maintenance offers the new
+   `debeski/dlux-crm:sales` image once it is published; or run `./start.sh update`.
+   Startup applies DjangoLux migrations `0027`–`0029`; no CRM data changes.
+4. **Repair the deployment**: Options > Operations > run the check, then **Apply
+   repairs** (or `./start.sh check --fix`). This moves the stack to schema 3, where
+   the update progress page ships in Composer, and replaces the wrappers with
+   version 6. The old `.proxy/maintenance.html` and the previous files are archived
+   under `.xclude/composer-check/`.
+
+A fresh installation from `crm-sales-<version>-deploy.zip` is already at schema 3
+and wrapper 6; see `deploy/README.md`.

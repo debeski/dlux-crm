@@ -13,8 +13,8 @@
     <link rel="stylesheet" href="{% static 'bootstrap/bootstrap.min.css' %}">
     {% endif %}
     <link rel="stylesheet" href="{% static 'bootstrap/bootstrap-icons.css' %}">
-    <link rel="stylesheet" href="{% static 'dlux/main/css/main.css' %}">
-    <link rel="stylesheet" href="{% static 'dlux/main/css/buttons.css' %}">
+    <link rel="stylesheet" href="{% static 'dlux/base/css/main.css' %}">
+    <link rel="stylesheet" href="{% static 'dlux/base/css/buttons.css' %}">
     <link rel="stylesheet" href="{% asset 'public_catalog/css/public_catalog.css' %}">
     <link rel="icon" href="{{ APP_CONFIG.favicon_url|default:'/static/img/base_logo.svg' }}">
     <meta name="csrf-token" content="{{ csrf_token }}">
@@ -60,7 +60,7 @@
         </div>
     </header>
     {% endif %}
-    {% include 'dlux/includes/messages.html' %}
+    {% include 'dlux/notifications/messages.html' %}
     {% block public_content %}{% endblock %}
     {% if not public_bare %}
     <footer class="public-footer">

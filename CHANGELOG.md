@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.12.0
+- **DjangoLux 1.15.2**: Upgrade the hash-pinned `django-lux[updater]` wheel from 1.12.0 to 1.15.2 (published stable). The image floor of DjangoLux 1.15 means the upgrade is an application-image update, not an inline install; normal startup applies the additive framework migrations `0027`–`0029`. Requires Composer 1.9.0 or later; paired stable Composer is 1.9.1.
+- **Unsaved-Changes Prompt On Modal Forms**: `common.forms.build_grid_helper()` sets `form.dlux_unsaved_guard = True`, so every modal create/edit form built on it asks to save, discard or go back when closed with changes; the invoice payment/cancellation modal (`sales/invoice_money_modal.html`) carries `data-dlux-unsaved-guard`. Ships now that DjangoLux 1.15.2 submits the prompt's Save once (on 1.12 one click could save the form twice).
+- **Stack Schema 3**: The update progress page now ships in Composer: `.proxy/Caddyfile` serves it from `/opt/dlux-runtime/proxy/maintenance` on 502/503/504 and its assets through `handle /_dlux/maintenance/*`, and `compose.yml` no longer bind-mounts `.proxy/maintenance.html`, which is retired (Composer's page has the same return-to-your-URL behaviour). Existing stacks migrate with Options > Operations > Apply repairs or `./start.sh check --fix`; see `docs/OPERATIONS.md`.
+- **Executor Reads Secrets With DAC_OVERRIDE**: `composer-executor` adds `DAC_OVERRIDE` instead of the retired `DAC_READ_SEARCH`, which also grants `open_by_handle_at` past the read-only bind mount; matches the DjangoLux scaffold and Composer's hardened topology.
+- **Composer Wrapper 6**: `start.sh`/`start.ps1` are byte-identical to the DjangoLux 1.15.2 scaffold: `./start.sh update` refreshes the Composer deployer before the stack, `./start.sh update self` refreshes only the deployer, and `self update` remains a deprecated alias.
+- **Quote-Safe Release Manifest Label**: `tools/validate_project_release_manifest.py` also emits `label=base64:<url-safe JSON>` and `release.yml` passes it as `DLUX_PROJECT_RELEASE_MANIFEST`, fixing the corrupted `org.dlux.project.release-manifest` label of v0.11.4 so the update review shows this release's summary and highlights.
+- **Canonical DjangoLux Static Paths**: `public_catalog/public_base.html` links `dlux/base/css/main.css`, `dlux/base/css/buttons.css` and includes `dlux/notifications/messages.html` instead of the compatibility shims removed in DjangoLux 2.0.
+- **Deployment Bundle**: `scripts/build_deploy_zip.sh` builds `dist/crm-sales-<version>-deploy.zip` from `compose.yml`, the wrappers, `.proxy/Caddyfile`, `relay/`, `config.json`, `deploy/README.md` and `deploy/env.template` (as `.secrets/.env.template`), with `.composer-channel` set to `stable`; it refuses to package a beta image or pin.
+
 ## v0.11.4
 - **DjangoLux 1.12.0**: Upgrade the hash-pinned `django-lux[updater]` wheel from 1.11.0 to 1.12.0; rebuild the application image to install the new runtime.
 

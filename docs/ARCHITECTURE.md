@@ -181,6 +181,9 @@ For **simple models** (products, services, categories, rates, deposits, customer
 - Create / edit / view / delete are handled by the DjangoLux **dynamic modal
   manager** (`modal_manager`), which auto-resolves `<Model>Form` from the app's
   `forms.py`. No per-model create/update/delete views or templates needed.
+- Every form built on `common.forms.build_grid_helper()` opts into DjangoLux's
+  unsaved-changes prompt (`form.dlux_unsaved_guard = True`). A custom modal
+  fragment with its own `<form>` adds `data-dlux-unsaved-guard` to that tag.
 - The list page's "Add" button and the `DluxTable` row context menu open those modals.
 
 `Product.stock_qty` and `ProductVariant.stock_qty` are running balances, applied once per movement by

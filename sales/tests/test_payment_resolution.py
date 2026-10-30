@@ -185,7 +185,9 @@ class PaymentResolutionTests(TestCase):
 
     def test_modal_validates_method_and_resolves_later(self):
         invoice = self.invoice()
-        self.assertEqual(self.request(InvoiceCancellationView, invoice).status_code, 200)
+        opened = self.request(InvoiceCancellationView, invoice)
+        self.assertEqual(opened.status_code, 200)
+        self.assertIn(b"data-dlux-unsaved-guard", opened.content)
         response = self.request(InvoiceCancellationView, invoice, {"payment_action": "refund"})
         self.assertIn(b'"success": false', response.content)
         self.assertFalse(PaymentResolution.objects.exists())

@@ -57,3 +57,4 @@ tracker.md
 .codex
 /CLAUDE.md
 db.sqlite3
+/deploy/
