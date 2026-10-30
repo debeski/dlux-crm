@@ -701,11 +701,14 @@ In order:
 3. **Update the image**: Options > Updates and maintenance offers the new
    `debeski/dlux-crm:sales` image once it is published; or run `./start.sh update`.
    Startup applies DjangoLux migrations `0027`–`0029`; no CRM data changes.
-4. **Repair the deployment**: Options > Operations > run the check, then **Apply
+4. **Retire the CRM's own progress page**: move `.proxy/maintenance.html` into
+   `.xclude/.proxy/`. Composer's page does the same job (it returns visitors to the
+   page they were on). If the file is still there in step 5, Composer keeps it as a
+   project override in `.proxy/maintenance/` and keeps serving the old page.
+5. **Repair the deployment**: Options > Operations > run the check, then **Apply
    repairs** (or `./start.sh check --fix`). This moves the stack to schema 3, where
-   the update progress page ships in Composer, and replaces the wrappers with
-   version 6. The old `.proxy/maintenance.html` and the previous files are archived
-   under `.xclude/composer-check/`.
+   composer-agent publishes the update progress page, and replaces the wrappers with
+   version 6. The previous files are archived under `.xclude/composer-check/`.
 
 A fresh installation from `crm-sales-<version>-deploy.zip` is already at schema 3
 and wrapper 6; see `deploy/README.md`.
