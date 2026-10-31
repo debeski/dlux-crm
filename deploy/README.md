@@ -60,7 +60,8 @@ refuses every private file, storefront images included.
 2. Update the image first, with your current files: `./start.sh update`.
 3. Move the old `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile`,
    `.proxy/maintenance.html` and `relay/` into `.xclude/`, copy this folder's
-   versions in (keep `.secrets/.env`, `media/`, `logs/` and `imports/`), then run
+   versions in (keep `.secrets/.env`, `media/`, `logs/` and `imports/`), add
+   `# dlux stack schema 4` as the first line of `.secrets/.env`, then run
    `./start.sh`.
 4. Run `./start.sh restart caddy`. Caddy reads its Caddyfile only when it starts,
    and neither `./start.sh` nor `update` recreates an unchanged caddy service.

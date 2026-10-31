@@ -711,8 +711,11 @@ private file, including storefront images. In order:
    `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile` and `relay/`. Keep
    `.secrets/.env`, `media/`, `logs/` and `imports/`. Move the old copies, and
    `.proxy/maintenance.html`, into `.xclude/` first: Composer now serves the update
-   progress page itself (it also returns visitors to the page they were on). Then
-   run `./start.sh` to apply the new `compose.yml`.
+   progress page itself (it also returns visitors to the page they were on). Add
+   `# dlux stack schema 4` as the first line of `.secrets/.env` (otherwise `check`
+   notes it as unstamped). Then run `./start.sh` to apply the new `compose.yml`;
+   it recreates the services whose environment changed, `db` included, with their
+   volumes untouched.
 5. **Restart the proxy**: `./start.sh restart caddy`. Caddy reads its Caddyfile only
    when it starts, and neither `./start.sh` nor `update` recreates an unchanged caddy
    service, so the old rules would keep serving.
