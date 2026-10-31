@@ -1,7 +1,7 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-10-30: v0.12.0 on branch `0.12/dlux_1_15_2` (PR, untagged): DjangoLux 1.15.2 + Composer 1.9.1, stack schema 3, wrapper 6, attachments behind login (`common.files.ProtectedFileField` + `common:stored_file`/`serve_file`, Caddy 404s their media paths), unsaved guard on modal forms. v0.11.4 (1.12.0) is production.
+- 2026-10-31: v0.12.0 on branch `0.12/dlux_1_15_2` (PR #1, untagged): DjangoLux 1.15.3 + Composer 1.9.2, stack schema 4 (stored files private; `DLUX_PUBLIC_MEDIA` storefront images, `DLUX_APP_ONLY_MEDIA` attachments/receipts via `common:stored_file`), wrapper 6, unsaved guard. v0.11.4 (1.12.0) is production.
 - 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
 - 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
@@ -26,7 +26,7 @@
 - 2026-08-03: Fixed DLUX source resolves 24 nav candidates/0 API; suffix and nested API names reject while `rapid_report` remains valid.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
 - 2026-10-18: Soft-resetting OpeningStockDraft leaves scope uniqueness on trashed rows, blocking replacement drafts. Permanent reset of Stock Movements + Opening Stock Drafts is verified to reopen intake; soft reset still needs a constraint fix.
-- v0.11.4 and older: stored attachments reachable without login; fixed in v0.12.0 once the release Caddyfile is installed and Caddy restarted (OPERATIONS "Upgrading to v0.12.0").
+- v0.11.4 and older: stored files reachable without login; fixed in v0.12.0 (image first, then release deploy files, then `./start.sh restart caddy`).
 - Live VPS/SSH stays severely slow with Compose down; disk/CPU/kernel logs are clean, narrowing the fault to UFW configuration or the provider network/hypervisor rather than Dlux.
 - Live VM likely runs stale Caddy/Compose: apex/www serve old portfolio while current repo proxies Django and redirects ERP.
 - Deployment SMTP credentials are unset, so contact relay cannot authenticate.
@@ -76,7 +76,7 @@
   - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
   - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-10-30 v0.12.0/DLux 1.15.2: 473 PASS (6 PG-only skips), check + makemigrations clean, image smoke PASS; testbeds/crm-sales upgrade v0.11.4→v0.12.0 with production-volume data: data identical, check clean, /media/ closed; deploy zip stack verified.
+- 2026-10-31 v0.12.0/DLux 1.15.3: 477 PASS (6 PG-only skips), check + makemigrations clean, image smoke PASS; testbeds/crm-sales upgrade from v0.11.4 in the documented order: data identical, `check` all pass incl. stored-files, /media/ matrix (public 200, attachments 403, private 403/200, backups 404).
 - 2026-10-12: SQLite throwaway `sales-web` container on `main`: 431 run, 1 failure = `tests.test_scaffold` still asserts the pre-v0.11.1 maintenance probe to `/` (stale test, not the template work); 8/8 Opening Stock Excel tests incl. Arabic template; check + makemigrations clean.
 - 2026-10-04: 111 targeted PostgreSQL cases validated (12 management/label cases pass on final rerun); released v0.11.0: 428 PostgreSQL + 423 packaged SQLite tests (4 PG-only skips) + 2 Node checks pass; fresh image smoke passes.
 - 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
@@ -84,7 +84,7 @@
 - 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
 - 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-10-30: OPERATIONS/RELEASING upgrade to v0.12.0 (install release deploy files), ARCHITECTURE/PERMISSIONS/BUSINESS_RULES protected attachments, README schema 3, new deploy/README.md + env.template.
+- 2026-10-31: OPERATIONS (upgrade order + stored-files table), RELEASING, ARCHITECTURE, README, deploy README/env.template for DjangoLux 1.15.3 / stack schema 4.
 - 2026-10-03: CLIENT_CATEGORIZATION/ARCHITECTURE/BUSINESS_RULES/PERMISSIONS/OPERATIONS/QA_WORKFLOWS and changelog document independent machinery, client seed, safe legacy migration and validation.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:
