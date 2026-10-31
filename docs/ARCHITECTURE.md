@@ -363,9 +363,13 @@ See [BUSINESS_RULES.md](BUSINESS_RULES.md) for pricing and the frozen-rate rule,
   `common.files.ProtectedFileField`: its `.url` is `common:stored_file`
   (`/staff/files/<app>/<model>/<pk>/<field>/`), which checks login, the record's
   `view_<model>` permission, scope and `OWNER_FIELDS` ownership, then answers with
-  DjangoLux's `serve_file` (byte ranges, revalidation). Caddy returns 404 for
-  `/media/purchase_invoices/*` and `/media/finance/expenses/*`; product, service
-  and listing images stay public for the storefront.
+  DjangoLux's `serve_file` (byte ranges, revalidation). Their folders are
+  `DLUX_APP_ONLY_MEDIA`, so the proxy refuses them at `/media/`.
+- Stored files are private by default (stack schema 4, DjangoLux 1.15.3): Caddy asks
+  `forward_auth` at `/staff/sys/files/media-access/` before serving any `/media/`
+  file outside the public folders. `DLUX_PUBLIC_MEDIA` keeps product, service and
+  listing images public for the storefront; other stored files need a signed-in user.
+  `config/urls.py` also answers `/sys/files/media-access/` for Composer's generated fix.
 
 ## Cancellation payments and customer credit (sales.0010)
 

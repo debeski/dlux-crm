@@ -13,6 +13,7 @@
 
 # ---------------------------------------------------------------------------
 # Caddy reverse proxy for the Switch Django/DLux stack.
+# dlux stack schema 4
 #
 # Public and staff paths are split inside Django/DLux, not by Caddy:
 #
@@ -45,10 +46,6 @@
 	route {
 		# Never serve dlux DB backups over media.
 		respond /media/dlux_backups/* 404
-		# Purchase-invoice attachments and expense receipts are served by the app
-		# behind their record's permissions: /staff/files/<app>/<model>/<pk>/<field>/
-		respond /media/purchase_invoices/* 404
-		respond /media/finance/expenses/* 404
 
 		# Static assets — immutable, cached one year. handle_path strips /static.
 		handle_path /static/* {
@@ -57,10 +54,31 @@
 			file_server
 		}
 
-		# Media files.
-		handle_path /media/* {
+		# Public media: branding, managed images and fonts, and the project's
+		# public/ folder, served to anyone. Keep in step with
+		# dlux.files.media.PUBLIC_MEDIA.
+		@public_media path /media/public/* /media/dlux/branding/* /media/dlux/assets/image/* /media/dlux/assets/font/*
+		handle @public_media {
+			uri strip_prefix /media
 			root * /app/media
 			file_server
+		}
+
+		# Every other stored file is private: the app decides who gets it
+		# (signed in, and a registered document file only to users who may view
+		# its document) before the file server sends a byte. DjangoLux is mounted
+		# under /staff/. Storefront images are DLUX_PUBLIC_MEDIA; attachments and
+		# receipts are DLUX_APP_ONLY_MEDIA, served by /staff/files/... instead.
+		handle /media/* {
+			route {
+				forward_auth web:8000 {
+					uri /staff/sys/files/media-access/
+				}
+				uri strip_prefix /media
+				root * /app/media
+				header Cache-Control "private, no-cache"
+				file_server
+			}
 		}
 
 		# Live update status/log for the maintenance progress page. Served even

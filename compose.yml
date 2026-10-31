@@ -3,6 +3,8 @@ name: sales
 x-environment:
   # Database settings
   &de
+  # The stack contract schema this file was written for (DjangoLux docs/stack-schema.md).
+  DLUX_STACK_SCHEMA: "4"
   WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
   POSTGRES_DB: "${POSTGRES_DB:-sales_db}"
   POSTGRES_PORT: "5432"

@@ -694,44 +694,70 @@ Back up the store database, deploy the `machinery` app with config/catalog/autom
 
 ## Upgrading to v0.12.0
 
-v0.12.0 runs DjangoLux 1.15.2. Its image floor rules out an inline DjangoLux
-install, so an existing v0.11.x deployment moves with an application-image update.
-It also changes deployment files: `.proxy/Caddyfile` stops serving attachments
-from `/media/`, which an image update alone cannot do. In order:
+v0.12.0 runs DjangoLux 1.15.3 and needs Composer 1.9.2 or later. Its image floor
+rules out an inline DjangoLux install, so an existing v0.11.x deployment moves with
+an application-image update. It also changes deployment files: stored files become
+private (stack schema 4). The new `.proxy/Caddyfile` asks DjangoLux before serving
+any `/media/` file outside the public folders, which an image update alone cannot
+do. The order matters: the new Caddyfile in front of an older image refuses every
+private file, including storefront images. In order:
 
-1. **Back up**: Options > Backups (the image update also takes one first).
+1. **Back up**: Options > Backups.
 2. **Update the Composer deployer**: `./start.sh self update` (wrapper 3 or 4).
-3. **Install the release's deployment files** from `crm-sales-0.12.0-deploy.zip`:
+3. **Update the image first**, with the deployment files you have: `./start.sh update`.
+   It pulls `debeski/dlux-crm:sales`, recreates the services and runs the migrations
+   (DjangoLux `0027`–`0029`; no CRM data changes).
+4. **Install the release's deployment files** from `crm-sales-0.12.0-deploy.zip`:
    `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile` and `relay/`. Keep
    `.secrets/.env`, `media/`, `logs/` and `imports/`. Move the old copies, and
    `.proxy/maintenance.html`, into `.xclude/` first: Composer now serves the update
-   progress page itself (it also returns visitors to the page they were on).
-4. **Update the stack**: `./start.sh update`. Wrapper 6 refreshes the deployer,
-   pulls `debeski/dlux-crm:sales` and the other images, recreates the services and
-   runs the migrations (DjangoLux `0027`–`0029`; no CRM data changes).
+   progress page itself (it also returns visitors to the page they were on). Then
+   run `./start.sh` to apply the new `compose.yml`.
 5. **Restart the proxy**: `./start.sh restart caddy`. Caddy reads its Caddyfile only
-   when it starts, and `update` recreates it only when its service definition in
-   `compose.yml` changed. From v0.11.x files it does change, but restart anyway.
-6. **Confirm that attachments are private**: signed out, request a stored file
-   through `/media/`; it must answer `404`. From the deployment folder, with your
-   `BASE_URL` in place of `https://switchlibya.ly`:
+   when it starts, and neither `./start.sh` nor `update` recreates an unchanged caddy
+   service, so the old rules would keep serving.
+6. **Confirm that stored files are private**: signed out, a stored file under
+   `/media/` must answer `403`. From the deployment folder, with your `BASE_URL` in
+   place of `https://switchlibya.ly`:
 
    ```bash
    f=$(find media/purchase_invoices media/finance/expenses -type f 2>/dev/null | head -n1); echo "${f:-no stored attachments}"; [ -z "$f" ] || curl -s -o /dev/null -w '%{http_code}\n' "https://switchlibya.ly/$f"
    ```
 
-   Anything but `404` means the proxy still runs the old Caddyfile: check step 3 and
-   repeat step 5. With no stored attachments there is nothing to expose yet.
-   Attachments open from the app for users who may view the record.
+   Anything but `403` means the proxy still runs the old Caddyfile: check step 4 and
+   repeat step 5. Storefront images (`catalog/products/`, `catalog/services/`,
+   `public_catalog/listings/`) stay public; attachments open from the app for users
+   who may view the record.
 7. **Update the resident pair** if Options > Updates and maintenance shows an older
    Composer agent: its row's update button, or `./start.sh agent update`.
 8. **Check**: Options > Operations > run the check, or `./start.sh check`. Every
-   check passes: wrapper 6, the stable channel, and the progress page served by
-   composer-agent.
+   check passes, including `stored-files`: wrapper 6, the stable channel, the
+   progress page served by composer-agent, and stored files behind DjangoLux's
+   access check.
 
-If only the image is updated (Options > Updates and maintenance, or `update` with
-the old files), the app works, but the old Caddyfile still serves stored
-attachments without login; install the files from step 3 and do steps 5 and 6.
+Between steps 3 and 4, `./start.sh check` reports `stored-files` as a SECURITY
+failure and offers `check --fix` (Options > Operations > Apply repairs). Its rewrite
+of the v0.11.x Caddyfile asks `/sys/files/media-access/`, which v0.12.0 also answers
+(DjangoLux itself lives under `/staff/`), so applying it is safe. It changes only the
+Caddyfile, though: install the release files in step 4 regardless.
 
-A fresh installation from `crm-sales-<version>-deploy.zip` is already at schema 3
+A fresh installation from `crm-sales-<version>-deploy.zip` is already at schema 4
 and wrapper 6; see `deploy/README.md`.
+
+### Stored files
+
+DjangoLux 1.15.3 decides who may fetch a `/media/` file (`dlux.files.media`); the
+proxy asks it at `/staff/sys/files/media-access/` (DjangoLux is mounted under
+`/staff/`).
+
+| Folder | Who gets it from `/media/` |
+| --- | --- |
+| `catalog/products/`, `catalog/services/`, `public_catalog/listings/` (`DLUX_PUBLIC_MEDIA`) | Anyone: the storefront shows them signed out. |
+| `dlux/branding/`, `dlux/assets/image/`, `dlux/assets/font/`, `public/` | Anyone (DjangoLux defaults). |
+| `purchase_invoices/`, `finance/expenses/` (`DLUX_APP_ONLY_MEDIA`) | No one; `/staff/files/...` serves them after the record's permission and ownership checks. |
+| `dlux_backups/` | No one (404 at the proxy). |
+| Anything else | Signed-in users. |
+
+A new upload field whose files a signed-out page shows goes in `DLUX_PUBLIC_MEDIA`;
+one whose files need a record permission goes in `DLUX_APP_ONLY_MEDIA` with a
+`ProtectedFileField`.

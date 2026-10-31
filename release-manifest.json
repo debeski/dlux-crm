@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "version": "0.12.0",
-  "summary": "DjangoLux 1.15.2 runtime with private attachments, unsaved-changes prompts, personal table columns and the Operations panel.",
+  "summary": "DjangoLux 1.15.3 security runtime: private stored files, unsaved-changes prompts, personal table columns and the Operations panel.",
   "highlights": [
-    "Updated the application framework to DjangoLux 1.15.2.",
-    "Purchase-invoice attachments and expense receipts open only for signed-in users who may see the record.",
+    "Updated the application framework to DjangoLux 1.15.3, a security release.",
+    "Stored files are private: attachments and receipts open only for signed-in users who may see the record; storefront images stay public.",
     "Closing an add or edit window with unsaved changes asks whether to save, discard or go back; Save submits the form once.",
     "Arrange columns lets each user reorder table columns and show or hide them with the eye on each header.",
     "Options > Operations checks the deployment, applies repairs, restarts services and shows their logs.",

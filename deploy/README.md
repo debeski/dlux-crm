@@ -37,7 +37,7 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
    The first start pulls the images, applies the migrations, imports
    `config.json` and starts every service.
 4. Open `BASE_URL/staff/` and sign in as `admin` with `ADMIN_PASS`.
-5. Run `./start.sh check`. Every check must pass.
+5. Run `./start.sh check`. Every check must pass, including `stored-files`.
 
 ## Updating
 
@@ -50,19 +50,21 @@ Back up first: **Options > Backups** in the app, or keep a database dump.
 
 ### From a Sales CRM before 0.12.0
 
-0.12.0 also changes the deployment files: its `.proxy/Caddyfile` stops serving
-purchase-invoice attachments and expense receipts from `/media/` (the app serves
-them to signed-in users who may see the record), and Composer now ships the update
-progress page.
+0.12.0 needs Composer 1.9.2 or later and changes the deployment files: stored files
+become private (stack schema 4). The new `.proxy/Caddyfile` asks the app before
+serving any `/media/` file outside the public folders, and Composer now ships the
+update progress page. Keep this order: the new Caddyfile in front of an older image
+refuses every private file, storefront images included.
 
 1. Back up, then run `./start.sh self update`.
-2. Move the old `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile`,
-   `.proxy/maintenance.html` and `relay/` into `.xclude/`, and copy this folder's
-   versions in. Keep `.secrets/.env`, `media/`, `logs/` and `imports/`.
-3. Run `./start.sh update`.
+2. Update the image first, with your current files: `./start.sh update`.
+3. Move the old `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile`,
+   `.proxy/maintenance.html` and `relay/` into `.xclude/`, copy this folder's
+   versions in (keep `.secrets/.env`, `media/`, `logs/` and `imports/`), then run
+   `./start.sh`.
 4. Run `./start.sh restart caddy`. Caddy reads its Caddyfile only when it starts,
-   and `update` recreates it only when its service in `compose.yml` changed.
-5. Signed out, a stored file under `/media/` must answer `404`. With your
+   and neither `./start.sh` nor `update` recreates an unchanged caddy service.
+5. Signed out, a stored attachment under `/media/` must answer `403`. With your
    `BASE_URL` in place of `https://switchlibya.ly`:
 
    ```bash
@@ -70,12 +72,12 @@ progress page.
    ```
 
    On Windows, open `BASE_URL/media/purchase_invoices/<a file in that folder>` in a
-   private browser window instead. Anything but `404` means the old Caddyfile is
-   still loaded: check step 2 and repeat step 4.
-6. Run `./start.sh check`.
+   private browser window instead. Anything but `403` means the old Caddyfile is
+   still loaded: check step 3 and repeat step 4.
+6. Run `./start.sh check`. Every check must pass, including `stored-files`.
 
-Updating only the image keeps the old Caddyfile, which still serves stored
-attachments without login.
+Updating only the image keeps the old Caddyfile, which still serves stored files
+without login.
 
 ## Everyday commands
 

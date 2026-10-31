@@ -109,10 +109,73 @@ class StoredFileTests(TestCase):
 
 
 class StoredFileProxyTests(SimpleTestCase):
-    def test_caddy_refuses_the_attachment_paths(self):
-        caddyfile = (Path(__file__).resolve().parents[2] / ".proxy" / "Caddyfile").read_text(encoding="utf-8")
-        media_route = caddyfile.index("handle_path /media/*")
-        for line in ("respond /media/purchase_invoices/* 404", "respond /media/finance/expenses/* 404"):
-            with self.subTest(line=line):
-                self.assertIn(line, caddyfile)
-                self.assertLess(caddyfile.index(line), media_route)
+    """Stack schema 4: the proxy asks DjangoLux before serving any private /media/ file."""
+
+    def _caddyfile(self):
+        return (Path(__file__).resolve().parents[2] / ".proxy" / "Caddyfile").read_text(encoding="utf-8")
+
+    def test_proxy_asks_the_mounted_media_access_view(self):
+        caddyfile = self._caddyfile()
+        self.assertIn(f"uri {reverse('dlux_media_access')}", caddyfile)
+        self.assertEqual(reverse("dlux_media_access"), "/staff/sys/files/media-access/")
+        self.assertNotIn("handle_path /media/*", caddyfile)
+        self.assertIn("respond /media/dlux_backups/* 404", caddyfile)
+
+    def test_storefront_images_are_public_and_paperwork_app_only(self):
+        from django.conf import settings
+
+        self.assertEqual(
+            settings.DLUX_PUBLIC_MEDIA, ["catalog/products/", "catalog/services/", "public_catalog/listings/"]
+        )
+        self.assertEqual(settings.DLUX_APP_ONLY_MEDIA, ["purchase_invoices/", "finance/expenses/"])
+
+
+class MediaDecisionTests(TestCase):
+    """What the proxy may serve straight from /media/ for this project's folders."""
+
+    def _request(self, user=None):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import RequestFactory
+
+        request = RequestFactory().get("/staff/sys/files/media-access/")
+        request.user = user or AnonymousUser()
+        return request
+
+    def test_decisions(self):
+        from dlux.files.media import media_decision
+
+        staff = get_user_model().objects.create_user("viewer", password="x", is_staff=True)
+        cases = (
+            ("catalog/products/lock.jpg", True, True),
+            ("public_catalog/listings/banner.png", True, True),
+            ("purchase_invoices/supplier.pdf", False, False),
+            ("Purchase_Invoices/supplier.pdf", False, False),
+            ("finance/expenses/receipt.pdf", False, False),
+            ("dlux_backups/system.dlb", False, False),
+            ("exports/report.pdf", False, True),
+        )
+        for name, anonymous, signed_in in cases:
+            with self.subTest(name=name):
+                self.assertIs(media_decision(self._request(), name), anonymous)
+                self.assertIs(media_decision(self._request(staff), name), signed_in)
+
+
+class MediaAccessViewTests(TestCase):
+    """The proxy's sub-request, through the whole middleware stack, at both URLs."""
+
+    def setUp(self):
+        settings = SystemSettings.load()
+        settings.is_configured = True
+        settings.save(update_fields=["is_configured"])
+
+    def test_both_urls_decide_the_same(self):
+        for url in ("/staff/sys/files/media-access/", "/sys/files/media-access/"):
+            for uri, status in (
+                ("/media/catalog/products/lock.jpg", 204),
+                ("/media/purchase_invoices/supplier.pdf", 403),
+                ("/media/finance/../purchase_invoices/supplier.pdf", 403),
+                ("/media/exports/report.pdf", 403),
+            ):
+                with self.subTest(url=url, uri=uri):
+                    response = Client().get(url, HTTP_X_FORWARDED_URI=uri)
+                    self.assertEqual(response.status_code, status)
