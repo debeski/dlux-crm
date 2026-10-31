@@ -26,7 +26,7 @@
 - 2026-08-03: Fixed DLUX source resolves 24 nav candidates/0 API; suffix and nested API names reject while `rapid_report` remains valid.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
 - 2026-10-18: Soft-resetting OpeningStockDraft leaves scope uniqueness on trashed rows, blocking replacement drafts. Permanent reset of Stock Movements + Opening Stock Drafts is verified to reopen intake; soft reset still needs a constraint fix.
-- v0.11.4 and older: purchase-invoice attachments and expense receipts are public under `/media/`; fixed in v0.12.0 only once the release Caddyfile is installed (OPERATIONS "Upgrading to v0.12.0").
+- v0.11.4 and older: stored attachments reachable without login; fixed in v0.12.0 once the release Caddyfile is installed and Caddy restarted (OPERATIONS "Upgrading to v0.12.0").
 - Live VPS/SSH stays severely slow with Compose down; disk/CPU/kernel logs are clean, narrowing the fault to UFW configuration or the provider network/hypervisor rather than Dlux.
 - Live VM likely runs stale Caddy/Compose: apex/www serve old portfolio while current repo proxies Django and redirects ERP.
 - Deployment SMTP credentials are unset, so contact relay cannot authenticate.

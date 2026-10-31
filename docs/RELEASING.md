@@ -22,9 +22,9 @@ additive and run on start; the CRM adds no migrations.
 Upgrade order for an existing deployment (see
 [OPERATIONS.md](OPERATIONS.md#upgrading-to-v0120)): back up, update the Composer
 deployer, install the release's deployment files (`compose.yml`, wrappers,
-`.proxy/Caddyfile`, `relay/`), then `./start.sh update`. The image alone is not
-enough: the new Caddyfile is what stops `/media/` serving purchase-invoice
-attachments and expense receipts to anyone with the URL.
+`.proxy/Caddyfile`, `relay/`), then `./start.sh update` and
+`./start.sh restart caddy`. The image alone is not enough: stored attachments
+become private only once the proxy runs the new Caddyfile.
 
 The release workflow now passes the project manifest to the image as a
 `base64:` label (`steps.project_manifest.outputs.label`), so the update review shows

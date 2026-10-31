@@ -709,18 +709,29 @@ from `/media/`, which an image update alone cannot do. In order:
 4. **Update the stack**: `./start.sh update`. Wrapper 6 refreshes the deployer,
    pulls `debeski/dlux-crm:sales` and the other images, recreates the services and
    runs the migrations (DjangoLux `0027`–`0029`; no CRM data changes).
-5. **Update the resident pair** if Options > Updates and maintenance shows an older
+5. **Restart the proxy**: `./start.sh restart caddy`. Caddy reads its Caddyfile only
+   when it starts, and `update` recreates it only when its service definition in
+   `compose.yml` changed. From v0.11.x files it does change, but restart anyway.
+6. **Confirm that attachments are private**: signed out, request a stored file
+   through `/media/`; it must answer `404`. From the deployment folder, with your
+   `BASE_URL` in place of `https://switchlibya.ly`:
+
+   ```bash
+   f=$(find media/purchase_invoices media/finance/expenses -type f 2>/dev/null | head -n1); echo "${f:-no stored attachments}"; [ -z "$f" ] || curl -s -o /dev/null -w '%{http_code}\n' "https://switchlibya.ly/$f"
+   ```
+
+   Anything but `404` means the proxy still runs the old Caddyfile: check step 3 and
+   repeat step 5. With no stored attachments there is nothing to expose yet.
+   Attachments open from the app for users who may view the record.
+7. **Update the resident pair** if Options > Updates and maintenance shows an older
    Composer agent: its row's update button, or `./start.sh agent update`.
-6. **Check**: Options > Operations > run the check, or `./start.sh check`. Every
+8. **Check**: Options > Operations > run the check, or `./start.sh check`. Every
    check passes: wrapper 6, the stable channel, and the progress page served by
    composer-agent.
 
-After step 4, `/media/purchase_invoices/...` and `/media/finance/expenses/...`
-answer 404; attachments open from the app for users who may view the record.
-
 If only the image is updated (Options > Updates and maintenance, or `update` with
-the old files), the app works, but the old Caddyfile keeps serving attachments to
-anyone who knows their URL; install the files from step 3 to close that.
+the old files), the app works, but the old Caddyfile still serves stored
+attachments without login; install the files from step 3 and do steps 5 and 6.
 
 A fresh installation from `crm-sales-<version>-deploy.zip` is already at schema 3
 and wrapper 6; see `deploy/README.md`.

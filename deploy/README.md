@@ -59,10 +59,23 @@ progress page.
 2. Move the old `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile`,
    `.proxy/maintenance.html` and `relay/` into `.xclude/`, and copy this folder's
    versions in. Keep `.secrets/.env`, `media/`, `logs/` and `imports/`.
-3. Run `./start.sh update`, then `./start.sh check`.
+3. Run `./start.sh update`.
+4. Run `./start.sh restart caddy`. Caddy reads its Caddyfile only when it starts,
+   and `update` recreates it only when its service in `compose.yml` changed.
+5. Signed out, a stored file under `/media/` must answer `404`. With your
+   `BASE_URL` in place of `https://switchlibya.ly`:
 
-Updating only the image keeps the old Caddyfile, which still serves attachments to
-anyone who knows their URL.
+   ```bash
+   f=$(find media/purchase_invoices media/finance/expenses -type f 2>/dev/null | head -n1); echo "${f:-no stored attachments}"; [ -z "$f" ] || curl -s -o /dev/null -w '%{http_code}\n' "https://switchlibya.ly/$f"
+   ```
+
+   On Windows, open `BASE_URL/media/purchase_invoices/<a file in that folder>` in a
+   private browser window instead. Anything but `404` means the old Caddyfile is
+   still loaded: check step 2 and repeat step 4.
+6. Run `./start.sh check`.
+
+Updating only the image keeps the old Caddyfile, which still serves stored
+attachments without login.
 
 ## Everyday commands
 
