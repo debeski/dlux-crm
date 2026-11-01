@@ -1,7 +1,7 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-10-31: v0.12.0 on branch `0.12/dlux_1_15_2` (PR #1, untagged): DjangoLux 1.15.3 + Composer 1.9.2, stack schema 4 (stored files private; `DLUX_PUBLIC_MEDIA` storefront images, `DLUX_APP_ONLY_MEDIA` attachments/receipts via `common:stored_file`), wrapper 6, unsaved guard. v0.11.4 (1.12.0) is production.
+- 2026-11-01: v0.12.0 published from `c43e305` (PR #1): DjangoLux 1.15.3 + Composer 1.9.2, stack schema 4; CI 41323638238 + Release 41323674722 PASS; `:sales-v0.12.0` = `:sales` digest `sha256:5e1455e9…`, baked 1.15.3, schema 4, manifest label readable. Production (v0.11.4) upgrades per OPERATIONS "Upgrading to v0.12.0".
 - 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
 - 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
@@ -33,7 +33,7 @@
 - Updates card can show a stale "Could not read the DjangoLux release index" after an image upgrade until a check completes (DjangoLux `last_check_error`).
 ### Incomplete Tasks: [Max 20 lines]
 - **Priority 1 — run it:**
-  - [ ] v0.12.0: owner OK to merge and tag `v0.12.0`; production then installs `dist/crm-sales-0.12.0-deploy.zip` files + `./start.sh update`. Retire `feat/unsaved-guard` (ported).
+  - [ ] Production: upgrade to v0.12.0 in the documented order (image first, release deploy files, `./start.sh restart caddy`); `dist/crm-sales-0.12.0-deploy.zip` holds the files. Retire `feat/unsaved-guard` (ported).
   - [x] v0.10.1 released 2026-10-01: `{% asset %}` content-hash versioning for all 31 project CSS/JS links (stale workspace card after update).
   - [x] Customer 2026-10-03: USD + EUR together, existing purchase permission only, per-product pricing currencies, frozen LYD costs and mixed valuation (v0.11.0 deployed locally).
   - [ ] Exchange rates through the Composer relay: merged to `main` 2026-09-30 (unpushed, unreleased) and LIVE on the `automotive-parts-first` dev stack (Composer 1.6.0 stable, DjangoLux 1.10.0; celery on `internal` only; refresh proven through the agent). Do NOT drop `egress` from celery in `main`'s `compose.yml` until Composer 1.6 is stable and production stacks run it: without the relay the scrape then fails. The dev overlay had celery's runtime volume `:ro` (fixed on main, and in the dev tree's uncommitted `compose.dev.yml`), which silently forced the direct-fetch fallback. `automotive-parts-first` also has uncommitted `compose.yml` (beta image tags, no celery egress) and an untracked `.composer-channel`; its uncommitted `CHANGELOG.md` overlaps `main`, so commit your work before merging `main` there.

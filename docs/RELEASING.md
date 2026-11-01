@@ -13,6 +13,15 @@ and the image smoke test. Keeping them equal is enforced by
 
 ## v0.12.0 DjangoLux 1.15.3 and Composer 1.9.2
 
+v0.12.0 was published on 2026-11-01 from merge commit `c43e305` (PR #1).
+[CI](https://github.com/debeski/dlux-crm/actions/runs/41323638238) and
+[Release](https://github.com/debeski/dlux-crm/actions/runs/41323674722) passed.
+[Release notes](https://github.com/debeski/dlux-crm/releases/tag/v0.12.0).
+Versioned `debeski/dlux-crm:sales-v0.12.0` and stable `:sales` tags share AMD64/ARM64
+index digest `sha256:5e1455e92121f7b0df1b03e2e3d9343252f5fc404eeae895ad02bfd47b11a86f`.
+Both platform images carry the DjangoLux 1.15.3 baked-version label, stack schema 4
+and a readable `base64:` project-manifest label (v0.12.0, eight highlights).
+
 v0.12.0 pins `django-lux[updater]==1.15.3` (hash-pinned published wheel; the
 GHSA-8c56-w8rg-wcff security stable). DjangoLux 1.15 sets an image floor of 1.15.0b1,
 so a v0.11.x deployment moves by an **application-image update**, never an inline
