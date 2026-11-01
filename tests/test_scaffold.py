@@ -3,6 +3,7 @@ Generated with django-lux 1.2.1.
 Project name: switch-pos.
 Generated on: 2026-06-22.
 """
+import base64
 import json
 import re
 from pathlib import Path
@@ -12,6 +13,7 @@ from django.test import SimpleTestCase
 
 from tools.validate_project_release_manifest import (
     ProjectReleaseManifestError,
+    encode_project_release_manifest_label,
     validate_project_release_manifest,
 )
 
@@ -28,12 +30,44 @@ class ProjectScaffoldTests(SimpleTestCase):
         contents = urls_path.read_text(encoding="utf-8")
         self.assertIn('path("", include("dlux.urls"))', contents)
 
-    def test_failed_update_page_probes_until_caddy_serves_the_app(self):
-        page_path = Path(__file__).resolve().parents[1] / ".proxy" / "maintenance.html"
-        contents = page_path.read_text(encoding="utf-8")
-        self.assertIn("scheduleRecoveryProbe", contents)
-        self.assertIn("fetch(window.location.href, { cache: 'no-store', credentials: 'same-origin' })", contents)
-        self.assertIn("window.location.reload()", contents)
+    def test_maintenance_page_comes_from_composer(self):
+        """Stack schema 3: composer-agent publishes the page on the runtime volume."""
+        project_root = Path(__file__).resolve().parents[1]
+        self.assertFalse((project_root / ".proxy" / "maintenance.html").exists())
+        compose = (project_root / "compose.yml").read_text(encoding="utf-8")
+        self.assertNotIn("maintenance.html", compose)
+        self.assertIn("dlux_runtime:/opt/dlux-runtime:ro", compose)
+        caddyfile = (project_root / ".proxy" / "Caddyfile").read_text(encoding="utf-8")
+        self.assertIn("handle /_dlux/maintenance/* {", caddyfile)
+        self.assertIn("root * /opt/dlux-runtime/proxy/maintenance", caddyfile)
+        self.assertIn("rewrite * /index.html", caddyfile)
+        self.assertNotIn("/usr/share/caddy/maintenance", caddyfile)
+
+    def test_stack_files_carry_the_installed_contract_schema(self):
+        from dlux.contracts.stack import stack_schema
+
+        project_root = Path(__file__).resolve().parents[1]
+        expected = str(stack_schema())
+        self.assertIn(f'DLUX_STACK_SCHEMA: "{expected}"', (project_root / "compose.yml").read_text(encoding="utf-8"))
+        self.assertIn(
+            f'LABEL org.dlux.stack-schema="{expected}"', (project_root / "Dockerfile").read_text(encoding="utf-8")
+        )
+        for name in ("compose.dev.yml", "entrypoint.sh", "gunicorn.py", ".proxy/Caddyfile", "deploy/env.template"):
+            with self.subTest(file=name):
+                self.assertIn(f"# dlux stack schema {expected}\n", (project_root / name).read_text(encoding="utf-8"))
+
+    def test_wrappers_match_the_dlux_scaffold(self):
+        """start.sh/start.ps1 are the installed DjangoLux's scaffold wrappers, byte for byte."""
+        import dlux
+
+        project_root = Path(__file__).resolve().parents[1]
+        templates = Path(dlux.__file__).resolve().parent / "scaffold" / "templates" / "project"
+        for name in ("start.sh", "start.ps1"):
+            with self.subTest(wrapper=name):
+                self.assertEqual(
+                    (project_root / name).read_bytes(),
+                    (templates / f"{name}.tmpl").read_bytes(),
+                )
 
     def test_dlux_requirement_is_an_exact_pin(self):
         """The baked version now comes from the installed package at runtime.
@@ -91,9 +125,16 @@ class ProjectScaffoldTests(SimpleTestCase):
         )
         self.assertEqual(
             workflow.count(
-                "DLUX_PROJECT_RELEASE_MANIFEST=${{ steps.project_manifest.outputs.json }}"
+                "DLUX_PROJECT_RELEASE_MANIFEST=${{ steps.project_manifest.outputs.label }}"
             ),
             2,
+        )
+        label = encode_project_release_manifest_label(manifest)
+        self.assertTrue(label.startswith("base64:"))
+        self.assertNotIn('"', label)
+        self.assertEqual(
+            json.loads(base64.urlsafe_b64decode(label.removeprefix("base64:"))),
+            manifest,
         )
         self.assertIn(
             'COMPOSER_RELEASE_MANIFEST_LABEL: "org.dlux.project.release-manifest"',

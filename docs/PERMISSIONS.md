@@ -611,6 +611,11 @@ represents the supplier document used to add stock. It is captured with the rich
 file field (drag-drop, phone camera, or desktop scanner) and shown as a link on
 the purchase invoice page.
 
+The attachment, like an expense receipt, opens only for a signed-in user who may
+view that record (`catalog.view_purchaseinvoice`; for receipts `finance.view_expense`
+plus ownership unless `view_all_expense`). The app serves it at
+`/staff/files/...`; the proxy refuses its `/media/` path.
+
 ## Cash deposits (ايداع نقدي)
 
 Technicians and delivery reps **record** the cash they collected (`pending`); an

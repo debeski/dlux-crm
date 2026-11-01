@@ -1,6 +1,7 @@
 """Validate project release metadata before building a tagged image."""
 
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,13 @@ from pathlib import Path
 
 class ProjectReleaseManifestError(ValueError):
     """Raised when project release metadata cannot be safely published."""
+
+
+def encode_project_release_manifest_label(manifest):
+    """Encode validated JSON for quote-safe transport through Docker build args."""
+    compact = json.dumps(manifest, separators=(",", ":"), ensure_ascii=True)
+    encoded = base64.urlsafe_b64encode(compact.encode("utf-8")).decode("ascii")
+    return f"base64:{encoded}"
 
 
 def _tag_version(tag):
@@ -94,9 +102,11 @@ def main(argv=None):
         return 1
 
     compact = json.dumps(manifest, separators=(",", ":"), ensure_ascii=True)
+    label = encode_project_release_manifest_label(manifest)
     if args.github_output:
         with open(args.github_output, "a", encoding="utf-8") as output:
             output.write(f"json={compact}\n")
+            output.write(f"label={label}\n")
     print(f"Validated project release manifest v{manifest['version']}")
     return 0
 

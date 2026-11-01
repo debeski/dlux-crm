@@ -9,16 +9,21 @@ thin and consistent.
 """
 from decimal import Decimal
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.core.exceptions import FieldDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db.models import Sum
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 from django_filters.views import FilterView
 from django_tables2 import SingleTableMixin
+from django.views import View
 from django.views.generic import TemplateView
 
+from dlux.files.serving import serve_file
 from dlux.ribbon import RibbonMixin, build_action
 from dlux.translations import get_current_language_code, get_strings
 from dlux.utils import get_user_scope, is_scope_enabled
@@ -856,3 +861,29 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             "workspace_tile_count": len(tiles),
         })
         return ctx
+
+
+#: The stored files the app serves, by (app label, model) and field; nothing else is reachable.
+STORED_FILES = {
+    ("catalog", "purchaseinvoice"): ("attachment",),
+    ("finance", "expense"): ("attachment",),
+}
+#: Opened in the browser; any other upload downloads, so it never renders on this origin.
+INLINE_FILE_TYPES = (".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp")
+
+
+class StoredFileView(LoginRequiredMixin, View):
+    """A record's stored attachment, behind that record's own access checks."""
+
+    def get(self, request, app_label, model_name, pk, field_name):
+        if field_name not in STORED_FILES.get((app_label, model_name), ()):
+            raise Http404
+        if not request.user.has_perm(f"{app_label}.view_{model_name}"):
+            raise PermissionDenied
+        model = apps.get_model(app_label, model_name)
+        queryset = apply_ownership(scope_filtered_queryset(model.objects.all(), request.user), request.user)
+        field_file = getattr(get_object_or_404(queryset, pk=pk), field_name)
+        if not field_file:
+            raise Http404
+        inline = field_file.name.lower().endswith(INLINE_FILE_TYPES)
+        return serve_file(request, field_file, as_attachment=not inline)

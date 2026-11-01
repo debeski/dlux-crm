@@ -8,6 +8,8 @@ from django.conf.urls.static import static
 from django.shortcuts import redirect
 from django.urls import include, path
 
+from dlux.files.media import media_access
+
 from automotive.views import (
     FeatureAwareDynamicModalDeleteView,
     FeatureAwareDynamicModalManagerView,
@@ -58,11 +60,16 @@ staff_urlpatterns = [
 
 urlpatterns = [
     path("health/", include("health_check.urls")),
+    # The release Caddyfile asks /staff/sys/files/media-access/ (DjangoLux lives
+    # under /staff/). Composer's generated stored-files fix asks the root path, so
+    # it answers there too rather than refusing every private /media/ file.
+    path("sys/files/media-access/", media_access, name="media_access_root"),
     path("staff/", include(staff_urlpatterns)),
     path("", include(("public_catalog.urls", "public_catalog"), namespace="public_catalog")),
 ]
 
 # Serve uploaded media via Django only in DEBUG (local runserver). In production
-# Caddy file_servers /media/ directly; static() returns [] when DEBUG is False.
+# Caddy serves /media/ after DjangoLux's access check; static() returns [] when
+# DEBUG is False.
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -39,6 +39,9 @@ LABEL org.dlux_crm.dlux_baked_version="${DLUX_BAKED_VERSION}"
 ARG DLUX_PROJECT_RELEASE_MANIFEST=""
 LABEL org.dlux.project.release-manifest="${DLUX_PROJECT_RELEASE_MANIFEST}"
 
+# The stack contract schema this Dockerfile was written for.
+LABEL org.dlux.stack-schema="4"
+
 # Copy the project files
 COPY . /app/
 

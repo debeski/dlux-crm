@@ -11,7 +11,30 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
-## v0.11.4 DjangoLux runtime upgrade
+## v0.12.0 DjangoLux 1.15.3 and Composer 1.9.2
+
+v0.12.0 pins `django-lux[updater]==1.15.3` (hash-pinned published wheel; the
+GHSA-8c56-w8rg-wcff security stable). DjangoLux 1.15 sets an image floor of 1.15.0b1,
+so a v0.11.x deployment moves by an **application-image update**, never an inline
+DjangoLux install. Composer 1.9.2 is the minimum (its `stored-files` check) and the
+paired stable. Stored files are private by default (stack schema 4). Framework migrations `0027`–`0029` are
+additive and run on start; the CRM adds no migrations.
+
+Upgrade order for an existing deployment (see
+[OPERATIONS.md](OPERATIONS.md#upgrading-to-v0120)): back up, update the Composer
+deployer, update the **image first** (`./start.sh update`), then install the release's
+deployment files (`compose.yml`, wrappers, `.proxy/Caddyfile`, `relay/`), run
+`./start.sh`, then `./start.sh restart caddy`. The new Caddyfile in front of an older
+image refuses every private file; and the image alone is not enough, because stored
+files become private only once the proxy runs the new Caddyfile.
+
+The release workflow now passes the project manifest to the image as a
+`base64:` label (`steps.project_manifest.outputs.label`), so the update review shows
+the summary and highlights; v0.11.4's raw-JSON label was corrupted by the build-arg
+parser.
+
+`./scripts/build_deploy_zip.sh` builds `dist/crm-sales-<version>-deploy.zip`, the
+deployment-only bundle (see [the bundle README](../deploy/README.md)).
 
 v0.11.4 was published on 2026-10-18 from `3de3065`.
 [CI](https://github.com/debeski/dlux-crm/actions/runs/39142826820) and

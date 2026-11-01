@@ -59,7 +59,7 @@ jobs:
           load: true
           build-args: |
             DLUX_BAKED_VERSION=${{ steps.dlux.outputs.version }}
-            DLUX_PROJECT_RELEASE_MANIFEST=${{ steps.project_manifest.outputs.json }}
+            DLUX_PROJECT_RELEASE_MANIFEST=${{ steps.project_manifest.outputs.label }}
           tags: ${{ env.IMAGE }}:ci-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -81,7 +81,7 @@ jobs:
           push: true
           build-args: |
             DLUX_BAKED_VERSION=${{ steps.dlux.outputs.version }}
-            DLUX_PROJECT_RELEASE_MANIFEST=${{ steps.project_manifest.outputs.json }}
+            DLUX_PROJECT_RELEASE_MANIFEST=${{ steps.project_manifest.outputs.label }}
           tags: |
             ${{ env.IMAGE }}:${{ env.EDITION }}-${{ github.ref_name }}
             ${{ env.IMAGE }}:${{ env.EDITION }}

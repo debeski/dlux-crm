@@ -1,5 +1,5 @@
 {% load crispy_forms_tags %}
-<form method="post" action="{{ editor_url }}" id="invoice-money-form" novalidate>
+<form method="post" action="{{ editor_url }}" id="invoice-money-form" novalidate data-dlux-unsaved-guard>
     {% csrf_token %}
     <p class="fw-semibold">{{ invoice.number }} · {{ invoice.display_customer }}</p>
     {% if is_cancel %}

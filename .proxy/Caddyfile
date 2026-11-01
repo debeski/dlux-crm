@@ -13,6 +13,7 @@
 
 # ---------------------------------------------------------------------------
 # Caddy reverse proxy for the Switch Django/DLux stack.
+# dlux stack schema 4
 #
 # Public and staff paths are split inside Django/DLux, not by Caddy:
 #
@@ -53,10 +54,31 @@
 			file_server
 		}
 
-		# Media files.
-		handle_path /media/* {
+		# Public media: branding, managed images and fonts, and the project's
+		# public/ folder, served to anyone. Keep in step with
+		# dlux.files.media.PUBLIC_MEDIA.
+		@public_media path /media/public/* /media/dlux/branding/* /media/dlux/assets/image/* /media/dlux/assets/font/*
+		handle @public_media {
+			uri strip_prefix /media
 			root * /app/media
 			file_server
+		}
+
+		# Every other stored file is private: the app decides who gets it
+		# (signed in, and a registered document file only to users who may view
+		# its document) before the file server sends a byte. DjangoLux is mounted
+		# under /staff/. Storefront images are DLUX_PUBLIC_MEDIA; attachments and
+		# receipts are DLUX_APP_ONLY_MEDIA, served by /staff/files/... instead.
+		handle /media/* {
+			route {
+				forward_auth web:8000 {
+					uri /staff/sys/files/media-access/
+				}
+				uri strip_prefix /media
+				root * /app/media
+				header Cache-Control "private, no-cache"
+				file_server
+			}
 		}
 
 		# Live update status/log for the maintenance progress page. Served even
@@ -71,6 +93,16 @@
 		handle /_update/log.txt {
 			root * /opt/dlux-runtime/state
 			rewrite * /deploy-log.txt
+			header Cache-Control "no-store"
+			file_server
+		}
+
+		# Maintenance page assets, published by composer-agent on the runtime
+		# volume and served here so they load while web is down.
+		# (nginx: location ^~ /_dlux/maintenance/ { alias /opt/dlux-runtime/proxy/maintenance/; })
+		handle /_dlux/maintenance/* {
+			root * /opt/dlux-runtime/proxy
+			uri strip_prefix /_dlux
 			header Cache-Control "no-store"
 			file_server
 		}
@@ -113,8 +145,8 @@
 	handle_errors {
 		@down expression {http.error.status_code} in [502, 503, 504]
 		handle @down {
-			root * /usr/share/caddy/maintenance
-			rewrite * /maintenance.html
+			root * /opt/dlux-runtime/proxy/maintenance
+			rewrite * /index.html
 			file_server {
 				status 503
 			}

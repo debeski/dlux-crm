@@ -1,12 +1,16 @@
 {
   "schema_version": 1,
-  "version": "0.11.4",
-  "summary": "Updated DjangoLux runtime with opening-stock drafts and improved intake editors.",
+  "version": "0.12.0",
+  "summary": "DjangoLux 1.15.3 security runtime: private stored files, unsaved-changes prompts, personal table columns and the Operations panel.",
   "highlights": [
-    "Updated the application framework to DjangoLux 1.12.0.",
-    "Save opening stock as a draft and resume later without changing products or stock.",
-    "Check Excel workbooks, add their rows to the editor, and finalize all manual and imported rows together.",
-    "Machine and vehicle compatibility fills the editor width below item fields; purchase totals align without extra scrolling."
+    "Updated the application framework to DjangoLux 1.15.3, a security release.",
+    "Stored files are private: attachments and receipts open only for signed-in users who may see the record; storefront images stay public.",
+    "Closing an add or edit window with unsaved changes asks whether to save, discard or go back; Save submits the form once.",
+    "Arrange columns lets each user reorder table columns and show or hide them with the eye on each header.",
+    "Options > Operations checks the deployment, applies repairs, restarts services and shows their logs.",
+    "The Updates card settles after a check, shows each release's own notes and reloads after Finish.",
+    "The update progress page now comes from Composer and returns you to the page you were on.",
+    "New Composer wrapper: ./start.sh update refreshes the deployer before updating the stack."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.11.4"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.12.0"
 }

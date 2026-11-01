@@ -30,6 +30,8 @@ def build_grid_helper(form, rows):
     form (e.g. a permission-gated field) are dropped and empty rows removed; any
     field not mentioned is appended full-width so nothing is ever lost.
     """
+    # Arms DjangoLux's unsaved-changes prompt when the dynamic modal renders this form.
+    form.dlux_unsaved_guard = True
     helper = FormHelper()
     helper.form_tag = False       # the modal template provides <form> + csrf
     helper.disable_csrf = True

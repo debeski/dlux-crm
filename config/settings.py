@@ -220,6 +220,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Stored files are private (stack schema 4): the proxy asks DjangoLux before
+# serving /media/. Product, service and listing images are shown to signed-out
+# visitors on the storefront. Purchase-invoice attachments and expense receipts
+# are served only by common:stored_file, after its permission checks.
+DLUX_PUBLIC_MEDIA = ["catalog/products/", "catalog/services/", "public_catalog/listings/"]
+DLUX_APP_ONLY_MEDIA = ["purchase_invoices/", "finance/expenses/"]
 
 dlux_settings(globals())
 
