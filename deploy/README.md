@@ -121,7 +121,8 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
 
    With this release's files `check --fix` changes at most the
    `docker-socket-proxy` image, which it pins to a digest, and it restamps
-   `.secrets/.env` if that file still carries an older stack-schema stamp. If it
+   `.secrets/.env` if that file still carries an older stack-schema stamp (a file
+   with no stamp, from before v0.12.0, is only noted: nothing to do). If it
    says `composer-agent` must be running to publish the maintenance page, run
    step 5 and then `check --fix` once more.
 5. **Deploy:** `./start.sh`. This adds the `worker` service, restarts the database
@@ -161,8 +162,12 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
      private browser window instead. Anything but `403` means the proxy still runs
      the old Caddyfile: check that `.proxy/Caddyfile` was replaced, and repeat step 7.
    - The exchange-rate refresh runs: `./start.sh log -n 100 celery` shows
-     `finance.tasks.refresh_market_rates` succeeding a minute after the start.
-   - Sign in, open **Reports > Sales report** and download the Excel file.
+     `finance.tasks.refresh_market_rates` succeeding shortly after the start. If it
+     shows `RelayError: timeout ... The agent did not answer in time`, the Composer
+     agent was still busy with its start-up package check (minutes on a slow
+     connection): wait, then `./start.sh restart celery` runs it again; otherwise the
+     next run comes within 3 hours and the last known rates stay in use meanwhile.
+   - Sign in, open the **Sales Report** page (`/staff/sales/report/`) and download the Excel file.
 
 ### DLUX_FRONT_PROXY
 
