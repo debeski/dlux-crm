@@ -1,19 +1,21 @@
-# Trust a front proxy on a private address (pfSense/HAProxy, another nginx, a
-# cloud LB, ...) so its X-Forwarded-For / X-Forwarded-Proto are forwarded
-# (client IP appended) instead of replaced with the peer address. Public
-# clients are never trusted, so they cannot spoof either header. Inert while
-# Caddy terminates TLS facing the internet directly; makes client-IP
-# resolution (dlux per-IP lockout, audit logs) correct if the stack is ever
-# fronted by a private proxy hop.
+# Trust a front proxy (pfSense/HAProxy, another nginx, a cloud LB, ...) so its
+# X-Forwarded-For / X-Forwarded-Proto are forwarded (client IP appended)
+# instead of replaced with the peer address. DLUX_FRONT_PROXY in .secrets/.env
+# names the trusted proxies: unset trusts every private address, a
+# space-separated list of addresses or networks (no quotes) trusts only those,
+# and an empty value trusts none (users reach Caddy directly). A client Caddy
+# does not trust cannot spoof either header. Inert while Caddy terminates TLS
+# facing the internet directly; makes client-IP resolution (dlux per-IP
+# lockout, audit logs) correct if the stack is ever fronted by a proxy hop.
 {
 	servers {
-		trusted_proxies static private_ranges
+		trusted_proxies static {$DLUX_FRONT_PROXY:private_ranges}
 	}
 }
 
 # ---------------------------------------------------------------------------
 # Caddy reverse proxy for the Switch Django/DLux stack.
-# dlux stack schema 4
+# dlux stack schema 5
 #
 # Public and staff paths are split inside Django/DLux, not by Caddy:
 #
