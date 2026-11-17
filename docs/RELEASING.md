@@ -11,6 +11,29 @@ At runtime the app reads its own version from the manifest —
 and the image smoke test. Keeping them equal is enforced by
 `tools/validate_project_release_manifest.py` and `tests/test_scaffold.py`.
 
+## v0.13.0 DjangoLux 1.16.1 and Composer 1.10.1
+
+Prepared, not tagged: the tag, push and release need the owner's go-ahead. The
+version is v0.13.0 rather than v0.12.1 for the same reason v0.12.0 was a minor step
+from v0.11.x: the stack schema changes (4 to 5), a service is added (`worker`) and the
+minimum Composer moves (1.9.2 to 1.10.1).
+
+v0.13.0 pins exactly one line, `django-lux[updater]==1.16.1` (PyPI wheel and sdist,
+published 2026-11-16); the v0.12.0 wheel-URL line (a CDN-lag workaround for 1.15.3) is
+gone. Composer is `debeski/composer:latest` (1.10.1); never a beta image or a beta
+`.composer-channel`. DjangoLux 1.16 needs stack schema 5, so a deployment cannot reach it
+by an inline install: it moves with the application image plus the release files
+(see [OPERATIONS.md](OPERATIONS.md#upgrading-to-v0130) and the bundle README), in the
+order pull the image, `./start.sh update self`, copy the files, `./start.sh check --fix`,
+`./start.sh`, remove orphans, `./start.sh restart caddy`.
+
+The resident Composer commands keep the `agent run` / `executor run` form of Composer
+1.10.1 (the 1.16.1 scaffold template emits the flat form; a fix is queued upstream), so
+do not regenerate them from the scaffold. `docker-socket-proxy` stays `:latest` in the
+shipped file; `check --fix` pins it to a digest.
+
+`./scripts/build_deploy_zip.sh` builds `dist/crm-sales-0.13.0-deploy.zip`.
+
 ## v0.12.0 DjangoLux 1.15.3 and Composer 1.9.2
 
 v0.12.0 was published on 2026-11-01 from merge commit `c43e305` (PR #1).

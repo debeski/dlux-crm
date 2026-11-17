@@ -1,8 +1,21 @@
-# Sales CRM — deployment files
+# Sales CRM 0.13.0 — deployment files
 
-This folder runs the published Sales CRM image (`debeski/dlux-crm:sales`) with
-Docker Compose. It holds no application source and no data: the database, the
-uploaded files and the certificates live in Docker volumes and in `media/`.
+This folder runs the published Sales CRM image (`debeski/dlux-crm:sales`, 0.13.0,
+DjangoLux 1.16.1) with Docker Compose, and Composer (`debeski/composer:latest`,
+1.10.1 or newer) deploys, updates and repairs the stack. It holds no application
+source and no data: the database, the uploaded files and the certificates live in
+Docker volumes and in `media/`.
+
+| File | Purpose |
+| --- | --- |
+| `compose.yml` | The stack: db, redis, web, **worker**, celery, smtp-relay, caddy, docker-socket-proxy, composer-executor, composer-agent. Keep `name: sales`. Stack schema 5. |
+| `start.sh`, `start.ps1` | Composer wrapper 6 (Linux/macOS, Windows). |
+| `.composer-channel` | `stable`. Production stays on the stable channel. |
+| `.proxy/Caddyfile` | Reverse proxy and automatic HTTPS. |
+| `relay/` | Allow-listed outbound requests (exchange rates) made by the Composer agent. |
+| `config.json` | Initial system settings, imported on the first start only. |
+| `.secrets/.env.template` | Settings template; copy to `.secrets/.env`. |
+| `media/`, `logs/`, `imports/` | Uploaded files, logs, and files to import. |
 
 ## Requirements
 
@@ -11,6 +24,27 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
 - Internet access on the first start, to pull the images.
 - For a public site: DNS records for every hostname in `CADDY_SITE_ADDRESS`
   pointing at this machine, and inbound TCP 80 and 443 open.
+
+## What changed for operators (since 0.12.0)
+
+- DjangoLux 1.16.1 runs its own task worker. A **`worker`** service now applies the
+  database migrations before the application starts, runs backups and DjangoLux's
+  scheduled work. The **`celery`** service stays for the one project task, the
+  exchange-rate refresh (every 3 hours and once at start); it no longer applies
+  migrations.
+- The stack files are **stack schema 5**. Stored files stay private (the proxy asks
+  the app before sending any attachment), and that only works with this release's
+  image behind the new `.proxy/Caddyfile`: the upgrade pulls the image first.
+- New setting **`DLUX_FRONT_PROXY`**: the address of a proxy or TLS terminator in
+  front of this server. Unset, Caddy trusts every private address for
+  `X-Forwarded-For`, and `./start.sh check` shows a `front-proxy` warning. That
+  warning is by design and harmless when Caddy itself faces the internet (see
+  [DLUX_FRONT_PROXY](#dlux_front_proxy)).
+- The database container's environment no longer follows the application's, so
+  later image updates stop restarting it. It restarts once, for a few seconds, at
+  this upgrade.
+- Sales Report to Excel writes customer names, descriptions and numbers as text:
+  a value starting with `=` can no longer run as a spreadsheet formula.
 
 ## First installation
 
@@ -37,9 +71,120 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
    The first start pulls the images, applies the migrations, imports
    `config.json` and starts every service.
 4. Open `BASE_URL/staff/` and sign in as `admin` with `ADMIN_PASS`.
-5. Run `./start.sh check`. Every check must pass, including `stored-files`.
+5. Run `./start.sh check`. It must exit 0. The `front-proxy` line stays a warning
+   until `DLUX_FRONT_PROXY` is set.
 
-## Updating
+## Upgrading an existing deployment (v0.11.x or v0.12.0 → 0.13.0)
+
+This is **one upgrade, whichever release the server runs now**. A server that is
+still on v0.11.x, or that never got v0.12.0, does not need an intermediate step:
+the steps below also deliver what v0.12.0 changed. In particular, **stored files
+(purchase-invoice and expense attachments) were reachable without signing in up to
+v0.11.4**; this upgrade closes that, and the order in steps 2, 4 and 7 is what
+closes it: image first, then the release files, then `./start.sh restart caddy`.
+Updating only the image keeps the old Caddyfile, which still serves stored files
+without login. A server whose Caddy and Compose files are older than v0.11.4 (the
+public site served from an old portfolio folder, a `dlux-updater`, `pgadmin` or
+`db-backup` service) takes the same steps; step 6 removes what the new stack no
+longer has.
+
+Run everything from the deployment folder (the one holding `compose.yml` and
+`.secrets/`) and keep the server's `.secrets/.env`, `media/`, `logs/` and
+`imports/`. Do **not** use **Options > Updates and maintenance** for this release:
+that card installs only the application image and keeps the old `compose.yml`, and
+an image older than DjangoLux 1.16 cannot update itself to this one.
+
+1. **Back up.** In the app, create a backup under Options > Backups and download
+   it, and copy the `media/` folder. Keep a database dump too if you have one.
+2. **Pull the new application image first.** This restarts nothing: the stack keeps
+   running the old image until step 5. The new proxy file asks the app's media
+   check, which only the new image answers.
+
+   ```bash
+   docker pull debeski/dlux-crm:sales
+   ```
+
+   If `.secrets/.env` has a `WEB_IMAGE=` line pinning an old version, remove it.
+3. **Refresh the Composer deployer:** `./start.sh update self`. An older wrapper
+   spells it `./start.sh self update` (wrappers 3 to 5) or `./start.sh update-self`
+   (wrapper 1).
+4. **Copy this release's files over the server's:** `compose.yml`, `start.sh`,
+   `start.ps1`, `.proxy/Caddyfile`, `.composer-channel` and `relay/`. Move the old
+   copies, and `.proxy/maintenance.html` (Composer now serves the update progress
+   page), into `.xclude/` first. Do not touch `.secrets/.env`; if the old
+   `compose.yml` had local edits, move them into `.secrets/.env` variables first.
+   Then repair and check:
+
+   ```bash
+   ./start.sh check --fix
+   ```
+
+   With this release's files `check --fix` changes at most the
+   `docker-socket-proxy` image, which it pins to a digest, and it restamps
+   `.secrets/.env` if that file still carries an older stack-schema stamp. If it
+   says `composer-agent` must be running to publish the maintenance page, run
+   step 5 and then `check --fix` once more.
+5. **Deploy:** `./start.sh`. This adds the `worker` service, restarts the database
+   once (its environment changed; its data stays in the volume) and the
+   application containers, and applies DjangoLux's own migrations. This release
+   adds no migration of its own. Wait for the first start to finish.
+6. **Remove containers the new stack no longer has.** Compose leaves the container
+   of a service that left `compose.yml` running. The new stack has exactly these
+   services: `db`, `redis`, `smtp-relay`, `caddy`, `web`, `worker`, `celery`,
+   `docker-socket-proxy`, `composer-executor` and `composer-agent`.
+
+   ```bash
+   docker ps -a --filter label=com.docker.compose.project=sales \
+     --format '{{.Label "com.docker.compose.service"}}\t{{.Names}}\t{{.Status}}'
+   ```
+
+   Remove any other row's container (`dlux-updater`, `pgadmin`, `db-backup`) with
+   `docker rm -f <name>`; its volume stays. If the stack was started under another
+   project name than `sales`, use that name in the filter.
+7. **Restart the proxy.** Caddy reads `.proxy/Caddyfile` only when it starts, and
+   `./start.sh` does not recreate it while its service definition is unchanged:
+
+   ```bash
+   ./start.sh restart caddy
+   ```
+8. **Verify.**
+   - `./start.sh check` exits 0: `stack-schema` 5, `stored-files` and the task
+     worker check OK (`front-proxy` stays a warning until it is set).
+   - Signed out, a stored attachment must answer `403`. With your `BASE_URL` in
+     place of `https://switchlibya.ly`:
+
+     ```bash
+     f=$(find media/purchase_invoices media/finance/expenses -type f 2>/dev/null | head -n1); echo "${f:-no stored attachments}"; [ -z "$f" ] || curl -s -o /dev/null -w '%{http_code}\n' "https://switchlibya.ly/$f"
+     ```
+
+     On Windows, open `BASE_URL/media/purchase_invoices/<a file in that folder>` in a
+     private browser window instead. Anything but `403` means the proxy still runs
+     the old Caddyfile: check that `.proxy/Caddyfile` was replaced, and repeat step 7.
+   - The exchange-rate refresh runs: `./start.sh log -n 100 celery` shows
+     `finance.tasks.refresh_market_rates` succeeding a minute after the start.
+   - Sign in, open **Reports > Sales report** and download the Excel file.
+
+### DLUX_FRONT_PROXY
+
+Set it when a proxy or TLS terminator sits in front of Caddy: add
+`DLUX_FRONT_PROXY=<address>` to `.secrets/.env` (several addresses or networks:
+space-separated, no quotes), then run `./start.sh` and `./start.sh restart caddy`.
+Only those addresses are trusted for `X-Forwarded-For`, so a user who reaches
+Caddy's port directly can no longer choose the address recorded for the login
+lockout and the activity log. `DLUX_FRONT_PROXY=` (empty) trusts none. With Caddy
+facing the internet directly there is nothing to name: the default
+(private addresses only) is safe, and the `front-proxy` warning can stay.
+
+### Rolling back
+
+0.13.0 runs DjangoLux 1.16.1, which adds its own database tables. To go back,
+restore the backup from step 1 with the previous `compose.yml`, `start.sh`,
+`start.ps1` and `.proxy/Caddyfile`, put `WEB_IMAGE=debeski/dlux-crm:sales-v0.12.0`
+(or the version you came from) in `.secrets/.env`, then run `./start.sh` and
+`./start.sh restart caddy`. Going back to v0.11.4 or older reopens the
+stored-files exposure: do it only to recover.
+
+## Updating later
 
 Back up first: **Options > Backups** in the app, or keep a database dump.
 
@@ -47,38 +192,6 @@ Back up first: **Options > Backups** in the app, or keep a database dump.
   image when one is published. Install it there.
 - Or from this folder: `./start.sh update`. It refreshes the Composer deployer,
   pulls the new images and recreates the services; migrations run on start.
-
-### From a Sales CRM before 0.12.0
-
-0.12.0 needs Composer 1.9.2 or later and changes the deployment files: stored files
-become private (stack schema 4). The new `.proxy/Caddyfile` asks the app before
-serving any `/media/` file outside the public folders, and Composer now ships the
-update progress page. Keep this order: the new Caddyfile in front of an older image
-refuses every private file, storefront images included.
-
-1. Back up, then run `./start.sh self update`.
-2. Update the image first, with your current files: `./start.sh update`.
-3. Move the old `compose.yml`, `start.sh`, `start.ps1`, `.proxy/Caddyfile`,
-   `.proxy/maintenance.html` and `relay/` into `.xclude/`, copy this folder's
-   versions in (keep `.secrets/.env`, `media/`, `logs/` and `imports/`), add
-   `# dlux stack schema 4` as the first line of `.secrets/.env`, then run
-   `./start.sh`.
-4. Run `./start.sh restart caddy`. Caddy reads its Caddyfile only when it starts,
-   and neither `./start.sh` nor `update` recreates an unchanged caddy service.
-5. Signed out, a stored attachment under `/media/` must answer `403`. With your
-   `BASE_URL` in place of `https://switchlibya.ly`:
-
-   ```bash
-   f=$(find media/purchase_invoices media/finance/expenses -type f 2>/dev/null | head -n1); echo "${f:-no stored attachments}"; [ -z "$f" ] || curl -s -o /dev/null -w '%{http_code}\n' "https://switchlibya.ly/$f"
-   ```
-
-   On Windows, open `BASE_URL/media/purchase_invoices/<a file in that folder>` in a
-   private browser window instead. Anything but `403` means the old Caddyfile is
-   still loaded: check step 3 and repeat step 4.
-6. Run `./start.sh check`. Every check must pass, including `stored-files`.
-
-Updating only the image keeps the old Caddyfile, which still serves stored files
-without login.
 
 ## Everyday commands
 
@@ -97,16 +210,3 @@ Run from this folder (Windows: prefix with
 | Last 200 log lines of a service | `./start.sh log -n 200 web` |
 
 Never pass `-v` or `-p` to `stop`: they delete the database and every other volume.
-
-## Files
-
-| Path | Purpose |
-| --- | --- |
-| `compose.yml` | The services. Edit settings in `.secrets/.env`, not here. |
-| `start.sh`, `start.ps1` | Composer wrapper (version 6). |
-| `.composer-channel` | `stable`. Production stays on the stable channel. |
-| `.proxy/Caddyfile` | Reverse proxy and automatic HTTPS. |
-| `relay/` | Allow-listed outbound requests (exchange rates) made by the Composer agent. |
-| `config.json` | Initial system settings, imported on the first start only. |
-| `.secrets/.env` | Your settings and secrets. Keep it private and backed up. |
-| `media/`, `logs/`, `imports/` | Uploaded files, logs, and files to import. |

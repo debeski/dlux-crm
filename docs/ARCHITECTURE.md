@@ -365,11 +365,13 @@ See [BUSINESS_RULES.md](BUSINESS_RULES.md) for pricing and the frozen-rate rule,
   `view_<model>` permission, scope and `OWNER_FIELDS` ownership, then answers with
   DjangoLux's `serve_file` (byte ranges, revalidation). Their folders are
   `DLUX_APP_ONLY_MEDIA`, so the proxy refuses them at `/media/`.
-- Stored files are private by default (stack schema 4, DjangoLux 1.15.3): Caddy asks
+- Stored files are private by default (stack schema 4 and later, DjangoLux 1.15.3+): Caddy asks
   `forward_auth` at `/staff/sys/files/media-access/` before serving any `/media/`
   file outside the public folders. `DLUX_PUBLIC_MEDIA` keeps product, service and
   listing images public for the storefront; other stored files need a signed-in user.
   `config/urls.py` also answers `/sys/files/media-access/` for Composer's generated fix.
+
+- Tasks (stack schema 5, DjangoLux 1.16.1): the `worker` service runs DjangoLux's task worker (migrations through its `pre_start` and `entrypoint.sh` boot gate, backups, scheduled work). The project's only task, `finance.tasks.refresh_market_rates`, still runs on Celery in its own `celery` service (beat every 3 hours, one run on `worker_ready`); it reaches the rate sites through the Composer agent's relay, not the internet. Moving it to `dlux.taskrunner` is possible before DjangoLux 1.17 drops Celery; see CHANGELOG v0.13.0.
 
 ## Cancellation payments and customer credit (sales.0010)
 
