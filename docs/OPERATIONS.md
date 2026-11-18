@@ -692,6 +692,42 @@ MachineType, Manufacturer and MachineModel use `machinery.view_*` lookup permiss
 
 Back up the store database, deploy the `machinery` app with config/catalog/automotive changes, and use `./start.sh` to recreate the development stack (web and Celery now bind `./machinery`). Apply migrations through the normal wrapper startup. Run `seed_machine_categories` in the appropriate scope (`--scope ID`, or no scope for global records). The command creates vocabulary and an unpriced Repair service, never stock or purchase invoices. Migration preserves original machine/engine records while copying simple model compatibility into machinery. Reference: [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md).
 
+## Upgrading to v0.13.0
+
+v0.13.0 runs DjangoLux 1.16.1 and needs Composer 1.10.1 or later. It is one upgrade
+from **any** earlier deployment (v0.11.x or v0.12.0): it also delivers the v0.12.0
+stored-files fix (stored files were reachable without login up to v0.11.4), so a
+server that never got v0.12.0 does not stop there first. The bundle README
+(`deploy/README.md`, shipped as `README.md` in `crm-sales-0.13.0-deploy.zip`) holds the
+steps; in short:
+
+1. **Back up**: Options > Backups, and copy `media/`.
+2. **Pull the image first**: `docker pull debeski/dlux-crm:sales`. Nothing restarts.
+3. **Refresh the deployer**: `./start.sh update self` (`self update` on wrappers 3 to 5).
+4. **Copy the release files** (`compose.yml`, `start.sh`, `start.ps1`,
+   `.proxy/Caddyfile`, `.composer-channel`, `relay/`; move the old ones and
+   `.proxy/maintenance.html` to `.xclude/`), then `./start.sh check --fix`.
+5. **Deploy**: `./start.sh`. Adds `worker`, restarts `db` once, applies DjangoLux's
+   migrations; the CRM adds none.
+6. **Remove orphans**: Compose keeps the container of a service that left the file
+   (`dlux-updater`, `pgadmin`, `db-backup` on an old layout); list them with the
+   `docker ps -a --filter label=com.docker.compose.project=sales` command in the README.
+7. **Restart the proxy**: `./start.sh restart caddy`.
+8. **Verify**: `./start.sh check` exits 0, signed-out `/media/` attachments answer
+   `403`, the exchange-rate refresh logged on `celery`.
+
+Stack schema 5 splits the work: `worker` (DjangoLux's task worker; applies the
+migrations through its `pre_start` and boot gate, runs backups) and the project-only
+`celery` (`finance.tasks.refresh_market_rates` with beat every 3 hours, plus one run when
+the worker starts). `celery` waits for `worker`'s migrations through `entrypoint.sh` and
+keeps the read-write runtime mount and no egress: it reaches cbl.gov.ly and eanlibya.com
+through the Composer agent's relay (`relay/operations.json`). `db` takes only its own
+`POSTGRES_*` variables, so an image tag or schema stamp change no longer recreates it.
+
+`DLUX_FRONT_PROXY` is unset in every shipped file. Set it in `.secrets/.env` when a
+proxy sits in front of Caddy; with Caddy on the internet the `front-proxy` warning of
+`./start.sh check` stays by design.
+
 ## Upgrading to v0.12.0
 
 v0.12.0 runs DjangoLux 1.15.3 and needs Composer 1.9.2 or later. Its image floor
@@ -744,12 +780,12 @@ of the v0.11.x Caddyfile asks `/sys/files/media-access/`, which v0.12.0 also ans
 (DjangoLux itself lives under `/staff/`), so applying it is safe. It changes only the
 Caddyfile, though: install the release files in step 4 regardless.
 
-A fresh installation from `crm-sales-<version>-deploy.zip` is already at schema 4
-and wrapper 6; see `deploy/README.md`.
+A fresh installation from `crm-sales-<version>-deploy.zip` is already at the current
+stack schema and wrapper 6; see `deploy/README.md`.
 
 ### Stored files
 
-DjangoLux 1.15.3 decides who may fetch a `/media/` file (`dlux.files.media`); the
+DjangoLux decides who may fetch a `/media/` file (`dlux.files.media`, stack schema 4 and later); the
 proxy asks it at `/staff/sys/files/media-access/` (DjangoLux is mounted under
 `/staff/`).
 

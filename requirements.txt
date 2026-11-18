@@ -1,5 +1,4 @@
-django-lux[updater] @ https://files.pythonhosted.org/packages/b2/a4/110065e7f24fd1d7fea0a6d3f0e51deae6dc2da7b11ce04e4ccaf6ab5b8e/django_lux-1.15.3-py3-none-any.whl#sha256=534b54a17e09772ec49e503bc83e3a4a3c4d8b514ac56f7676f80863fd748271
-django-lux[updater]==1.15.3
+django-lux[updater]==1.16.1
 django-cors-headers
 django-csp
 gunicorn

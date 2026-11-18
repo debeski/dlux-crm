@@ -40,7 +40,7 @@ ARG DLUX_PROJECT_RELEASE_MANIFEST=""
 LABEL org.dlux.project.release-manifest="${DLUX_PROJECT_RELEASE_MANIFEST}"
 
 # The stack contract schema this Dockerfile was written for.
-LABEL org.dlux.stack-schema="4"
+LABEL org.dlux.stack-schema="5"
 
 # Copy the project files
 COPY . /app/
