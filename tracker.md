@@ -1,7 +1,7 @@
 # Project Tracker (switch-pos) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-11-17: v0.13.0 prepared on branch `feat/dlux-1-16-1` (from v0.12.0 `042195e`), UNPUSHED/UNTAGGED: DjangoLux 1.16.1 + Composer 1.10.1, stack schema 5 (`worker` beside project `celery`), F3 fix in `sales/reports.py`, one pin line. Version v0.13.0 (not v0.12.1: schema/service/Composer minimum change) is the owner's call. v0.12.0 (tag `c43e305`, DjangoLux 1.15.3, schema 4) is the published release.
+- 2026-11-17: v0.13.0 on branch `feat/dlux-1-16-1` (from v0.12.0 `042195e`), pushed 2026-11-18, PR https://github.com/debeski/dlux-crm/pull/2 open, UNMERGED/UNTAGGED: DjangoLux 1.16.1 + Composer 1.10.1, stack schema 5 (`worker` beside project `celery`), F3 fix in `sales/reports.py`, one pin line. Version v0.13.0 (not v0.12.1: schema/service/Composer minimum change) is the owner's call. v0.12.0 (tag `c43e305`, DjangoLux 1.15.3, schema 4) is the published release.
 - v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
 - Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
 - `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
@@ -31,7 +31,7 @@
 - Updates card can show a stale "Could not read the DjangoLux release index" after an image upgrade until a check completes (DjangoLux `last_check_error`).
 ### Incomplete Tasks: [Max 20 lines]
 - **Priority 1 — run it:**
-  - [ ] Owner OK to push `feat/dlux-1-16-1` (`-u origin`), PR, merge, tag `v0.13.0`; then re-run the testbed from the published image and upgrade the VM in one hop from `dist/crm-sales-0.13.0-deploy.zip` (README order: pull image, `update self`, copy files, `check --fix`, `./start.sh`, orphans, `restart caddy`). Needs `DLUX_FRONT_PROXY` only if a proxy sits in front of Caddy. Retire `feat/unsaved-guard` (ported).
+  - [ ] Pushed with PR #2 (2026-11-18). Owner OK to merge and tag `v0.13.0`; then re-run the testbed from the published image and upgrade the VM in one hop from `dist/crm-sales-0.13.0-deploy.zip` (README order: pull image, `update self`, copy files, `check --fix`, `./start.sh`, orphans, `restart caddy`). Needs `DLUX_FRONT_PROXY` only if a proxy sits in front of Caddy. Retire `feat/unsaved-guard` (ported).
   - [x] v0.10.1 released 2026-10-01: `{% asset %}` content-hash versioning for all 31 project CSS/JS links (stale workspace card after update).
   - [x] Customer 2026-10-03: USD + EUR together, existing purchase permission only, per-product pricing currencies, frozen LYD costs and mixed valuation (v0.11.0 deployed locally).
   - [ ] Owner decision: keep the project `celery` (rate refresh, relay-based) until DjangoLux 1.17 or move that one task to `dlux.taskrunner` (`@task`, `DLUX_TASK_SCHEDULE`, `worker_started`); assessment in the v0.13.0 hand-over. Celery stays off `egress` (relay needs the rw runtime mount); the dev overlay must keep celery/worker runtime `:rw`. `currency-switch` and `automotive-parts-first` carry uncommitted work on old pins: merge this branch's stack files there deliberately.
@@ -51,7 +51,7 @@
   - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
   - [ ] Storefront polish: mobile `/shop/` search input collapses (placeholder hidden); landing hero kicker has low contrast.
 - **Completed Recently:**
-  - [x] 2026-11-18: v0.13.0 prepared (unpushed): pin 1.16.1, schema 5, `worker` beside project `celery`, `db` env narrowed, F3 in `build_sales_report_xlsx`, one-hop upgrade README, testbed acceptance from v0.12.0 and v0.11.4. Celery→`dlux.taskrunner` move assessed, not done (no test covers the task; owner's call).
+  - [x] 2026-11-18: v0.13.0 prepared (PR #2): pin 1.16.1, schema 5, `worker` beside project `celery`, `db` env narrowed, F3 in `build_sales_report_xlsx`, one-hop upgrade README, testbed acceptance from v0.12.0 and v0.11.4. Celery→`dlux.taskrunner` move assessed, not done (no test covers the task; owner's call).
   - [x] 2026-10-02: invoice row deletion/save + cancelled debt; `sales.0010` refunds/customer credit/later modal and idempotent credit use, cancellation releases used credit; receipts retained and reports separate refund/credit liabilities.
   - [x] Removed POS *Open the till on login* and the parts-mode `/staff/` landing (never applied: DLux login goes to its Home); landing = DLux Home (store/per-user; per-group coming in dlux); real-login test `common.tests.test_login_landing` (2026-09-30).
   - [x] Machine wording synced on `SystemSettings` post_save (wizard/import safe); dlux pinned 1.10.0 stable (2026-09-30); relay rates need Composer 1.6.0.
