@@ -16,7 +16,7 @@ from catalog.forms import ProductForm, ServiceForm
 from catalog.models import Product, Service
 from catalog.tables import ProductTable, ServiceTable
 
-MEDIA = tempfile.mkdtemp(prefix="switchpos-test-media-")
+MEDIA = tempfile.mkdtemp(prefix="sales-crm-test-media-")
 
 
 def _png_upload(name="p.png"):

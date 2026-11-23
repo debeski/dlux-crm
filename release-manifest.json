@@ -1,16 +1,15 @@
 {
   "schema_version": 1,
-  "version": "0.12.0",
-  "summary": "DjangoLux 1.15.3 security runtime: private stored files, unsaved-changes prompts, personal table columns and the Operations panel.",
+  "version": "0.13.0",
+  "summary": "DjangoLux 1.16.3 runtime with its own task worker, tighter record ownership, per-colour/size stock takes, and hardened stack files (schema 5).",
   "highlights": [
-    "Updated the application framework to DjangoLux 1.15.3, a security release.",
-    "Stored files are private: attachments and receipts open only for signed-in users who may see the record; storefront images stay public.",
-    "Closing an add or edit window with unsaved changes asks whether to save, discard or go back; Save submits the form once.",
-    "Arrange columns lets each user reorder table columns and show or hide them with the eye on each header.",
-    "Options > Operations checks the deployment, applies repairs, restarts services and shows their logs.",
-    "The Updates card settles after a check, shows each release's own notes and reloads after Finish.",
-    "The update progress page now comes from Composer and returns you to the page you were on.",
-    "New Composer wrapper: ./start.sh update refreshes the deployer before updating the stack."
+    "Updated the application framework to DjangoLux 1.16.3; it needs Composer 1.10.3 or newer and the new stack files.",
+    "DjangoLux's tasks and backups run in a new worker service; the exchange-rate refresh keeps its own Celery service.",
+    "Sales Report to Excel keeps customer names, descriptions and numbers as text, so a value starting with = can never run as a formula.",
+    "Stored files stay private: a server still on an older release gets this fix in the same upgrade.",
+    "New DLUX_FRONT_PROXY setting names the proxy in front of this server, so login lockout and the activity log record real client addresses.",
+    "Invoices, payments, deposits and deliveries only link to records the user may see; issued invoices can no longer be deleted.",
+    "Stock takes count each colour and size on its own line, and product cost is shown only to product editors."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.12.0"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.13.0"
 }

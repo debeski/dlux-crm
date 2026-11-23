@@ -16,11 +16,15 @@ class Command(BaseCommand):
         scope_id = options.get("scope")
         if scope_id is not None:
             Scope.objects.get(pk=scope_id)
-        typ, _ = MachineType.objects.get_or_create(scope_id=scope_id, name="Concrete pump & mixer")
-        maker, _ = Manufacturer.objects.get_or_create(scope_id=scope_id, name="CIFA")
+        # Names are unique case-insensitively, so match them the same way: a store
+        # that already typed "cifa" reuses that row instead of failing the insert.
+        typ, _ = MachineType.objects.get_or_create(scope_id=scope_id, name__iexact="Concrete pump & mixer", defaults={"name": "Concrete pump & mixer"})
+        maker, _ = Manufacturer.objects.get_or_create(scope_id=scope_id, name__iexact="CIFA", defaults={"name": "CIFA"})
         models = {}
         for name in ("F8", "F9", "HPG", "ZOOM"):
-            models[name], _ = MachineModel.objects.get_or_create(scope_id=scope_id, machine_type=typ, manufacturer=maker, name=name)
+            models[name], _ = MachineModel.objects.get_or_create(
+                scope_id=scope_id, machine_type=typ, manufacturer=maker, name__iexact=name, defaults={"name": name},
+            )
         def category(name, parent=None):
             matches = Category.objects.filter(scope_id=scope_id, name__iexact=name, parent=parent)
             if matches.count() > 1:

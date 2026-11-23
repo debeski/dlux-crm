@@ -1,23 +1,25 @@
-# Trust a front proxy on a private address (pfSense/HAProxy, another nginx, a
-# cloud LB, ...) so its X-Forwarded-For / X-Forwarded-Proto are forwarded
-# (client IP appended) instead of replaced with the peer address. Public
-# clients are never trusted, so they cannot spoof either header. Inert while
-# Caddy terminates TLS facing the internet directly; makes client-IP
-# resolution (dlux per-IP lockout, audit logs) correct if the stack is ever
-# fronted by a private proxy hop.
+# Trust a front proxy (pfSense/HAProxy, another nginx, a cloud LB, ...) so its
+# X-Forwarded-For / X-Forwarded-Proto are forwarded (client IP appended)
+# instead of replaced with the peer address. DLUX_FRONT_PROXY in .secrets/.env
+# names the trusted proxies: unset trusts every private address, a
+# space-separated list of addresses or networks (no quotes) trusts only those,
+# and an empty value trusts none (users reach Caddy directly). A client Caddy
+# does not trust cannot spoof either header. Inert while Caddy terminates TLS
+# facing the internet directly; makes client-IP resolution (dlux per-IP
+# lockout, audit logs) correct if the stack is ever fronted by a proxy hop.
 {
 	servers {
-		trusted_proxies static private_ranges
+		trusted_proxies static {$DLUX_FRONT_PROXY:private_ranges}
 	}
 }
 
 # ---------------------------------------------------------------------------
-# Caddy reverse proxy for the Switch Django/DLux stack.
-# dlux stack schema 4
+# Caddy reverse proxy for the Sales CRM stack.
+# dlux stack schema 5
 #
 # Public and staff paths are split inside Django/DLux, not by Caddy:
 #
-#   CADDY_SITE_ADDRESS  → Django app (e.g. "switchlibya.ly www.switchlibya.ly")
+#   CADDY_SITE_ADDRESS  → Django app (e.g. "crm.example.com www.crm.example.com")
 #   CADDY_ERP_ADDRESS   → optional legacy host redirected to /staff/
 #
 # Automatic HTTPS: when an address is a real hostname (prod), Caddy obtains AND
@@ -64,6 +66,60 @@
 			file_server
 		}
 
+		# Live update status/log for the maintenance progress page. Served even
+		# during maintenance (Composer writes these on the shared dlux_runtime
+		# volume, which stays up while web is recreated).
+		handle /_update/status.json {
+			root * /opt/dlux-runtime/state
+			rewrite * /deploy-status.json
+			header Cache-Control "no-store"
+			file_server
+		}
+		handle /_update/log.txt {
+			root * /opt/dlux-runtime/state
+			rewrite * /deploy-log.txt
+			header Cache-Control "no-store"
+			file_server
+		}
+
+		# Maintenance page assets, published by composer-agent on the runtime
+		# volume and served here so they load while web is down.
+		handle /_dlux/maintenance/* {
+			root * /opt/dlux-runtime/proxy
+			uri strip_prefix /_dlux
+			header Cache-Control "no-store"
+			file_server
+		}
+
+		# Always-200 edge-liveness probe for a front proxy's health check. Never
+		# proxied to web, never gated by the maintenance flag.
+		handle /_edge-alive {
+			respond "ok" 200
+		}
+
+		# Fetch Metadata resource isolation (web.dev/articles/fetch-metadata):
+		# refuse requests another site makes in the background (images, scripts,
+		# fetch(), form posts, <object>/<embed>). A link from another site (a
+		# top-level GET navigation) still opens a page; same-origin, same-site and
+		# typed-in requests pass, and so do requests without the header (crawlers,
+		# health checks, server-to-server calls, older browsers). Everything above
+		# stays open to other sites on purpose: static files, public media, the
+		# update progress files, the maintenance page assets and the edge probe.
+		# The storefront's image folders (DLUX_PUBLIC_MEDIA in config/settings.py;
+		# keep the two lists in step) are public too but pass the app's media check
+		# below, so they are exempted here by name: another site may show them.
+		# Composer's fetch-metadata check looks for this matcher by name: keep
+		# @cross_site_request.
+		@cross_site_request expression <<CEL
+			{header.Sec-Fetch-Site} == "cross-site"
+			&& !(method("GET", "HEAD")
+				&& {header.Sec-Fetch-Mode} == "navigate"
+				&& !({header.Sec-Fetch-Dest} in ["object", "embed"]))
+			&& !(method("GET", "HEAD")
+				&& path("/media/catalog/products/*", "/media/catalog/services/*", "/media/public_catalog/listings/*"))
+			CEL
+		respond @cross_site_request 403
+
 		# Every other stored file is private: the app decides who gets it
 		# (signed in, and a registered document file only to users who may view
 		# its document) before the file server sends a byte. DjangoLux is mounted
@@ -81,38 +137,6 @@
 			}
 		}
 
-		# Live update status/log for the maintenance progress page. Served even
-		# during maintenance (composer-updater writes these on the shared
-		# dlux_runtime volume, which stays up while web is recreated).
-		handle /_update/status.json {
-			root * /opt/dlux-runtime/state
-			rewrite * /deploy-status.json
-			header Cache-Control "no-store"
-			file_server
-		}
-		handle /_update/log.txt {
-			root * /opt/dlux-runtime/state
-			rewrite * /deploy-log.txt
-			header Cache-Control "no-store"
-			file_server
-		}
-
-		# Maintenance page assets, published by composer-agent on the runtime
-		# volume and served here so they load while web is down.
-		# (nginx: location ^~ /_dlux/maintenance/ { alias /opt/dlux-runtime/proxy/maintenance/; })
-		handle /_dlux/maintenance/* {
-			root * /opt/dlux-runtime/proxy
-			uri strip_prefix /_dlux
-			header Cache-Control "no-store"
-			file_server
-		}
-
-		# Always-200 edge-liveness probe for a front proxy's health check. Never
-		# proxied to web, never gated by the maintenance flag.
-		handle /_edge-alive {
-			respond "ok" 200
-		}
-
 		# Hybrid health endpoint:
 		# - normal operation: proxy to Django's /health/
 		# - planned maintenance: proxy-local 200 so a front proxy keeps backend UP
@@ -128,7 +152,7 @@
 		}
 
 		# Maintenance flag: dlux writes /opt/dlux-runtime/state/maintenance.
-		# Short-circuit the app route to 503 (static/media/pgadmin + /_update/* +
+		# Short-circuit the app route to 503 (static/media + /_update/* +
 		# /_edge-alive + /health above are already served). handle_errors renders
 		# the maintenance progress page.
 		@maintenance file {
@@ -141,7 +165,7 @@
 		reverse_proxy web:8000
 	}
 
-	# Maintenance / upstream-down page (mirrors nginx error_page 502 503 504 =503).
+	# Maintenance / upstream-down page for a 502, 503 or 504.
 	handle_errors {
 		@down expression {http.error.status_code} in [502, 503, 504]
 		handle @down {

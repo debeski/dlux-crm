@@ -6,7 +6,7 @@ from dlux.utils import get_app_system_config
 from common.i18n import t
 from common.identity import store_name
 
-PUBLIC_CATALOG_NS = "switch_pos.public_catalog"
+PUBLIC_CATALOG_NS = "sales_crm.public_catalog"
 
 PUBLIC_CATALOG_DEFAULTS = {
     "enabled": True,           # the whole public site: homepage, shop, builders

@@ -63,8 +63,8 @@ class PublicStaffSplitTests(TestCase):
         self.assertEqual(reverse("common:workspace_dashboard"), "/staff/workspace/")
         self.assertEqual(reverse("catalog:product_list"), "/staff/catalog/")
         self.assertEqual(
-            reverse("update_app_preference", kwargs={"namespace": "switch_pos.workspace_dashboard.v1"}),
-            "/staff/sys/api/preferences/app/switch_pos.workspace_dashboard.v1/",
+            reverse("update_app_preference", kwargs={"namespace": "sales_crm.workspace_dashboard.v1"}),
+            "/staff/sys/api/preferences/app/sales_crm.workspace_dashboard.v1/",
         )
 
     def test_staff_routes_redirect_anonymous_to_staff_login(self):

@@ -34,7 +34,7 @@ class PricingCurrencyTests(TestCase):
         ExchangeRate.objects.create(currency="EUR", rate=Decimal("10.0000"))
         self.admin = User.objects.create_superuser("pricing-admin", "pricing@example.com", "x")
         self.client.force_login(self.admin)
-        self.url = reverse("dlux_app_settings_group_modal", args=["switch_pos.crm_options"])
+        self.url = reverse("dlux_app_settings_group_modal", args=["sales_crm.crm_options"])
         self.filter = Product.objects.create(name="Oil Filter", cost_usd=Decimal("100.00"), markup_percent=Decimal("50"))
         self.fitting = Service.objects.create(name="Fitting", price_usd=Decimal("20.00"))
 
@@ -43,8 +43,13 @@ class PricingCurrencyTests(TestCase):
         if convert:
             data[f"{PREFIX}-convert_prices"] = "on"
         response = self.client.post(self.url, data)
-        cache.clear()
+        self.clear_cache()
         return response.json()
+
+    def clear_cache(self):
+        """Clear cached settings and rates; sessions live in the same cache in production settings."""
+        cache.clear()
+        self.client.force_login(self.admin)
 
     def test_usd_is_the_default_and_drives_the_live_rate(self):
         self.assertEqual(pricing_currency(), "USD")
@@ -88,10 +93,10 @@ class PricingCurrencyTests(TestCase):
     def test_switch_needs_both_rates_and_a_confirmation(self):
         ExchangeRate.objects.filter(currency="EUR").delete()
         ExchangeRate.all_objects.filter(currency="EUR").delete()
-        cache.clear()
+        self.clear_cache()
         self.assertNotIn("success", self.switch("EUR"))
         ExchangeRate.objects.create(currency="EUR", rate=Decimal("10.0000"))
-        cache.clear()
+        self.clear_cache()
         self.assertNotIn("success", self.switch("EUR", convert=False))
         self.assertEqual(pricing_currency(), "USD")
         self.filter.refresh_from_db()
@@ -134,7 +139,7 @@ class PricingCurrencyTests(TestCase):
     def test_both_currencies_option_round_trips_without_repricing_products(self):
         response = self.client.post(self.url, {f"{PREFIX}-currency": "BOTH"})
         self.assertTrue(response.json().get("success"))
-        cache.clear()
+        self.clear_cache()
         self.assertEqual(active_currencies(), ("USD", "EUR"))
         self.filter.refresh_from_db()
         self.assertEqual((self.filter.currency, self.filter.cost_usd), ("USD", Decimal("100")))
@@ -142,7 +147,7 @@ class PricingCurrencyTests(TestCase):
     def test_market_and_cbl_fallback_allow_switch_without_manual_eur(self):
         from finance.services import EAN_RATE_CACHE_KEYS, CBL_RATE_CACHE_KEYS, has_configured_rate
         ExchangeRate.all_objects.filter(currency="EUR").delete()
-        cache.clear()
+        self.clear_cache()
         cache.set(EAN_RATE_CACHE_KEYS["EUR"], {"rate": "11.25"}, None)
         cache.set(CBL_RATE_CACHE_KEYS["EUR"], {"average": "7.10"}, None)
         self.assertEqual(get_current_rate("EUR"), Decimal("11.25"))
@@ -170,7 +175,7 @@ class PricingCurrencyTests(TestCase):
     def test_rate_page_includes_collected_rates_and_working_source(self):
         from finance.services import EAN_RATE_CACHE_KEYS, CBL_RATE_CACHE_KEYS
         ExchangeRate.all_objects.all().delete()
-        cache.clear()
+        self.clear_cache()
         cache.set(EAN_RATE_CACHE_KEYS["USD"], {"rate": "9.73", "fetched_at": "2026-10-03T12:00:00+00:00"}, None)
         cache.set(CBL_RATE_CACHE_KEYS["EUR"], {"average": "7.21", "fetched_at": "2026-10-03T12:00:00+00:00"}, None)
         response = self.client.get(reverse("finance:exchange_rate_list"))

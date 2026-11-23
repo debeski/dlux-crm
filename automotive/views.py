@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -86,14 +87,31 @@ class FeatureAwareDynamicModalManagerView(
     OptionalEnhancementModalGuardMixin,
     DynamicModalManagerView,
 ):
-    pass
+    #: Models whose record view is a project modal, not DjangoLux's generic field
+    #: list (which shows every stored field, product cost included).
+    DETAIL_VIEWS = {("catalog", "product"): "catalog.views.ProductCardView"}
+
+    def get(self, request, *args, **kwargs):
+        key = (kwargs.get("app_label", "").lower(), kwargs.get("model_name", "").lower())
+        pk = kwargs.get("pk") or request.GET.get("id")
+        if key in self.DETAIL_VIEWS and pk and pk != "new" and request.GET.get("action") == "view":
+            from django.utils.module_loading import import_string
+
+            return import_string(self.DETAIL_VIEWS[key]).as_view()(request, pk=pk)
+        return super().get(request, *args, **kwargs)
 
 
 class FeatureAwareDynamicModalDeleteView(
     OptionalEnhancementModalGuardMixin,
     DynamicModalDeleteView,
 ):
-    pass
+    def post(self, request, *args, **kwargs):
+        # A record that refuses deletion (an issued invoice, a stock movement's
+        # history) says why instead of failing the request.
+        try:
+            return super().post(request, *args, **kwargs)
+        except ValidationError as exc:
+            return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
 
 
 class AutomotiveHubView(

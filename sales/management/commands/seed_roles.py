@@ -135,7 +135,7 @@ GROUPS = {
 
 
 class Command(BaseCommand):
-    help = "Create/refresh the Switch POS permission groups (Manager / Rep / Courier)."
+    help = "Create/refresh the Sales CRM permission groups (Manager / Rep / Courier)."
 
     def handle(self, *args, **options):
         for group_name, perm_codes in GROUPS.items():

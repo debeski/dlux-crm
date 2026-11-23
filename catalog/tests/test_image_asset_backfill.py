@@ -14,7 +14,7 @@ from django.test import TestCase, override_settings
 
 from catalog.models import Product, Service
 
-MEDIA = tempfile.mkdtemp(prefix="switchpos-backfill-media-")
+MEDIA = tempfile.mkdtemp(prefix="sales-crm-backfill-media-")
 
 
 def _png_upload(name="p.png", color=(30, 90, 180)):

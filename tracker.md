@@ -1,99 +1,52 @@
-# Project Tracker (switch-pos) [Max 100 lines total]
+# Project Tracker (Sales CRM) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-11-01: v0.12.0 published from `c43e305` (PR #1): DjangoLux 1.15.3 + Composer 1.9.2, stack schema 4; CI 41323638238 + Release 41323674722 PASS; `:sales-v0.12.0` = `:sales` digest `sha256:5e1455e9…`, baked 1.15.3, schema 4, manifest label readable. Production (v0.11.4) upgrades per OPERATIONS "Upgrading to v0.12.0".
-- 2026-10-04 machinery/vehicle controls: renamed hubs + machine description; browse assisted entry off; dual-mode Products only Assign buttons, single mode Browse + Assign. Scoped assignment/sidebar guards verified; settings Manage buttons now share renderer/live behavior. Machine type alone is required when adding a machine; vehicle switches limited to type/generation/fuel/trim/position; year/engine/transmission always on. Preview cards removed and Manage gap fixed.
-- 2026-10-03 currency correction: USD/EUR/BOTH selector, hidden single-mode controls; manual → market → CBL rate fallback deployed to currency-switch; 134 finance/catalog/settings regressions + check pass; HTTP 200.
-- v0.11.0 published 2026-10-04 at tag 33df98e; CI and Release 37209994905 green: concurrent purchase currencies under existing permissions, per-product USD/EUR prices, mixed-currency sales/valuation and local aliases. Live dev at :84 now runs v0.11.0; migrations/static applied, all services healthy.
-- Public `/`/`/shop/...`/`/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS for apex/www and redirects legacy ERP host.
-- `DLUX_APP_VERSION` now comes from `get_project_version(BASE_DIR)` (manifest); root `VERSION` stays the release-gate input and is version-locked to schema-1 `release-manifest.json`.
-- Hardened topology: `composer-executor` holds Docker authority, `composer-agent` none, `docker-socket-proxy` read-only. `db-backup`/`pgadmin`/`dlux-updater` retired; their volumes are kept.
+- 2026-11-23: v0.13.0 on DjangoLux 1.16.3 + Composer 1.10.3 (stack schema 5, 1.16.3 scaffold stack files incl. Fetch Metadata gate) accepted on the testbed from published v0.12.0 and v0.11.4; being released from `feat/dlux-1-16-1` via PR https://github.com/debeski/dlux-crm/pull/2.
+- Phase B release steps: push, merge #2, tag `v0.13.0`, CI release, re-test from the published image, fresh install from `dist/crm-sales-0.13.0-deploy.zip`.
+- Product name is **Sales CRM** (repo/image `debeski/dlux-crm:sales`, project slug `dlux-crm-sales`); the old name "Switch POS" and the customer brand are gone from docs, code defaults and stored identifiers (`sales_crm_*` cookies, `sales_crm.*` settings moved by `common.0001`).
+- Public `/`, `/shop/...`, `/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS and redirects the legacy ERP host.
 ### Current Project Adopted Standards: [Max 5 lines]
 - Scoped models via `dlux.ScopedModel`; lists are `common.ScopedListView` on the dlux Ribbon + `dlux/list_page.html` (non-list pages use `common.RibbonPageMixin`), CRUD through the modal manager.
-- Products retain `currency`; sales freeze `unit_price_lyd` + six-decimal `unit_cost_lyd`, purchases freeze their own currency/rate; finance is dependency root. Decimals fed to JS go through `|unlocalize` (Arabic renders `9,85`).
-- Quantity inputs use `common.forms.QUANTITY_INPUT_ATTRS` (`step="any"`); site-wide JS loads via `common/templates/dlux/includes/custom_scripts.html`.
-- Variants own stock buckets and the ledger is append-only (undo by compensating movement); images use `ManagedAssetField` namespaced by model — read `image_url`, backfill via `adopt_image_assets --apply`.
+- Products retain `currency`; sales freeze `unit_price_lyd` + six-decimal `unit_cost_lyd`, purchases freeze their own currency/rate; finance is dependency root. Decimals fed to JS go through `|unlocalize`.
+- Variants own stock buckets and the ledger is append-only (undo by compensating movement); images use `ManagedAssetField` (`adopt_image_assets --apply`).
 - Row visibility uses `OWNER_FIELDS` + `view_all_<model>` and `common.access.apply_ownership` at read boundaries only.
 - Public catalog is a curated projection; public contact writes are DB-idempotent.
 ### Adopted Standards' rules and policies: [Max 5 lines]
-- Never delete files; move obsolete paths under `.xclude/` preserving relative paths.
-- CSP and four-network isolation remain enforced; web has no egress or Docker API access.
-- External rate fetches run in Celery; network changes require `./start.sh -d` recreation.
+- Never delete files; move obsolete paths under `.xclude/` preserving relative paths. Consumers ship only on published stables (no beta pin, `:beta` image or beta channel).
+- Four-network isolation: `web` has no egress or Docker API access; the rate refresh reaches the internet only through the Composer relay (`relay/operations.json`, hash-locked in `operations.lock`).
 - Future reservation/purchase/checkout writes require DB-backed idempotency keys.
-- Release changes update CHANGELOG/docs and keep tag, `VERSION`, and project manifest aligned.
+- Release changes update CHANGELOG/docs; tag, `VERSION` and `release-manifest.json` stay aligned. Manuals describe the present: history in CHANGELOG, evidence in `.xclude/validation`.
 ### Cross-Cutting Audits if any: [Max 3 lines]
-- 2026-07-18: Release/update path audit covers Caddy TLS, Composer recovery, baked Dlux gate, and project manifest metadata.
-- 2026-08-03: Fixed DLUX source resolves 24 nav candidates/0 API; suffix and nested API names reject while `rapid_report` remains valid.
+- 2026-11-23 docs audit (Phase A, static): rename, README, OPERATIONS/RELEASING rebuilt, BUSINESS_RULES/PERMISSIONS/ARCHITECTURE/AUTOMOTIVE checked against code. Report: `docs-audit-crm-sales.md` in the session notes folder.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
-- 2026-10-18: Soft-resetting OpeningStockDraft leaves scope uniqueness on trashed rows, blocking replacement drafts. Permanent reset of Stock Movements + Opening Stock Drafts is verified to reopen intake; soft reset still needs a constraint fix.
-- v0.11.4 and older: stored files reachable without login; fixed in v0.12.0 (image first, then release deploy files, then `./start.sh restart caddy`).
-- Live VPS/SSH stays severely slow with Compose down; disk/CPU/kernel logs are clean, narrowing the fault to UFW configuration or the provider network/hypervisor rather than Dlux.
-- Live VM likely runs stale Caddy/Compose: apex/www serve old portfolio while current repo proxies Django and redirects ERP.
-- Deployment SMTP credentials are unset, so contact relay cannot authenticate.
-- Updates card can show a stale "Could not read the DjangoLux release index" after an image upgrade until a check completes (DjangoLux `last_check_error`).
+- Soft-resetting `OpeningStockDraft` leaves the scope uniqueness constraint on trashed rows, blocking replacement drafts (permanent reset works).
+- Fetch Metadata gate exempts the storefront image folders by path: keep `.proxy/Caddyfile` in step with `DLUX_PUBLIC_MEDIA` (test enforces).
+- Live VM likely runs a stale stack (old portfolio on apex/www, stored files open to v0.11.4): one-hop upgrade per `deploy/README.md`; check its project and database names first: v0.1.0 `switch_pos`/`switch_pos_db`, v0.1.2 `sales-crm`/`sales_crm_db`, v0.1.3+ `sales`/`sales_db` (a pre-v0.1.3 server would start empty volumes under `name: sales`).
+- SMTP credentials unset on the deployment, so the contact relay cannot authenticate. Updates card can show a stale "Could not read the DjangoLux release index" until a check completes.
 ### Incomplete Tasks: [Max 20 lines]
-- **Priority 1 — run it:**
-  - [ ] Production: upgrade to v0.12.0 in the documented order (image first, release deploy files, `./start.sh restart caddy`); `dist/crm-sales-0.12.0-deploy.zip` holds the files. Retire `feat/unsaved-guard` (ported).
-  - [x] v0.10.1 released 2026-10-01: `{% asset %}` content-hash versioning for all 31 project CSS/JS links (stale workspace card after update).
-  - [x] Customer 2026-10-03: USD + EUR together, existing purchase permission only, per-product pricing currencies, frozen LYD costs and mixed valuation (v0.11.0 deployed locally).
-  - [ ] Exchange rates through the Composer relay: merged to `main` 2026-09-30 (unpushed, unreleased) and LIVE on the `automotive-parts-first` dev stack (Composer 1.6.0 stable, DjangoLux 1.10.0; celery on `internal` only; refresh proven through the agent). Do NOT drop `egress` from celery in `main`'s `compose.yml` until Composer 1.6 is stable and production stacks run it: without the relay the scrape then fails. The dev overlay had celery's runtime volume `:ro` (fixed on main, and in the dev tree's uncommitted `compose.dev.yml`), which silently forced the direct-fetch fallback. `automotive-parts-first` also has uncommitted `compose.yml` (beta image tags, no celery egress) and an untracked `.composer-channel`; its uncommitted `CHANGELOG.md` overlaps `main`, so commit your work before merging `main` there.
-  - [ ] Click through the running stack at http://localhost:84: row-menu modals, the invoice editor, a purchase invoice, the layout toggle. All 17 lists are verified to RENDER the ribbon server-side; none has been driven by hand.
-  - [ ] Confirm the ribbon's Arabic/RTL rendering, `ui_view`/`ui_edit` row labels in Arabic, and the new year dropdown on Invoices/Payments/Expenses.
-  - [ ] Verify `show_scan=True` still renders a scanner button on the purchase-invoice/expense attachment: ScanLink is opt-in since dlux 1.8.0.
-  - [ ] Verify the packaged smtp-relay reads `SystemSettings.email_config` — the deployment's unset SMTP credentials may be fixable through the UI now.
-- **Priority 2 — decisions and follow-ups:**
-  - [x] Client diagram implemented/deployed: independent machinery, category hierarchy/service leaves, product/service/intake compatibility; docs/CLIENT_CATEGORIZATION.md. Only F8 branches seeded; other model fitments require actual compatibility data.
-  - [x] Optional enhancement architecture: independent vehicle and machinery flows; future pharmacy/cafe packs remain deferred.
-  - [ ] POS phase 2 (P1 committed `80c7d96`; till polish + CRM options committed `e430ab0`): P2 phone paired as scanner (server cart per user+till, 1s polling), parked sales, guided cert install (Caddy internal CA on the PC's static IP, QR setup page); P3 shifts/Z-report, returns. Heavy-equipment serial ranges deferred.
-  - [ ] Automotive Phases 0/4: obtain the retailer workbook, confirm controlled values/out-of-stock behavior, then build reviewed XLSX import, audit and pilot tooling.
-  - [ ] Design ribbon tab strips (Invoice status — `_status_counts` already feeds `get_ribbon_tab_counts`; StockMovement type; PurchaseInvoice status; Product category).
-  - [ ] Ask upstream for a detail-modal hook: `get_modal_context()` is merged before `auto_detail_fields` is set, the only reason `templates/dlux/helpers/dynamic_modal_detail.html` is forked.
-  - [ ] Re-check that fork against dlux's partial on every upgrade (a test asserts the audit trail and Back control, not full parity).
-  - [ ] Purchase-invoice/stock-take/opening-stock editors do NOT fit `DocumentEditorView` — intake lines are plain Forms that create Products, not an inline formset. Left alone deliberately; revisit only if they gain a header+lines shape.
-  - [ ] Publish v0.7.0 and confirm the image exposes both baked-version and project-manifest labels.
-  - [ ] Storefront polish: mobile `/shop/` search input collapses (placeholder hidden); landing hero kicker has low contrast.
+- **Priority 1 — release v0.13.0 (in progress):**
+  - [ ] Push, merge #2, tag `v0.13.0`, CI release; testbed re-run from `debeski/dlux-crm:sales-v0.13.0` (drop `WEB_IMAGE`); fresh install from the zip; deploy zip from the tag.
+- **Priority 2 — owner decisions and follow-ups:**
+  - [ ] Keep the project `celery` until DjangoLux 1.17 or move `refresh_market_rates` to `dlux.taskrunner` (about 2-3 h plus a testbed run; no test covers the task). `currency-switch` and `automotive-parts-first` carry uncommitted work on old pins.
+  - [ ] Ask upstream (DjangoLux) for a per-model detail template or field-visibility hook, so the project need not shadow its `modal_manager` route.
+  - [ ] POS phase 2 (phone as scanner, parked sales, guided certificate install, shifts/Z-report, returns); Automotive Phases 0/4 (retailer workbook, reviewed import); ribbon tab strips; storefront polish (mobile `/shop/` search, hero kicker contrast).
 - **Completed Recently:**
-  - [x] 2026-10-02: invoice row deletion/save + cancelled debt; `sales.0010` refunds/customer credit/later modal and idempotent credit use, cancellation releases used credit; receipts retained and reports separate refund/credit liabilities.
-  - [x] Removed POS *Open the till on login* and the parts-mode `/staff/` landing (never applied: DLux login goes to its Home); landing = DLux Home (store/per-user; per-group coming in dlux); real-login test `common.tests.test_login_landing` (2026-09-30).
-  - [x] Machine wording synced on `SystemSettings` post_save (wizard/import safe); dlux pinned 1.10.0 stable (2026-09-30); relay rates need Composer 1.6.0.
-  - [x] Dependent settings: POS and Optional-enhancements dependents greyed/disabled with dlux tooltip instead of hidden; stored values kept while off (2026-09-29).
-  - [x] CRM options tile on dlux 1.10.0b1 settings groups (`register_app_settings_group` + `group=`); layout/public catalog/POS as sections, namespaces unchanged; `common/crm_options.py` retired to `.xclude/` (2026-09-30).
-  - [x] Test data (2026-09-29): PINV-000003 "Libya Heavy Parts Co." — 21 machines/7 Arabic types, 13 shared engines, 35 products (EAN-13 `624…`, size variants with own codes, low/out-of-stock cases, Fleetguard supplier-label extra code).
-  - [x] POS phase 1: till `/staff/sales/pos/`, `sales.pos.complete_sale` (idempotent `PosSale`), card method, discount cap, receipts, `ProductBarcode`; dev POS on; all demo data soft-deleted (2026-09-29).
-  - [x] Machinery replacement (2026-10-03): new scoped app, client vocabulary, shared model fitments, local aliases, DLux browser and modals; original engines/year/trim records retained for recovery. No engine/trim controls in machine flow.
-  - [x] v0.9.0 (untagged) parts-first automotive UX: Fits picker in Product modal, Same cars as…/Assign vehicles, `PartProfile`/`ProductPartNumber` extension (Product unchanged), browser Find a vehicle + Add part, purchase-line fits, `/staff/` → browser, Vehicle/Year product filters (2026-09-28).
-  - [x] v0.8.4 (untagged, merged into this branch): public storefront labels, modals, contact form/links and untouched homepage seed copy follow the visitor language (`public_*` / `hp_seed_*` keys) (2026-09-29).
-  - [x] DjangoLux runtime pin advanced exactly from 1.8.13 to 1.9.1 for the v0.8.0 release candidate (2026-09-23).
-  - [x] Bundled `config.json` made retailer-neutral: removed Switch/SwitchLibya assets, copy, contacts and public-site app payloads; retained a valid generic settings snapshot (2026-09-23).
-  - [x] Automotive UX: removed settings notice, save-gated Manage action, enhancement-gated bilingual hub sidebar entry, and consistent hover/focus behavior across all seven hub cards (2026-09-23).
-  - [x] Dev runtime: automotive mounted into web/Celery; Composer v3 wrappers/resident commands; rebuilt on dlux 1.8.13; 9/9 services healthy and automotive migration applied (2026-09-23).
-  - [x] v0.8.0 Phase 3: gated Make → Model → Year browser, progressive optional criteria, broad-fitment matching, distinct-SKU counts, stock status and direct Product search (2026-09-23).
-  - [x] v0.8.0 Phase 2: gated vehicle-data managers, multi-row fitment editor, Product-card compatibility and reverse keyword search (2026-09-23).
-  - [x] v0.8.0 foundation: default-off Optional Enhancements card, configurable automotive criteria/guards, scoped fitment schema and role permissions (2026-09-22).
-  - [x] v0.7.3: Opening Stock XLSX validation/diff/finalize; USD+EUR manual/scraped rates; operational Product card; purchase-invoice missing-product path re-verified (2026-09-22).
-  - [x] v0.7.3: Inventory Valuation expected profit/margin; purchase-invoice LYD total no longer uses the rate's whole part; quantity step 1 + wheel guard; dlux 1.8.13 (2026-09-11).
-  - [x] Product/Service/Listing images moved onto dlux 1.8.4 `ManagedAssetField` (namespaces `catalog.product`, `catalog.service`, `public_catalog.publiccataloglisting`), with `image_url` readers, camera capture, and the `adopt_image_assets` dry-run backfill (2026-09-02).
-  - [x] Stock balances rebuild from the live ledger after a dlux data reset (`catalog/stock_balance.py` on `data_reset_finished`); fixes products keeping stock after their movements were cleared (2026-09-02).
-  - [x] Ribbons everywhere: `RibbonPageMixin` + `refresh_ribbon()` put a real ribbon on Inventory Valuation, Sales Overview, Sales Report, Financial Report and both public-site builders; 6 more lists gained descriptions (2026-09-02).
+  - [x] 2026-11-18: v0.13.0 prepared, pushed, PR #2; testbed acceptance from v0.12.0 and v0.11.4 passed.
+  - [x] 2026-11-23: Phase B on DjangoLux 1.16.3: stack files, storefront images exempt from the cross-site gate, stale-settings-cache guard (`common.settings_namespaces`), tested rollback order in `deploy/README.md`; testbed paths A and C passed.
+  - [x] 2026-11-23: docs audit Phase A (rename to Sales CRM, real README and app READMEs, OPERATIONS/RELEASING rebuilt, doc fixes).
+  - [x] 2026-11-23: ownership on writes (customer, deposit, delivery, deposit review), issued invoices undeletable, cost on the card, POS CSRF, stock-take bucket, Add Stock gating, machinery live uniqueness, till vehicle-panel permissions, no cross-store bulk links, browsable-only vehicle tile, product record view = item card on both modal routes, per-bucket stock takes (`catalog.0014`), stored-identifier renames + `common.0001`, neutral defaults, `portfolio/` retired.
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-10-31 v0.12.0/DLux 1.15.3: 477 PASS (6 PG-only skips), check + makemigrations clean, image smoke PASS; testbeds/crm-sales upgrade from v0.11.4 in the documented order: data identical, `check` all pass incl. stored-files, /media/ matrix (public 200, attachments 403, private 403/200, backups 404).
-- 2026-10-12: SQLite throwaway `sales-web` container on `main`: 431 run, 1 failure = `tests.test_scaffold` still asserts the pre-v0.11.1 maintenance probe to `/` (stale test, not the template work); 8/8 Opening Stock Excel tests incl. Arabic template; check + makemigrations clean.
-- 2026-10-04: 111 targeted PostgreSQL cases validated (12 management/label cases pass on final rerun); released v0.11.0: 428 PostgreSQL + 423 packaged SQLite tests (4 PG-only skips) + 2 Node checks pass; fresh image smoke passes.
-- 2026-09-30: 347/347 on dlux 1.10.0b1 (real-login landing, workspace enhancement tiles).
-- 2026-09-29: 344/344 app tests after v0.8.4 merge + dependent settings; earlier 341/341 (+popular, +post-migrate wording, +4 `common.tests.test_crm_options`); CRM tile rendered and saved in-browser; till dropdown/outside-click, payment balancing and ZXing load driven in-browser.
-- 2026-09-29: 320/320 app tests in `sales-web-1` (SQLite; +8 `test_heavy_equipment`), check + makemigrations clean.
-- 2026-09-28: v0.9.0 — 312/312 in `sales-web-1` (SQLite; new: `test_quick_fits` 26, `test_arabic_ui` 3, `test_neutral_branding` 3), `check` + `makemigrations --check` clean, manifest validator OK; UI checked in-browser desktop + 375px.
+- 2026-11-23 (DjangoLux 1.16.3): 531 pass on SQLite (6 PG-only skips) and 531 on PostgreSQL 17 + Redis; testbed upgrade from published v0.12.0 and v0.11.4: data identical, settings moved, sign-out once, till sale, relay 4/4, journeys 20/20, edge probes 42/42, load 40 clients no 5xx, rollback + re-upgrade. Evidence `testbeds/crm-sales/.xclude/acceptance-1.16.3/REPORT.md`.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-10-31: OPERATIONS (upgrade order + stored-files table), RELEASING, ARCHITECTURE, README, deploy README/env.template for DjangoLux 1.15.3 / stack schema 4.
-- 2026-10-03: CLIENT_CATEGORIZATION/ARCHITECTURE/BUSINESS_RULES/PERMISSIONS/OPERATIONS/QA_WORKFLOWS and changelog document independent machinery, client seed, safe legacy migration and validation.
+- 2026-11-23 (Phase B): `deploy/README.md` rollback order and check --fix effects, `deploy/env.template` + `docs/OPERATIONS.md` SMTP relay/registry settings, Composer 1.10.3. Earlier: README, per-app READMEs, `docs/*` (OPERATIONS, RELEASING, PERMISSIONS, BUSINESS_RULES, ARCHITECTURE, automotive/QA docs), `deploy/README.md`, template and comment fixes; CHANGELOG history untouched.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:
-- No project venv: run tests in `sales-web-1` (`python manage.py test ... --settings=config.settings_dev_sqlite`); new static needs `collectstatic` there before Caddy serves it.
-- Validate releases with `python tools/validate_project_release_manifest.py --tag vX.Y.Z --repository debeski/dlux-crm`.
+- No project venv: run the suite in the amd64 image with the worktree copied over `/app` (`--entrypoint sh`; `.dockerignore` drops tests/docs), under `config.settings_dev_sqlite`. Validate releases with `python tools/validate_project_release_manifest.py --tag vX.Y.Z --repository debeski/dlux-crm`.
+- Read-only reference sources: `~/Desktop/depy/pkg-django-lux/main` (DjangoLux), `~/Desktop/depy/app-composer/main` (Composer README).
 ### Global Rulesets:
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
-- v0.11.0 deployed in currency-switch at :84 via ./start.sh -d --build --skip-config; migrations/static complete, 20 running-image SQLite currency/alias tests + checks pass. DB backup /tmp/crm-sales-dev-before-v0.11.0.dump; source backups .xclude/deploy-before-v0.11.0; no extra currency permission.
-- 2026-10-18: Live dev now runs from this `sales_edition/main` checkout at http://localhost:84 via `./start.sh -d --build --skip-config`; existing sales volumes retained, migrations/static completed, HTTP 200 and all 9 services ready. Refreshed to v0.11.3 with opening-stock drafts; startup log `/tmp/crm-opening-draft-dev-refresh.log`.
+- Branch `feat/dlux-1-16-1` (upstream set): push only that branch (`git push origin feat/dlux-1-16-1`), never `main`; merge/tag/release only with the owner's go-ahead (given for Phase B once 1.16.3 + Composer 1.10.3 are stable). Owner said "proceed" for the v0.13.0 release on 2026-11-23. Composer 1.10.x uses `agent run`/`executor run` (the 1.16.3 scaffold emits it too).
+- Testbed `~/Desktop/depy/testbeds/crm-sales`: stop what you start, `docker update --restart=no`; one heavy Docker job at a time.
 ### References and Links:
-- Dlux source: `../../pkg-django-lux`; release guide: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`.
+- Releasing: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`; bundle: `deploy/README.md`; PR: https://github.com/debeski/dlux-crm/pull/2.

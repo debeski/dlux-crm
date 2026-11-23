@@ -109,3 +109,14 @@ class BulkMachineAssignmentForm(forms.Form):
             field.widget.choices = field.choices
         set_field_attrs(self)
         build_grid_helper(self, [("products",), ("machines",)])
+
+    def clean(self):
+        cleaned_data = super().clean()
+        from common.access import crosses_scope
+
+        machines = list(cleaned_data.get("machines") or ())
+        if any(crosses_scope(product, *machines) for product in cleaned_data.get("products") or ()):
+            self.add_error("machines", t(
+                "machine_assign_other_store", "A product and a machine belong to different stores.",
+            ))
+        return cleaned_data

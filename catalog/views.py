@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -282,6 +283,9 @@ class ProductCardView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
             .order_by("-created_at", "-pk")[:30]
         )
         ctx["price_lyd"] = self.object.selling_price_lyd()
+        # Cost and markup are a manager's figures: the edit form already needs
+        # change_product, so the card shows them on the same condition.
+        ctx["can_view_cost"] = self.request.user.has_perm("catalog.change_product")
         from automotive.services import fitment_label
         from automotive.settings import get_automotive_config
 
@@ -376,6 +380,7 @@ class StockMovementListView(ScopedListView):
         if (
             user.has_perm("catalog.add_purchaseinvoice")
             and user.has_perm("catalog.add_product")
+            and user.has_perm("catalog.change_product")
             and user.has_perm("catalog.add_stockmovement")
         ):
             actions.append({
@@ -414,6 +419,7 @@ class PurchaseInvoiceListView(ScopedListView):
         if not (
             user.has_perm("catalog.add_purchaseinvoice")
             and user.has_perm("catalog.add_product")
+            and user.has_perm("catalog.change_product")
             and user.has_perm("catalog.add_stockmovement")
         ):
             return []
@@ -478,23 +484,33 @@ class StockTakeCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     raise_exception = True
     template_name = "catalog/stock_take_form.html"
 
-    def _products(self):
-        return Product.objects.filter(is_active=True, track_stock=True).order_by("name")
+    def _rows(self):
+        products = (
+            Product.objects.filter(is_active=True, track_stock=True)
+            .prefetch_related(Prefetch("variants", queryset=ProductVariant.objects.order_by("color", "size", "pk")))
+            .order_by("name")
+        )
+        return [
+            {"product": product, "variant": variant, "system_qty": system_qty,
+             "input_name": StockTakeLine.input_name(product, variant)}
+            for product, variant, system_qty in StockTakeLine.count_rows(products)
+        ]
 
     def get(self, request):
-        return render(request, self.template_name, {"products": self._products()})
+        return render(request, self.template_name, {"rows": self._rows()})
 
     def post(self, request):
-        products = list(self._products())
         with transaction.atomic():
+            rows = self._rows()  # snapshot at save time, inside the transaction
             take = StockTake(notes=request.POST.get("notes", ""))  # count_date defaults to today
             take.save()
-            for p in products:
+            for row in rows:
                 StockTakeLine.objects.create(
                     stock_take=take,
-                    product=p,
-                    system_qty=p.stock_qty,
-                    counted_qty=_parse_qty(request.POST.get(f"count_{p.pk}")),
+                    product=row["product"],
+                    variant=row["variant"],
+                    system_qty=row["system_qty"],
+                    counted_qty=_parse_qty(request.POST.get(row["input_name"])),
                 )
             log_user_action(request, "CREATE", instance=take)
         messages.success(request, _("Stock take %(no)s saved.") % {"no": take.number})
@@ -512,7 +528,7 @@ class StockTakeDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailVie
         ctx = super().get_context_data(**kwargs)
         take = self.object
         rate = get_current_rate()
-        lines = list(take.lines.select_related("product"))
+        lines = list(take.lines.select_related("product", "variant"))
         for ln in lines:
             ln.variance_lyd = ln.variance_value_lyd(rate)
         ctx["lines"] = lines

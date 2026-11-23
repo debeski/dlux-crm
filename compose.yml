@@ -1,26 +1,24 @@
 name: sales
 
 x-environment:
-  # Database settings
+  # Settings shared by the application services (db has its own, below).
   &de
   # The stack contract schema this file was written for (DjangoLux docs/stack-schema.md).
-  DLUX_STACK_SCHEMA: "4"
+  DLUX_STACK_SCHEMA: "5"
   WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
   POSTGRES_DB: "${POSTGRES_DB:-sales_db}"
   POSTGRES_PORT: "5432"
   POSTGRES_HOST: "db"
-  # Redis / Celery
+  # Redis (cache) and the project Celery task (finance.tasks.refresh_market_rates)
   REDIS_URL_DB: "redis://redis:6379/1"
   CELERY_BROKER_URL: "redis://redis:6379/2"
   CELERY_RESULT_BACKEND: "redis://redis:6379/3"
-  # Backup settings
-  BACKUP_INTERVAL: "${BACKUP_INTERVAL:-680400}"
   # Web app settings (override these in compose.dev.yml or .env)
   # Django/DLux owns the public/staff path split on the canonical host.
   # The legacy erp.<domain> host may redirect to /staff/ at Caddy.
-  ALLOWED_HOSTS: "${ALLOWED_HOSTS:-web,localhost,127.0.0.1,switchlibya.ly,www.switchlibya.ly,erp.switchlibya.ly,caddy}"
-  ALLOWED_URLS: "${ALLOWED_URLS:-https://switchlibya.ly,https://www.switchlibya.ly}"
-  BASE_URL: "${BASE_URL:-https://switchlibya.ly}"
+  ALLOWED_HOSTS: "${ALLOWED_HOSTS:-web,localhost,127.0.0.1,caddy}"
+  ALLOWED_URLS: "${ALLOWED_URLS:-http://localhost}"
+  BASE_URL: "${BASE_URL:-http://localhost}"
   DEBUG_STATUS: "${DEBUG_STATUS:-False}"
   # DjangoLux verified inline updater (generated Compose deployments only)
   DLUX_INLINE_UPDATES_ENABLED: "True"
@@ -33,6 +31,20 @@ x-environment:
   EMAIL_USE_TLS: "False"
   EMAIL_USE_SSL: "False"
   DEFAULT_FROM_EMAIL: "${DEFAULT_FROM_EMAIL:-webmaster@localhost}"
+  # The relay's provider settings. Shared so the Email step can show what the
+  # relay uses; the password itself reaches smtp-relay only, web gets set/unset.
+  # SMTP_RELAY_USE_SSL empty: SSL on port 465, STARTTLS (SMTP_RELAY_USE_TLS) otherwise.
+  SMTP_RELAY_HOST: "${SMTP_RELAY_HOST:-smtp.gmail.com}"
+  SMTP_RELAY_PORT: "${SMTP_RELAY_PORT:-587}"
+  SMTP_RELAY_USE_TLS: "${SMTP_RELAY_USE_TLS:-True}"
+  SMTP_RELAY_USE_SSL: "${SMTP_RELAY_USE_SSL:-}"
+  SMTP_RELAY_USER: "${SMTP_RELAY_USER:-}"
+  SMTP_RELAY_PASSWORD_SET: "${SMTP_RELAY_PASSWORD:+yes}"
+  # The relay signs in only to a provider whose certificate a trusted CA issued for
+  # its host. SMTP_RELAY_CA_FILE adds a private CA (see smtp-relay below);
+  # SMTP_RELAY_TLS_VERIFY=False switches the check off.
+  SMTP_RELAY_TLS_VERIFY: "${SMTP_RELAY_TLS_VERIFY:-True}"
+  SMTP_RELAY_CA_FILE: "${SMTP_RELAY_CA_FILE:-}"
 
 services:
   db:
@@ -42,8 +54,10 @@ services:
       org.dlux.restart: "protected"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Only what Postgres reads, not the shared x-environment block: a new image
+    # tag or stack schema stamp there must not recreate the database.
     environment:
-      <<: *de
+      POSTGRES_DB: "${POSTGRES_DB:-sales_db}"
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_pass}
     healthcheck:
@@ -85,11 +99,12 @@ services:
       DJANGO_SETTINGS_MODULE: "config.settings"
       SMTP_RELAY_LISTEN_HOST: "0.0.0.0"
       SMTP_RELAY_LISTEN_PORT: "1025"
-      SMTP_RELAY_HOST: "${SMTP_RELAY_HOST:-smtp.gmail.com}"
-      SMTP_RELAY_PORT: "${SMTP_RELAY_PORT:-587}"
-      SMTP_RELAY_USE_TLS: "${SMTP_RELAY_USE_TLS:-True}"
-      SMTP_RELAY_USER: "${SMTP_RELAY_USER:-}"
       SMTP_RELAY_PASSWORD: "${SMTP_RELAY_PASSWORD:-}"
+    # A provider certificate from a private CA: save the CA bundle as
+    # .secrets/smtp-relay-ca.pem, uncomment these two lines and set
+    # SMTP_RELAY_CA_FILE=/etc/dlux/smtp-relay-ca.pem in .secrets/.env.
+    # volumes:
+    #   - ./.secrets/smtp-relay-ca.pem:/etc/dlux/smtp-relay-ca.pem:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 1025), 5).close()"]
       interval: 30s
@@ -111,13 +126,17 @@ services:
       - "${HTTPS_PORT:-443}:443"
     environment:
       # Canonical Django/DLux host(s), space-separated; Caddy auto-provisions certs.
-      # e.g. "switchlibya.ly www.switchlibya.ly"
-      CADDY_SITE_ADDRESS: "${CADDY_SITE_ADDRESS:-switchlibya.ly www.switchlibya.ly}"
+      # e.g. "crm.example.com www.crm.example.com". Set it in .secrets/.env; the
+      # default serves plain HTTP on any host name.
+      CADDY_SITE_ADDRESS: "${CADDY_SITE_ADDRESS:-:80}"
       # Optional legacy ERP hostname redirected to CADDY_PRIMARY_URL/staff/.
-      CADDY_ERP_ADDRESS: "${CADDY_ERP_ADDRESS:-erp.switchlibya.ly}"
-      CADDY_PRIMARY_URL: "${CADDY_PRIMARY_URL:-https://switchlibya.ly}"
+      CADDY_ERP_ADDRESS: "${CADDY_ERP_ADDRESS:-http://erp.localhost}"
+      CADDY_PRIMARY_URL: "${CADDY_PRIMARY_URL:-http://localhost}"
       # Max upload size (Caddy units, e.g. 10MB).
       CADDY_MAX_SIZE: "${CADDY_MAX_SIZE:-10MB}"
+      # Trusted front proxy (TLS terminator): unset trusts every private address,
+      # a space-separated list trusts only those, empty trusts none.
+      DLUX_FRONT_PROXY: "${DLUX_FRONT_PROXY-private_ranges}"
     volumes:
       - ./.proxy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data        # certs + ACME account — MUST persist across restarts
@@ -183,13 +202,29 @@ services:
     networks:
       - internal
 
-  celery:
+  worker:
     image: ${WEB_IMAGE:-debeski/dlux-crm:sales}
     restart: always
     labels:
       org.dlux.restart: "safe"
-    command: ["python", "-m", "dlux.updater.supervisor", "--", "python", "-m", "celery", "-A", "config", "worker", "-B", "--loglevel=info"]
+    # DjangoLux's task worker: queued tasks and DLUX_TASK_SCHEDULE, including
+    # the write-side loop dlux.tasks.dlux_state_tick (small JSON writes on the
+    # runtime volume, which is why this service mounts it rw).
+    command: ["python", "-m", "dlux.updater.supervisor", "--", "python", "manage.py", "dlux_worker"]
+    # dlux_worker lets running tasks finish for up to 25 s after SIGTERM.
+    stop_grace_period: 30s
     entrypoint: ["/app/entrypoint.sh"]
+    # Init containers (Compose 5.3+): runtime reconcile, then migrations, each in
+    # its own ephemeral container that must exit 0 before this service starts.
+    # `web` does not declare them and does not depend on this service: it waits
+    # on the migrations themselves (see entrypoint.sh).
+    # They live here rather than on `web` because dlux_reconcile writes the
+    # runtime pointer and a step inherits its service's mounts, which are
+    # read-only on web.
+    # DLUX_BOOT_GATE=off is required: a step inherits the entrypoint, whose gate
+    # waits for the very migrations these steps apply.
+    # DLUX_MIGRATOR_FLAGS is how a deploy's -mm / -nm / -a reach a hook that is
+    # otherwise static in this file; Composer sets it in the compose environment.
     pre_start:
       - environment:
           DLUX_BOOT_GATE: "off"
@@ -197,6 +232,47 @@ services:
       - environment:
           DLUX_BOOT_GATE: "off"
         command: ["sh", "-c", "python -m dlux.updater.supervisor --no-watch -- python manage.py migrator ${DLUX_MIGRATOR_FLAGS:-}"]
+    volumes:
+      - static:/app/staticfiles:rw
+      - ./media/:/app/media:rw
+      - ./logs/:/app/logs:rw
+      - dlux_runtime:/opt/dlux-runtime:rw
+    environment:
+      <<: *de
+      # This is the service that applies migrations. pre_start is the fast path;
+      # `apply` covers the restart-policy restart Compose skips it on, where web
+      # and worker would otherwise both wait for a migration nothing was left to run.
+      DLUX_BOOT_GATE: "apply"
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_pass}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local_secret}
+      ADMIN_PASS: ${ADMIN_PASS:-admin}
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "dlux_worker", "--check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # Project-only Celery (finance.tasks.refresh_market_rates: the exchange-rate
+  # scrape, beat every 3 hours and once at start). DjangoLux's own work runs on
+  # `worker`; this service stays until the project moves its task to
+  # dlux.taskrunner (Celery goes away in DjangoLux 1.17). It runs no migrations:
+  # it waits on the ones `worker` applies (entrypoint.sh).
+  celery:
+    image: ${WEB_IMAGE:-debeski/dlux-crm:sales}
+    restart: always
+    labels:
+      org.dlux.restart: "safe"
+    command: ["python", "-m", "dlux.updater.supervisor", "--", "python", "-m", "celery", "-A", "config", "worker", "-B", "--loglevel=info"]
+    entrypoint: ["/app/entrypoint.sh"]
     volumes:
       - static:/app/staticfiles:rw
       - ./media/:/app/media:rw
@@ -227,7 +303,9 @@ services:
 
   # DjangoLux Composer agent start
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    # Pinned by digest, the same reference Composer's check --fix enforces: this
+    # image holds the host's docker.sock, so whoever can move a tag is root here.
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     restart: always
     labels:
       org.dlux.restart: "protected"
@@ -282,6 +360,11 @@ services:
       - "2"
     environment:
       WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
+      # The login for a private WEB_IMAGE registry (a read-only deploy token in
+      # .secrets/.env); empty for a public image. The executor's pulls use it.
+      COMPOSER_REGISTRY_USERNAME: "${COMPOSER_REGISTRY_USERNAME:-}"
+      COMPOSER_REGISTRY_PASSWORD: "${COMPOSER_REGISTRY_PASSWORD:-}"
+      COMPOSER_REGISTRY_HOST: "${COMPOSER_REGISTRY_HOST:-}"
       COMPOSER_EXECUTOR_SOCKET: "/run/composer-exec/composer-exec.sock"
       COMPOSER_VERSION_LABEL: "org.dlux_crm.dlux_baked_version"
       COMPOSER_RELEASE_MANIFEST_LABEL: "org.dlux.project.release-manifest"
@@ -290,7 +373,7 @@ services:
       COMPOSER_STATUS_FILE: "/opt/dlux-runtime/state/deploy-status.json"
       COMPOSER_WATCH_SELF_SERVICE: "composer-executor"
       COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,docker-socket-proxy,db,redis"
-      COMPOSER_AGENT_RESTART_SERVICES: "web,celery,smtp-relay,caddy"
+      COMPOSER_AGENT_RESTART_SERVICES: "web,worker,celery,smtp-relay,caddy"
     volumes:
       - "${PWD}:${PWD}:ro"
       - dlux_runtime:/opt/dlux-runtime:rw
@@ -329,6 +412,10 @@ services:
     environment:
       DOCKER_HOST: "tcp://docker-socket-proxy:2375"
       WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
+      # The same login, for the update check.
+      COMPOSER_REGISTRY_USERNAME: "${COMPOSER_REGISTRY_USERNAME:-}"
+      COMPOSER_REGISTRY_PASSWORD: "${COMPOSER_REGISTRY_PASSWORD:-}"
+      COMPOSER_REGISTRY_HOST: "${COMPOSER_REGISTRY_HOST:-}"
       COMPOSER_CONTROL_URL: "${COMPOSER_CONTROL_URL:-}"
       COMPOSER_ENROLLMENT_TOKEN: "${COMPOSER_ENROLLMENT_TOKEN:-}"
       COMPOSER_AGENT_STATE_DIR: "/var/lib/composer-agent"
@@ -340,7 +427,7 @@ services:
       COMPOSER_STATUS_FILE: "/opt/dlux-runtime/state/deploy-status.json"
       COMPOSER_WATCH_SELF_SERVICE: "composer-agent"
       COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,docker-socket-proxy,db,redis"
-      COMPOSER_AGENT_RESTART_SERVICES: "web,celery,smtp-relay,caddy"
+      COMPOSER_AGENT_RESTART_SERVICES: "web,worker,celery,smtp-relay,caddy"
     volumes:
       - "${PWD}:${PWD}:ro"
       - dlux_runtime:/opt/dlux-runtime:rw
@@ -359,7 +446,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  pgadmin_data:
   static:
   dlux_runtime:
   composer_agent_state:
@@ -373,12 +459,12 @@ networks:
   frontend:
     driver: bridge
   # Outbound internet for the narrow set of services that need it: smtp-relay
-  # (→ your SMTP provider), dlux-updater (→ PyPI), composer-agent (→ registry).
+  # (→ your SMTP provider) and composer-agent (→ registry, PyPI, rate sources).
   # Separate from `frontend` so the internet-facing proxy shares no network with
   # them; nothing may sit on both.
   egress:
     driver: bridge
-  # Inter-service traffic with NO internet access — db, redis, web, celery, …
+  # Inter-service traffic with NO internet access — db, redis, web, worker, celery, …
   internal:
     internal: true
   # Isolated path from composer-agent to the docker-socket-proxy only.

@@ -412,6 +412,14 @@ class BulkFitmentForm(forms.Form):
             return cleaned_data
         if not self.fit_rows:
             self.add_error("fits", t("fits_bulk_need_vehicle", "Add at least one vehicle."))
+            return cleaned_data
+        from common.access import crosses_scope
+
+        references = [value for row in self.fit_rows for value in row.values() if hasattr(value, "scope_id")]
+        if any(crosses_scope(product, *references) for product in cleaned_data.get("products") or ()):
+            self.add_error("products", t(
+                "fits_bulk_other_store", "A product and a vehicle belong to different stores.",
+            ))
         return cleaned_data
 
 

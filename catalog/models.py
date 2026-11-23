@@ -1,5 +1,5 @@
 """
-Catalog domain models — everything Switch can put on an invoice.
+Catalog domain models — everything the store can put on an invoice.
 
 Two sellable families:
   * ``Product``  — stock items (smart locks, spare parts, unrelated goods).
@@ -908,14 +908,18 @@ class StockTake(ScopedModel):
         if self.status != self.STATUS_OPEN:
             raise ValidationError("Only an open stock take can be applied.")
         with transaction.atomic():
-            for line in self.lines.select_related("product"):
+            for line in self.lines.select_related("product", "variant"):
                 variance = line.variance
                 if variance in (None, Decimal("0.00"), 0):
                     continue
                 if not line.product.track_stock:
                     continue
+                # A line counts one colour/size bucket, so its adjustment moves
+                # that bucket and the product total together; a line without a
+                # bucket is stock held outside any bucket and moves the total only.
                 StockMovement.objects.create(
                     product=line.product,
+                    variant=line.variant,
                     movement_type=StockMovement.TYPE_ADJUST,
                     quantity=variance,  # signed delta counted − system
                     reason=f"Stock take {self.number}",
@@ -927,12 +931,21 @@ class StockTake(ScopedModel):
 
 
 class StockTakeLine(models.Model):
-    """One product counted within a StockTake. ``system_qty`` is the snapshot
-    taken when the line was created; ``counted_qty`` is the physical count
-    (``None`` = not counted). Managed through the parent take."""
+    """One counted stock bucket within a StockTake.
+
+    A product with colour/size buckets gets a line per bucket, plus a line
+    without a bucket for any quantity its total holds outside them; a product
+    without buckets gets one line. ``system_qty`` is the snapshot taken when the
+    line was created; ``counted_qty`` is the physical count (``None`` = not
+    counted). Managed through the parent take.
+    """
 
     stock_take = models.ForeignKey(StockTake, on_delete=models.CASCADE, related_name="lines")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_take_lines", verbose_name="Product")
+    variant = models.ForeignKey(
+        ProductVariant, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="stock_take_lines", verbose_name="Variant",
+    )
     system_qty = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="System Qty")
     counted_qty = models.DecimalField(
         max_digits=12, decimal_places=2, null=True, blank=True,
@@ -943,13 +956,43 @@ class StockTakeLine(models.Model):
         verbose_name = "Stock Take Line"
         verbose_name_plural = "Stock Take Lines"
         default_permissions = ()  # managed through the parent StockTake
-        ordering = ["product__name"]
+        ordering = ["product__name", "variant__color", "variant__size", "variant_id"]
         constraints = [
-            models.UniqueConstraint(fields=["stock_take", "product"], name="uniq_stocktake_product"),
+            models.UniqueConstraint(fields=["stock_take", "product", "variant"], name="uniq_stocktake_bucket"),
+            models.UniqueConstraint(
+                fields=["stock_take", "product"], condition=models.Q(variant__isnull=True),
+                name="uniq_stocktake_product_unbucketed",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.product.name}: {self.counted_qty}/{self.system_qty}"
+        return f"{self.label}: {self.counted_qty}/{self.system_qty}"
+
+    @property
+    def label(self):
+        if self.variant_id:
+            return f"{self.product.name} — {self.variant.display_label}"
+        return self.product.name
+
+    @classmethod
+    def count_rows(cls, products):
+        """``(product, variant, system_qty)`` for every bucket a take counts."""
+        rows = []
+        for product in products:
+            buckets = list(product.variants.all())
+            if not buckets:
+                rows.append((product, None, product.stock_qty))
+                continue
+            for bucket in buckets:
+                rows.append((product, bucket, bucket.stock_qty))
+            outside = product.stock_qty - sum((bucket.stock_qty for bucket in buckets), Decimal("0"))
+            if outside:
+                rows.append((product, None, outside))
+        return rows
+
+    @staticmethod
+    def input_name(product, variant):
+        return f"count_{product.pk}_{variant.pk if variant else 0}"
 
     @property
     def variance(self):

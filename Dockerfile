@@ -8,8 +8,9 @@ ENV PYTHONUNBUFFERED=1
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies for Postgres and general tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies for Postgres and general tools. `upgrade` pulls the
+# Debian security fixes published after the base image was built.
+RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     libffi-dev \
@@ -22,10 +23,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies from requirements.txt
+# Install python dependencies from requirements.txt, then remove pip: nothing
+# in the running stack calls it (Composer unpacks inline releases itself), and
+# its vendored packages are what image scanners flag. `python -m ensurepip`
+# brings it back in a derived image that needs it.
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    python -m pip uninstall --yes pip
 
 # Surface the baked DjangoLux version as an image label so an external updater
 # (composer's preflight version gate) can refuse to recreate onto an image
@@ -40,7 +44,7 @@ ARG DLUX_PROJECT_RELEASE_MANIFEST=""
 LABEL org.dlux.project.release-manifest="${DLUX_PROJECT_RELEASE_MANIFEST}"
 
 # The stack contract schema this Dockerfile was written for.
-LABEL org.dlux.stack-schema="4"
+LABEL org.dlux.stack-schema="5"
 
 # Copy the project files
 COPY . /app/

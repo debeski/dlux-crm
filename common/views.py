@@ -728,7 +728,11 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             from catalog.models import Product
 
             user = self.request.user
-            machines = scope_filtered_queryset(VehicleModel.objects.all(), user).count()
+            # The same vehicle models the browser offers: active, of an active make,
+            # and not moved to machinery.
+            machines = scope_filtered_queryset(
+                VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True), user,
+            ).count()
             fitted = scope_filtered_queryset(
                 Product.objects.filter(
                     is_active=True, automotive_fitments__isnull=False, automotive_fitments__deleted_at__isnull=True,
@@ -857,7 +861,7 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
         user_key = getattr(self.request.user, "pk", "anonymous") or "anonymous"
         ctx.update({
             "workspace_tiles": tiles,
-            "workspace_storage_key": f"switch.workspace.dashboard.v1.{user_key}",
+            "workspace_storage_key": f"sales_crm.workspace.dashboard.v1.{user_key}",
             "workspace_tile_count": len(tiles),
         })
         return ctx

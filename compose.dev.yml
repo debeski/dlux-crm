@@ -1,5 +1,5 @@
 # Development override for compose.yml
-# dlux stack schema 4
+# dlux stack schema 5
 # Usage: docker compose -f compose.yml -f compose.dev.yml up
 
 name: sales
@@ -44,6 +44,23 @@ services:
       BASE_URL: "http://localhost:84"
       DEBUG_STATUS: "True"
       NGINX_PORT: "84"
+
+  worker:
+    build: .
+    image: !reset null
+    volumes: !override
+      - ./automotive:/app/automotive:rw
+      - ./machinery:/app/machinery:rw
+      - ./catalog:/app/catalog:rw
+      - ./common:/app/common:rw
+      - ./config:/app/config:rw
+      - ./finance:/app/finance:rw
+      - ./public_catalog:/app/public_catalog:rw
+      - ./sales:/app/sales:rw
+      - static:/app/staticfiles:rw
+      - ./media/:/app/media/:rw
+      - ./logs/:/app/logs:rw
+      - dlux_runtime:/opt/dlux-runtime:rw
 
   celery:
     build: .

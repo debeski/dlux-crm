@@ -5,6 +5,7 @@ from django.forms import inlineformset_factory
 from dlux.translations import get_strings
 from dlux.utils import set_field_attrs
 
+from common.access import apply_ownership
 from common.forms import QUANTITY_INPUT_ATTRS, build_grid_helper, translate_choice_fields, translate_help_text
 
 from .models import Customer, Delivery, Invoice, InvoiceItem, Payment
@@ -15,6 +16,17 @@ User = get_user_model()
 def _staff_queryset():
     """Active users eligible to be picked as a salesperson / courier."""
     return User.objects.filter(is_active=True).order_by("first_name", "username")
+
+
+def attachable_deposits(user):
+    """Cash-deposit batches ``user`` may add a payment to.
+
+    Only pending batches (a confirmed or rejected deposit's amount is settled), and
+    only the user's own unless they hold ``view_all_cashdeposit``.
+    """
+    from finance.models import CashDeposit
+
+    return apply_ownership(CashDeposit.objects.filter(status=CashDeposit.STATUS_PENDING), user)
 
 
 class CustomerForm(forms.ModelForm):
@@ -53,6 +65,11 @@ class InvoiceForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["customer"].required = False
+        # The hidden FK is filled by JS from the datalist, which lists only the
+        # user's own customers; a posted id outside that book is rejected rather
+        # than copied onto the invoice (name, phone and address are read from it).
+        if user is not None:
+            self.fields["customer"].queryset = apply_ownership(Customer.objects.all(), user)
         # The salesperson picker is manager-only (assign_salesperson). For a
         # regular rep the field is dropped entirely — the invoice defaults to
         # them (Invoice.save / the editor view), so they can't reassign it away.
@@ -172,9 +189,15 @@ class PaymentForm(forms.ModelForm):
         fields = ["amount", "method", "deposit", "notes"]
         widgets = {"deposit": forms.HiddenInput()}
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["deposit"].required = False
+        if user is not None:
+            deposits = attachable_deposits(user)
+            if self.instance.pk and self.instance.deposit_id:
+                # Keep the batch the payment already belongs to selectable.
+                deposits = deposits | type(self.instance.deposit).objects.filter(pk=self.instance.deposit_id)
+            self.fields["deposit"].queryset = deposits.distinct()
         strings = get_strings()
         self.fields["deposit_ref"].label = strings.get("label_payment_deposit", "Cash Deposit")
         if self.instance.pk and self.instance.deposit_id:
@@ -193,7 +216,11 @@ class PaymentForm(forms.ModelForm):
 class DeliveryForm(forms.ModelForm):
     """Dynamic-modal form for the delivery board. The ``assigned_to`` courier
     picker is dispatcher-only (``assign_delivery``); a courier editing their own
-    job can update the status/notes but not hand it to someone else."""
+    job can update the status/notes but not hand it to someone else, nor change
+    where or what it delivers."""
+
+    #: Fields only a dispatcher may change on an existing delivery.
+    DISPATCH_FIELDS = ("invoice", "recipient", "phone", "address", "scheduled_date")
 
     refresh_parent = True
 
@@ -214,6 +241,13 @@ class DeliveryForm(forms.ModelForm):
             self.fields["assigned_to"].queryset = _staff_queryset()
         else:
             self.fields.pop("assigned_to", None)
+        if self.instance.pk and not can_assign:
+            # A disabled field keeps the stored value whatever is posted.
+            for name in self.DISPATCH_FIELDS:
+                self.fields[name].disabled = True
+        elif user is not None:
+            # Only invoices the user may see can be linked.
+            self.fields["invoice"].queryset = apply_ownership(Invoice.objects.all(), user)
         set_field_attrs(self)
         translate_choice_fields(self)
         translate_help_text(self)

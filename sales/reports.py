@@ -119,6 +119,8 @@ def build_sales_report_xlsx(report):
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
+    from dlux.utils.spreadsheets import append_text_safe_row
+
     wb = Workbook()
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill("solid", fgColor="0D6EFD")
@@ -140,6 +142,8 @@ def build_sales_report_xlsx(report):
     ws = wb.active
     ws.title = "Summary"
     ws["A1"] = f"{store_name() or 'Sales'} — Sales Report"
+    if ws["A1"].data_type == "f":
+        ws["A1"].data_type = "s"
     ws["A1"].font = title_font
     ws["A2"] = f"Period: {report['date_from']} → {report['date_to']}"
     rows = [
@@ -161,7 +165,7 @@ def build_sales_report_xlsx(report):
         sheet.append(headers)
         style_header(sheet)
         for r in data_rows:
-            sheet.append(r)
+            append_text_safe_row(sheet, r)
         for col_idx in money_cols:
             for row in sheet.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx):
                 for cell in row:

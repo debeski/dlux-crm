@@ -197,6 +197,18 @@ class Invoice(ScopedModel):
         """Only drafts may have their lines / header changed."""
         return self.status == self.STATUS_DRAFT
 
+    def delete(self, *args, **kwargs):
+        """Only a draft may be deleted.
+
+        An issued invoice has drawn stock and may carry payments; deleting it
+        (DjangoLux's record modal offers delete to any holder of delete_invoice)
+        would leave both standing. It is cancelled instead, which restores the
+        stock and settles its payments.
+        """
+        if self.status != self.STATUS_DRAFT:
+            raise ValidationError(_("Only a draft invoice can be deleted. Cancel an issued invoice instead."))
+        return super().delete(*args, **kwargs)
+
     @property
     def status_label(self):
         """Localized status label for the active request language."""
@@ -242,7 +254,7 @@ class InvoiceItem(models.Model):
     """A single line on an invoice. Prices are snapshots frozen at line creation.
 
     A line is a Product, a Service, or a free-text "custom" line (for the
-    occasional unrelated goods Switch resells). ``description`` is always stored
+    occasional unrelated goods the store resells). ``description`` is always stored
     so the printed invoice never changes if the source product is later renamed.
     """
 

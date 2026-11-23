@@ -7,7 +7,7 @@ Two surfaces:
     products chooses their own layout; persisted to their profile preferences.
   * A section of the superuser **CRM options** tile (`common.dlux_options`) that
     sets the shop-wide *default* layout, saved to
-    `SystemSettings.extra_config['app']['switch_pos.products_layout']`. The
+    `SystemSettings.extra_config['app']['sales_crm.products_layout']`. The
     per-user pick overrides it; otherwise everyone gets this default.
 """
 from dlux.options import register_app_settings, register_card
@@ -63,7 +63,7 @@ def _context(request):
 
 
 register_card(
-    id="switch_pos.products_layout",
+    id="sales_crm.products_layout",
     title=_title,
     template_name="catalog/options/products_layout_card.html",
     icon="bi-grid-3x3-gap",

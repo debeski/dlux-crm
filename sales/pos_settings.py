@@ -2,7 +2,7 @@ from copy import deepcopy
 from decimal import Decimal, InvalidOperation
 
 
-POS_NS = "switch_pos.point_of_sale"
+POS_NS = "sales_crm.point_of_sale"
 
 POS_METHODS = ("cash", "card", "bank_transfer")
 RECEIPT_SIZES = ("none", "58", "80", "a4")

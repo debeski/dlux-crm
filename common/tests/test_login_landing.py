@@ -25,8 +25,8 @@ class LoginLandingTests(TestCase):
         settings.save(update_fields=["is_configured"])
         # Saved settings are cached; the test's rollback does not reach the cache.
         self.addCleanup(cache.clear)
-        write_app_system_config("switch_pos.point_of_sale", {"enabled": True})
-        write_app_system_config("switch_pos.optional_enhancements", {"automotive": {"enabled": True}})
+        write_app_system_config("sales_crm.point_of_sale", {"enabled": True})
+        write_app_system_config("sales_crm.optional_enhancements", {"automotive": {"enabled": True}})
         self.seller = User.objects.create_user("counter-seller", password=PASSWORD)
         self.seller.user_permissions.add(*Permission.objects.filter(
             content_type__app_label__in=["sales", "catalog", "automotive"],

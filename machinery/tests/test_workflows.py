@@ -192,7 +192,14 @@ class MachineryWorkflowTests(TestCase):
         vehicle = VehicleModel.objects.create(make=make, name="Legacy F8", alias="Old local name")
         product = Product.objects.create(name="Legacy part", stock_qty=7)
         ProductFitment.objects.create(product=product, vehicle_model=vehicle)
-        write_app_system_config(OPTIONAL_ENHANCEMENTS_NS, {"automotive": {"enabled": True, "terminology": "equipment"}})
+        # The migration ran before the settings moved to sales_crm.*, so it reads the old key.
+        # A queryset update: saving the settings row would rename the old key.
+        from dlux.models import SystemSettings
+
+        row = SystemSettings.load()
+        extra = dict(row.extra_config or {})
+        extra["app"] = {**extra.get("app", {}), "switch_pos.optional_enhancements": {"automotive": {"enabled": True, "terminology": "equipment"}}}
+        SystemSettings.objects.filter(pk=row.pk).update(extra_config=extra)
         migrate = import_module("machinery.migrations.0002_separate_legacy_machines").migrate_machines
         from django.db import connection
         from django.db.migrations.executor import MigrationExecutor

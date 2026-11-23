@@ -57,7 +57,10 @@ class CashDepositReviewView(LoginRequiredMixin, PermissionRequiredMixin, View):
     raise_exception = True
 
     def post(self, request, pk, decision):
-        deposit = get_object_or_404(CashDeposit, pk=pk)
+        deposit = get_object_or_404(apply_ownership(CashDeposit.objects.all(), request.user), pk=pk)
+        if deposit.status != CashDeposit.STATUS_PENDING:
+            messages.error(request, _("This cash deposit has already been decided."))
+            return redirect("finance:cash_deposit_list")
         if decision == "confirm":
             deposit.confirm(request.user)
             log_user_action(request, "CONFIRM", instance=deposit)

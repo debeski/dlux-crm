@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404, JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -18,6 +18,13 @@ from .pos_settings import enabled_methods, get_pos_config
 from .views import _visible_invoices
 
 POS_PERMS = ("sales.use_pos", "sales.add_invoice", "sales.issue_invoice", "sales.add_payment")
+#: What the vehicle browser itself needs; the till's "By vehicle" panel asks the same.
+VEHICLE_LOOKUP_PERMS = (
+    "automotive.view_vehiclemake",
+    "automotive.view_vehiclemodel",
+    "automotive.view_productfitment",
+    "catalog.view_product",
+)
 
 
 class PosEnabledMixin(LoginRequiredMixin, PermissionRequiredMixin):
@@ -39,6 +46,10 @@ def _automotive_on():
     return get_automotive_config()["enabled"]
 
 
+def _vehicle_lookup_allowed(user):
+    return _automotive_on() and user.has_perms(VEHICLE_LOOKUP_PERMS)
+
+
 class TillView(PosEnabledMixin, RibbonPageMixin, TemplateView):
     template_name = "sales/pos/till.html"
     page_title_key = "pos_till_title"
@@ -48,6 +59,7 @@ class TillView(PosEnabledMixin, RibbonPageMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         config = self.pos_config
         user = self.request.user
+        vehicle_lookup = _vehicle_lookup_allowed(user)
         context.update({
             "pos_config": config,
             "pos_methods": enabled_methods(config),
@@ -55,8 +67,8 @@ class TillView(PosEnabledMixin, RibbonPageMixin, TemplateView):
                 "lookup": reverse("sales:pos_lookup"),
                 "checkout": reverse("sales:pos_checkout"),
                 "receipt": reverse("sales:pos_receipt", args=[0]),
-                "vehicle": reverse("sales:pos_vehicle") if _automotive_on() else "",
-                "vehicleSearch": reverse("automotive:vehicle_search") if _automotive_on() else "",
+                "vehicle": reverse("sales:pos_vehicle") if vehicle_lookup else "",
+                "vehicleSearch": reverse("automotive:vehicle_search") if vehicle_lookup else "",
                 "addProduct": reverse("scoped_modal_manager", args=["catalog", "product", "new"])
                 if user.has_perm("catalog.add_product") else "",
                 "receiptSize": config["receipt_size"],
@@ -141,6 +153,8 @@ class VehicleProductsView(PosEnabledMixin, View):
     def get(self, request):
         if not _automotive_on():
             raise Http404
+        if not request.user.has_perms(VEHICLE_LOOKUP_PERMS):
+            raise PermissionDenied
         from automotive.browser import VehicleBrowser
         from automotive.settings import get_automotive_config
 

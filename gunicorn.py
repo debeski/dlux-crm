@@ -1,4 +1,4 @@
-# dlux stack schema 4
+# dlux stack schema 5
 
 # Number of worker processes
 workers = 3

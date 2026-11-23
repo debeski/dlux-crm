@@ -2,7 +2,7 @@
 Finance domain models.
 
 This app is the monetary foundation of the system. Everything that needs to
-convert between USD (how Switch imports & thinks about cost) and LYD (how Switch
+convert between USD (how the store imports and thinks about cost) and LYD (how it
 sells locally) reuses the single global black-market exchange rate defined here.
 
 Layering: ``finance`` has no dependency on ``catalog`` or ``sales`` — they depend

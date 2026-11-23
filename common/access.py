@@ -35,6 +35,20 @@ def user_can_view_all(user, model):
     return user.has_perm(view_all_perm(model))
 
 
+def crosses_scope(record, *references):
+    """True when a reference row belongs to another store scope than ``record``.
+
+    Reference rows without a scope (global vehicle or machine data) fit every
+    store. Scoped querysets keep ordinary users inside their scope; a superuser
+    sees every scope, so links between records are checked here as well.
+    """
+    scope = getattr(record, "scope_id", None)
+    return any(
+        reference is not None and getattr(reference, "scope_id", None) not in (None, scope)
+        for reference in references
+    )
+
+
 def apply_ownership(queryset, user):
     """Restrict ``queryset`` to rows ``user`` owns, unless the model is shared or
     the user may view all. Safe to call on any queryset — a model without

@@ -1,6 +1,6 @@
 """
 Generated with django-lux 1.2.1.
-Project name: switch-pos.
+Project name: dlux-crm-sales.
 Generated on: 2026-06-22.
 """
 import os
@@ -37,7 +37,7 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
         "ALLOWED_HOSTS",
-        "web,nginx,caddy,localhost,127.0.0.1,switchlibya.ly,www.switchlibya.ly,erp.switchlibya.ly",
+        "web,caddy,localhost,127.0.0.1",
     ).split(",")
     if host.strip()
 ]
@@ -74,8 +74,8 @@ SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week
-SESSION_COOKIE_NAME = 'switch_pos_sessionid'
-CSRF_COOKIE_NAME = 'switch_pos_csrftoken'
+SESSION_COOKIE_NAME = 'sales_crm_sessionid'
+CSRF_COOKIE_NAME = 'sales_crm_csrftoken'
 CSRF_COOKIE_SAMESITE = "Lax"
 LOGIN_URL = "login"
 
@@ -84,8 +84,6 @@ DLUX_CONFIG = {
     "public_root": True,
     "public_root_split_enabled": True,
     "public_root_url": "/",
-    "public_root_title": "Switch Libya",
-    "public_root_meta_description": "Smart locks, access control, installation and after-sale services from Switch Libya.",
     "show_titlebar_on_public": False,
     "show_sidebar_on_public": False,
 }
@@ -146,7 +144,7 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "switch_pos_db"),
+        "NAME": os.getenv("POSTGRES_DB", "sales_db"),
         "USER": os.getenv("POSTGRES_USER", "admin"),
         "PASSWORD": get_secret("POSTGRES_PASSWORD", "POSTGRES_PASSWORD") or "admin_pass",
         "HOST": os.getenv("POSTGRES_HOST", "db"),

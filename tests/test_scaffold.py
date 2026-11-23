@@ -1,6 +1,6 @@
 """
 Generated with django-lux 1.2.1.
-Project name: switch-pos.
+Project name: dlux-crm-sales.
 Generated on: 2026-06-22.
 """
 import base64
@@ -16,6 +16,11 @@ from tools.validate_project_release_manifest import (
     encode_project_release_manifest_label,
     validate_project_release_manifest,
 )
+
+
+def service_block(compose, name):
+    services = re.search(r"^services:\n(.*?)(?=^\S|\Z)", compose, re.M | re.S).group(1)
+    return re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  \S|\Z)", services, re.M | re.S).group(1)
 
 
 class ProjectScaffoldTests(SimpleTestCase):
@@ -84,6 +89,9 @@ class ProjectScaffoldTests(SimpleTestCase):
             re.MULTILINE,
         )
         self.assertIsNotNone(requirement)
+        self.assertEqual(requirement.group("version"), "1.16.3")
+        self.assertEqual(contents.count("django-lux"), 1, "one pin line, no wheel URL beside it")
+        self.assertNotIn("files.pythonhosted.org", contents)
 
         dev_compose = (project_root / "compose.dev.yml").read_text(encoding="utf-8")
         self.assertNotIn("DLUX_BAKED_VERSION", dev_compose)
@@ -148,3 +156,70 @@ class ProjectScaffoldTests(SimpleTestCase):
                 tag="v0.0.0",
                 repository="debeski/dlux-crm",
             )
+
+    def test_worker_runs_dlux_tasks_beside_the_project_celery_service(self):
+        project_root = Path(__file__).resolve().parents[1]
+        compose = (project_root / "compose.yml").read_text(encoding="utf-8")
+        worker = service_block(compose, "worker")
+        celery = service_block(compose, "celery")
+        self.assertIn('"python", "manage.py", "dlux_worker"]', worker)
+        self.assertIn('"dlux_worker", "--check"]', worker)
+        self.assertIn("stop_grace_period: 30s", worker)
+        self.assertIn('DLUX_BOOT_GATE: "apply"', worker)
+        self.assertIn("pre_start:", worker)
+        self.assertIn("dlux_reconcile", worker)
+        self.assertIn("manage.py migrator", worker)
+        self.assertIn("dlux_runtime:/opt/dlux-runtime:rw", worker)
+        self.assertIn('"-m", "celery", "-A", "config", "worker", "-B"', celery)
+        self.assertNotIn("pre_start:", celery)
+        self.assertNotIn("DLUX_BOOT_GATE", celery)
+        self.assertIn("dlux_runtime:/opt/dlux-runtime:rw", celery)
+        self.assertNotIn("- egress", celery, "the rate scrape goes through the Composer relay")
+        self.assertIn("      - internal", celery)
+        self.assertEqual(compose.count('COMPOSER_AGENT_RESTART_SERVICES: "web,worker,celery,smtp-relay,caddy"'), 2)
+
+    def test_db_environment_is_not_the_shared_application_block(self):
+        compose = (Path(__file__).resolve().parents[1] / "compose.yml").read_text(encoding="utf-8")
+        db = service_block(compose, "db")
+        self.assertNotIn("<<: *de", db)
+        self.assertIn("POSTGRES_DB:", db)
+        self.assertNotIn("DLUX_STACK_SCHEMA", db)
+        self.assertNotIn("WEB_IMAGE", db)
+
+    def test_boot_gate_lets_only_the_worker_apply_migrations(self):
+        project_root = Path(__file__).resolve().parents[1]
+        entrypoint = (project_root / "entrypoint.sh").read_text(encoding="utf-8")
+        for marker in (
+            'case "${DLUX_BOOT_GATE:-on}" in',
+            "  off)",
+            "  apply)",
+            "manage.py migrate --check",
+            "manage.py migrate --noinput",
+            'exec "$@"',
+        ):
+            self.assertIn(marker, entrypoint, marker)
+        self.assertNotIn("DLUX_BOOT_GATE", service_block(
+            (project_root / "compose.yml").read_text(encoding="utf-8"), "web"))
+
+    def test_front_proxy_is_trusted_through_dlux_front_proxy_and_never_set_in_shipped_files(self):
+        project_root = Path(__file__).resolve().parents[1]
+        caddy = (project_root / ".proxy" / "Caddyfile").read_text(encoding="utf-8")
+        compose = (project_root / "compose.yml").read_text(encoding="utf-8")
+        template = (project_root / "deploy" / "env.template").read_text(encoding="utf-8")
+        self.assertIn("trusted_proxies static {$DLUX_FRONT_PROXY:private_ranges}", caddy)
+        self.assertIn('DLUX_FRONT_PROXY: "${DLUX_FRONT_PROXY-private_ranges}"', service_block(compose, "caddy"))
+        self.assertIn("\n# DLUX_FRONT_PROXY=", template)
+        self.assertNotRegex(template, r"(?m)^DLUX_FRONT_PROXY=")
+
+    def test_resident_composer_commands_use_the_run_form(self):
+        compose = (Path(__file__).resolve().parents[1] / "compose.yml").read_text(encoding="utf-8")
+        self.assertRegex(service_block(compose, "composer-agent"), r"command:\n      - agent\n      - run\n")
+        self.assertRegex(service_block(compose, "composer-executor"), r"command:\n      - executor\n      - run\n")
+
+    def test_cross_site_gate_exempts_exactly_the_public_storefront_folders(self):
+        caddy = (Path(__file__).resolve().parents[1] / ".proxy" / "Caddyfile").read_text(encoding="utf-8")
+        gate = re.search(r"@cross_site_request expression <<CEL\n(.*?)\n\t*CEL", caddy, re.S).group(1)
+        self.assertIn("respond @cross_site_request 403", caddy)
+        exempt = re.findall(r'"/media/([^"*]+)\*"', gate)
+        self.assertEqual(sorted(exempt), sorted(django_settings.DLUX_PUBLIC_MEDIA))
+        self.assertLess(caddy.index("respond @cross_site_request 403"), caddy.index("handle /media/* {"))

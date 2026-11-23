@@ -1,6 +1,6 @@
 """
 Generated with django-lux 1.2.1.
-Project name: switch-pos.
+Project name: dlux-crm-sales.
 Generated on: 2026-06-22.
 """
 import os
@@ -12,7 +12,7 @@ from celery.signals import worker_ready
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
-app = Celery("switch_pos")
+app = Celery("sales_crm")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.conf.broker_connection_retry_on_startup = True
 app.autodiscover_tasks()

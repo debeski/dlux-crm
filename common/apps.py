@@ -35,3 +35,13 @@ class CommonConfig(AppConfig):
 
         post_save.connect(sync_wording, sender="dlux.SystemSettings", dispatch_uid="common_sync_wording")
         post_migrate.connect(refresh_wording, sender=self, dispatch_uid="common_refresh_wording")
+
+        # The stored settings moved from switch_pos.* to sales_crm.* (common.0001);
+        # keep an old copy from surviving in the cache or being saved back.
+        from django.db.models.signals import pre_save
+
+        from .settings_namespaces import drop_stale_cache, rename_on_save
+
+        pre_save.connect(rename_on_save, sender="dlux.SystemSettings", dispatch_uid="common_settings_rename")
+        post_migrate.connect(drop_stale_cache, sender=self, dispatch_uid="common_settings_cache")
+        drop_stale_cache()

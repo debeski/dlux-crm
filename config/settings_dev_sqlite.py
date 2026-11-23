@@ -12,7 +12,7 @@ from .settings import *  # noqa: F401,F403
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": str(Path(tempfile.gettempdir()) / "switch_pos_dev.sqlite3"),
+        "NAME": str(Path(tempfile.gettempdir()) / "sales_crm_dev.sqlite3"),
     }
 }
 

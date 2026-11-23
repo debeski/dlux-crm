@@ -5,7 +5,7 @@ from common.i18n import lazy_t
 # The store-wide settings of catalog, public_catalog and sales are sections of
 # this one tile (register_app_settings(group=CRM_OPTIONS_GROUP)); each still
 # saves its own namespace.
-CRM_OPTIONS_GROUP = "switch_pos.crm_options"
+CRM_OPTIONS_GROUP = "sales_crm.crm_options"
 
 register_app_settings_group(
     id=CRM_OPTIONS_GROUP,

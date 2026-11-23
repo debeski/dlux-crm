@@ -1,41 +1,125 @@
-# Machinery categorization — client diagram
+# Sales CRM — Machinery Categorization
 
-Source: `sales_edition/catagories.pdf`. Accepted customer interpretation: Repair is a billable service; ZOOM is a model under CIFA. Only F8 is expanded in the paper.
+Machinery compatibility is an optional enhancement, switched on in System Settings
+→ **Optional enhancements** → **Machinery compatibility**. It is independent of
+vehicle compatibility, which keeps its own switch and its own year, chassis/generation,
+engine, trim, fuel, transmission and position criteria. Machinery has none of those
+qualifiers, and enabling it does not change vehicle wording. Settings,
+permissions and URLs of both enhancements are in [AUTOMOTIVE_FITMENT.md](AUTOMOTIVE_FITMENT.md).
 
-## Machinery workflow
+The flow is **Machine type → Manufacturer → Model → Category branch → Parts or services**.
 
-The independent Machinery enhancement uses **Machine type → Manufacturer → Model → Category branch → Parts or services**. Enable it from Optional enhancements. Vehicle compatibility has its own toggle and retains its year, generation, engine, trim, fuel, transmission and position criteria. Machinery has none of those qualifiers, and enabling it does not rewrite vehicle labels.
+## Machine records
 
-`machinery.MachineType`, `Manufacturer` and `MachineModel` are scoped records. Adding a machine requires only machine type; manufacturer, model name, local alias and category branches are optional. Machines without a manufacturer appear directly under their type in the browser and remain searchable and assignable. Labels omit empty details; the same type/manufacturer/model-name combination cannot be duplicated, including blank details. Products and services can fit multiple models; the compatibility relation does not duplicate a product, SKU, stock ledger or price. Compatibility is edited from the existing product/service modals, under those records' existing create/change permissions and the machine-model lookup permission. Purchase/opening-stock rows can add compatible machines under the existing intake permissions. Their expandable picker sits in a separate row beneath the item fields, spanning the visible editor width. Searchable horizontal chips fill that width inside a bounded scrolling area; expanding compatibility does not change the height or alignment of the item fields. Purchase-invoice vehicle fitment chips and inline search suggestions use the same compact wrapping and height limit. Intake adds compatibility without clearing previous links.
+`machinery.MachineType`, `Manufacturer` and `MachineModel` are scoped records with an
+Active flag. A machine model needs only a machine type; manufacturer, model name,
+local alias and category branches are optional. A label is the filled details joined
+by ` / ` (for example `Concrete pump & mixer / CIFA / F8`). At most one machine exists
+per machine type, manufacturer and model name (case-insensitive), blank details
+included. Machines without a manufacturer appear directly under their type in the
+browser and stay searchable and assignable. Reference lists offer View and Edit on
+each row; a record is switched inactive instead of deleted.
 
-`catalog.Category.parent` creates a reusable tree. `Category.is_service` marks service-only leaves; Repair is seeded with it, stock forms reject it, and that browser branch offers only service entry. A category containing existing stock items cannot be switched to service-only. Existing categories remain root nodes. Category forms reject cycles and scope mismatches, and their parent selector excludes the current node and its descendants. Choice labels and the category list show full paths. Selecting a parent in the product filter or machine browser includes its descendants. Opening-stock workbook categories accept full paths such as `Hydraulic / Pump / Piston`; ambiguous bare leaf names are rejected.
+Products and services can fit several machine models. The link is a plain
+many-to-many relation: it carries no engine, trim or year data and does not
+duplicate a product, SKU, stock ledger or price. A vehicle model that a machine
+references through `legacy_vehicle_model` is hidden from vehicle screens.
 
-The browser shows only active scoped vocabulary and compatible active items. Category branches assigned to a model can appear before any parts have been stocked. Parts and services require their respective catalog view permissions. Adding an item from a branch preselects its category and compatible machine. Product cards and product/service detail modals show compatible machines when the enhancement and lookup permission are enabled. Disabling Machinery hides its fields/navigation and rejects its direct CRUD/browser routes; stored compatibility remains intact.
+Compatibility is edited with the **Compatible machines** picker in the Product and
+Service modals, under the record's own add or change permission plus
+`machinery.view_machinemodel`; the Service form shows its Category selector only
+while machinery is on. Purchase-invoice and opening-stock rows carry the same picker
+in a separate row under the item fields; posting or finalizing adds links to the
+created or reused product and never clears existing ones. **Assign machines** on the Products ribbon
+opens `/staff/machinery/assign/`, an additive modal that needs `catalog.view_product`,
+`catalog.change_product` and `machinery.view_machinemodel`; it lists only active
+machines and writes an audit entry per product.
 
-## Client vocabulary
+## Categories
 
-Run `python manage.py seed_machine_categories` (or `--scope ID` for a scoped store). The command is atomic and idempotent; ambiguous existing categories stop it without a partial seed.
+`catalog.Category.parent` makes a reusable tree. Choice labels and the category list
+show full paths (`Hydraulic / Pump / Piston`). Category forms reject cycles and a
+parent from another scope, and the parent selector of a saved category excludes the
+category and its descendants. Selecting a parent in the Products category filter or
+the machine browser includes its descendants.
 
-- Concrete pump & mixer → CIFA → F8 / F9 / HPG / ZOOM.
-- F8 category branches: Hydraulic / Control / S-valve / Hopper / Seal kit.
-- Hydraulic: Pump / Motor / Valve / Accumulator / Instruments / Repair.
-- Pump: Gear / Piston / Vane / Charge / Tandem / Spare part.
-- Hydraulic / Repair contains a maintenance service named Repair, quoted per job until the store sets a price. It does not create stock.
+`Category.is_service` marks service-only categories. Product and intake forms do not
+offer them and product validation rejects them; the browser offers only service entry
+inside such a branch. A category that already holds stock items cannot be switched to
+service-only.
 
-No real products, stock quantities, prices or compatible parts are invented. F9, HPG and ZOOM have no assumed category branches or fitments. Assign shared branches or actual parts explicitly when their compatibility is known.
+Opening-stock workbook category cells accept a name or a full path such as
+`Hydraulic / Pump / Piston` (separator `/`). A name that matches more than one
+category is rejected as ambiguous, and an unknown category is a blocking error.
 
-## Migration and local deployment
+## Browsing machinery
 
-`catalog.0011` adds the category hierarchy and service category; `catalog.0012` adds the service-only category flag. `machinery.0001` creates machinery vocabulary and compatibility; `machinery.0002` copies legacy equipment-type models, aliases and compatible products, preserving the original automotive rows. In a store formerly configured with equipment wording, all old models are copied, the machinery toggle inherits the previous enabled value, and vehicle compatibility is turned off with vehicle wording restored. Model-based and shared-engine compatibility become simple machine-model links. Original engine/trim/year data is retained for recovery but is not used by the machine flow.
+- **Machines Hub** (`/staff/machinery/`): cards for Browse machinery, Machine types,
+  Manufacturers, Machine models, Category branches, Parts and Services, each shown
+  only to users who hold its view permission. The hub has a ribbon description.
+- **Browse machinery** (`/staff/machinery/browse/`, needs view on machine types,
+  manufacturers and machine models). The path is in the query: `type`,
+  `manufacturer`, `model`, `category`; `q` searches parts by name, alias, SKU or
+  barcode, extra barcodes included (services by name). The type step lists
+  manufacturers and manufacturer-less models; the model step lists models with their
+  local aliases; then category branches narrow the result.
+- **Find a machine** jump search (`/staff/machinery/models/search/?q=`): two or more
+  characters, every word must match a model name, alias, manufacturer or machine
+  type, up to 20 results.
+- Only active vocabulary and compatible active items in the user's scope are shown.
+  For a selected model the browser offers its assigned branches with their
+  descendants, plus the branches (with their ancestors) of its compatible items, so
+  branches appear even when no part is stocked. Parts need `catalog.view_product` and
+  services `catalog.view_service`.
+- With a model selected, **Add part** and **Add service** open the catalog modals with
+  the category and machine preselected, for users who may add them.
+- Parts open the product card. A service shows its price, or **Per job** when it has
+  none, a service badge and no stock badge.
+- The pages reuse the vehicle browser's hub and product partials, stylesheets,
+  jump-search widget, breadcrumbs, choice grid and item cards. Both browse search
+  forms opt out of assisted entry.
 
-The migration adds machine lookup permissions to existing Sales Representatives and lookup/create/change permissions to Sales Managers, without replacing their other grants. `seed_roles` includes the same permissions for future setup.
+Product and service detail modals and the product card list the compatible machines
+while machinery is on and the user holds `machinery.view_machinemodel`. Subject to
+permissions, the Products ribbon shows **Browse machinery** when only machinery is on
+and **Assign machines** whenever it is on; with both enhancements on it offers only
+**Assign vehicles** and **Assign machines**.
 
-Development compose mounts `./machinery` into web and Celery alongside the existing feature apps. Use the project `./start.sh` wrapper to rebuild/recreate the stack after adding the app, then seed the client vocabulary in the intended scope. Back up the database before migration.
+Switching machinery off hides its fields and navigation and answers its direct
+browser, list and modal routes with HTTP 404; stored compatibility stays intact.
+Saved sidebar entries pointing into a switched-off enhancement are hidden at render
+time by the project `crm_context` wrapper around the DLux context, empty groups are
+removed, and the saved order and labels return when it is switched on.
 
-Saved sidebar entries also obey enhancement switches at render time via the project `crm_context` wrapper around DLux context. Disabled vehicle/machinery entries and empty groups are hidden without removing their saved order or labels; re-enabling restores the configured links.
+## Settings card
 
-Machinery uses the vehicle hub and browser components: shared hub/product partials, existing automotive stylesheets, the same jump-search widget, breadcrumbs, choice grid and responsive item cards. The scoped `machinery:model_search` endpoint returns active model/type/manufacturer paths and aliases for that picker. Parts open the operational product card; Repair uses the matching card surface with service/per-job pricing and no stock badge. Reference modals use the existing form-grid helper.
+The Optional enhancements card always renders the machinery block and its **Manage
+machinery** action, built like the vehicle block (same dependent-settings component,
+Manage-button builder and live event handler). Switching machinery off greys the
+block at once and switching it on restores its controls. Each Manage action stays
+disabled until the enabled state is saved, then follows the toggle on the open form.
+Vehicle year, engine and transmission are always on; only machine type,
+chassis/generation, fuel type, trim and part position have switches.
 
-Vehicles Hub and Machines Hub use translated navigation titles; Machines Hub includes its ribbon description. Both browse search forms opt out of assisted entry. Products show Browse + Assign for a single active enhancement and only Assign vehicles + Assign machines when both are active, subject to permissions. `machinery:bulk_assign` is an additive scoped modal using the shared vehicle template and DLux searchable selectors. It requires `catalog.view_product`, `catalog.change_product` and `machinery.view_machinemodel`; existing links remain, inactive/cross-scope choices are rejected, and updates are audited. Disabled machine links use the same saved/cached sidebar guard as vehicles.
+## Seeded vocabulary
 
-The Optional enhancements settings form always renders the machinery settings block and Manage action. It uses the same dependent-settings component, Manage-button builder and live event handler as vehicles: switching off greys the block immediately; switching on restores its controls immediately. Both Manage actions require first-time activation to be saved, then react instantly to toggles on the open form. Machine type is required when adding a machine; manufacturer and model name are optional. Vehicle year, engine and transmission are always enabled; only machine type, chassis/generation, fuel type, trim and part position have optional switches. Normalization restores those required criteria for legacy configurations that disabled them. The settings form omits both Staff browsing path cards and separates Manage machinery from the automotive card with bottom spacing.
+`python manage.py seed_machine_categories` (or `--scope ID` for one store scope;
+without it the records are global) is atomic and idempotent. A duplicate of a seeded
+category name under the same parent stops it without a partial seed.
+
+- Machine type **Concrete pump & mixer**, manufacturer **CIFA**, models **F8**, **F9**,
+  **HPG** and **ZOOM**.
+- F8 category branches: Hydraulic, Control, S-valve, Hopper, Seal kit.
+- Hydraulic: Pump, Motor, Valve, Accumulator, Instruments, Repair.
+- Pump: Gear, Piston, Vane, Charge, Tandem, Spare part.
+- Hydraulic / Repair is a service-only category holding the maintenance service
+  **Repair**, linked to F8 and quoted per job until the store sets a price.
+
+The command creates no products, stock, prices or compatible parts. F9, HPG and ZOOM
+have no category branches or fitments; branches are assigned in the machine model modal
+and parts with Assign machines or the Product modal.
+
+## Roles
+
+`seed_roles` gives the Sales Representative view on machine types, manufacturers and
+machine models, and the Sales Manager view, add and change on them.

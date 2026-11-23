@@ -1,34 +1,71 @@
-# Switch POS — Architecture
+# Sales CRM — Architecture
 
-A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.10.1)**.
-It is a single Django/DLux project with a public catalog surface and an authenticated
-staff workflow. DjangoLux provides users, permissions, sidebar/titlebar/navbar UI,
-dynamic modals, audit trail, soft-delete, reports, backups and notifications — this
-project adds the Switch sales/catalog/finance domain plus the public catalog projection.
+Sales CRM is a web-based sales system (منظومة مبيعات) built on **DjangoLux** (the pinned
+version is in `requirements.txt`). It is a single Django/DLux project with a public catalog
+surface and an authenticated staff workflow. DjangoLux provides users, permissions,
+sidebar/titlebar/navbar UI, dynamic modals, audit trail, soft-delete, reports, backups and
+notifications; this project adds the sales, catalog and finance domain plus the public
+catalog projection.
 
 ## Apps & dependency layering
 
 ```
-finance   (money foundation: exchange rate, cash deposits, expenses, staff accounts)
+finance          (money foundation: exchange rates, cash deposits, expenses, staff accounts and ledger)
    ▲
-catalog   (products, services, stock ledger) — uses finance for conversion
-   ▲                         ▲
-sales     (customers,       automotive (optional vehicle compatibility;
-           invoices,        references Product, never changes stock identity)
-           payments)
-
-public_catalog (curated public listings linked to catalog Product/Service)
+catalog          (categories, products, services, purchasing, stock ledger) — uses finance for conversion
+   ▲                       ▲                        ▲
+sales                automotive               public_catalog
+(customers,          (optional vehicle        (curated public listings
+ invoices,            compatibility;           linked to catalog
+ payments,            references Product,      Product / Service)
+ deliveries, POS)     never changes stock
+                      identity)
+                           ▲
+                      machinery
+                      (optional machine compatibility; references Product, Service and
+                       Category, with an optional link to automotive.VehicleModel)
 ```
 
-Lower layers **never** import higher ones. The stock ledger references invoices by
-their string number (not a FK) so `catalog` stays independent of `sales`.
+Model-level dependencies run one way, from the upper apps down to `finance`. The stock
+ledger references sales invoices by their string number (`StockMovement.reference`), not by
+a foreign key, so `catalog` stays independent of `sales`. Where a lower app has to reach an
+upper one it imports at call time inside the function: `catalog` forms, views and filters
+reach the optional `automotive` and `machinery` extensions, and `finance.currency` reaches
+`catalog` and `sales` models when the default currency changes.
+
+App-level settings live in DjangoLux's app-settings store,
+`SystemSettings.extra_config['app'][<namespace>]`, and per-user preferences in
+`Profile.preferences['app'][<key>]`. These namespaces and keys use the prefix
+`sales_crm.` (for example `sales_crm.pricing`, `sales_crm.point_of_sale`). Stores
+installed under the product's earlier name held them as `switch_pos.*`; the data
+migration `common/migrations/0001_sales_crm_settings_namespaces.py` moves both JSON
+columns to the new keys (and back on reverse).
+
+| Key | Owner | Holds |
+| --- | --- | --- |
+| `sales_crm.pricing` | `finance` | Default currency and the both-currencies flag |
+| `sales_crm.optional_enhancements` | `automotive` | Machinery and Automotive switches, Automotive criteria and wording mode |
+| `sales_crm.point_of_sale` | `sales` | Till switch, accepted methods, discount cap, receipt size |
+| `sales_crm.public_catalog` | `public_catalog` | Public-site switch, shop identity, contact endpoints, shop and homepage live flags, featured limit |
+| `sales_crm.public_homepage` | `public_catalog` | Homepage Builder configuration |
+| `sales_crm.products_layout` | `catalog` | Shop-wide default Products layout; also the per-user preference key |
+| `sales_crm.workspace_dashboard.v1` | `common` | Per-user Workspace dashboard layout (preference key) |
+| `sales_crm.crm_options` | `common` | Id of the CRM options group (no stored value of its own) |
+
+Four features are switchable: Automotive and Machinery (Optional enhancements), Point of
+sale, and the Public site. While one is off, its routes answer 404 or redirect to the staff
+entry, its sidebar entries are hidden (a `sidebar_exclude` switch on the views;
+`common.context_processors.crm_context` also filters saved navigation for Automotive,
+Machinery and the public builders), and `common.permission_visibility` keeps its
+permissions out of the permission editors (the grants themselves are kept). Each switch
+defaults to off, except the Public site, which defaults to on.
 
 `automotive/` is an optional extension above `catalog`. Its make/model,
 generation, engine, trim and fitment tables reference `catalog.Product`, but no
 automotive fields exist on Product, ProductVariant, stock, purchasing or sales
-tables. `SystemSettings.extra_config['app']['switch_pos.optional_enhancements']`
-is the single shop-wide configuration source; the Automotive master switch
-defaults off, and its criteria affect only extension UI/query behavior.
+tables. `sales_crm.optional_enhancements` is the single shop-wide configuration source
+for both extensions; the Automotive criteria affect only extension UI/query behavior, and
+model year, engine and transmission are always on.
 When enabled, `/staff/automotive/` is the reference-data hub and the Product
 Item card is the reverse-lookup and fitment-maintenance entry point. Lookup
 lists reuse `ScopedListView` and DjangoLux modals; Product fitments use a custom
@@ -55,45 +92,55 @@ are the extension tables. The picker is one widget
 by the Product modal, the bulk *Assign vehicles* modal, purchase-invoice lines and
 the browser's *Find a vehicle* jump; it loads its own static and re-binds on
 `dlux:modal-content-loaded`.
-Heavy equipment reuses the same tables: `EquipmentType` groups models,
+Heavy equipment can reuse the same tables: `EquipmentType` groups models,
 `VehicleEngine.vehicle_model` may be blank for a shared engine linked to many
 models through `fitted_models`, and `ProductFitment.vehicle_model`/years may be
 blank (engine-only rows, all years). `VehicleBrowser._expanded_rows()` repeats an
 engine-only row once per fitted active model, so every later step counts and
-filters it like a model row. `automotive.terminology` derives the machine
-wording from the project's own strings and stores it in
-`SystemSettings.translations_override`.
+filters it like a model row. `automotive.terminology` registers the vehicle ↔ machine
+wording axis, derived from the project's own strings (see *Store wording*).
+Vehicle models that a `machinery.MachineModel` links to through `legacy_vehicle_model`
+are left out of the vehicle lists, pickers, filters and browser.
 
 `sales.pos` holds the till's lookup and `complete_sale` service; it builds an
-invoice with the editor's own pricing helper, then reuses `issue_invoice` and
-`Payment`, so the till adds no parallel sales model — only `PosSale` (retry key,
-cash given, change). Settings live in the `switch_pos.point_of_sale` app config
-(`sales.pos_settings`, card in `sales/dlux_options.py`). Phase 1 keeps the cart
-in the browser (localStorage) and sends it once at checkout; the till page,
-lookup, checkout, receipt and vehicle panel are under `/staff/sales/pos/`.
+invoice with the editor's own pricing helper (`_apply_item_price`), then reuses
+`issue_invoice` and `Payment`, so the till adds no parallel sales model — only
+`PosSale` (retry key, till name, cash tendered, change). Settings live in the
+`sales_crm.point_of_sale` app config (`sales.pos_settings`; form in
+`sales/pos_options_forms.py`, registered in `sales/dlux_options.py` as a section of
+the CRM options tile). While the till is off its routes answer 404; it needs
+`sales.use_pos` plus the invoice-add, invoice-issue and payment-add permissions, and a
+discount over the configured cap needs `sales.pos_unlimited_discount`. The cart stays in
+the browser (localStorage, per user) and is sent once at checkout; the till page,
+lookup, checkout, receipt and vehicle panel (Automotive only) are under `/staff/sales/pos/`.
 
-`common/` is a plain Python package (not a Django app, no models). It holds
-`ScopedListView`, `RibbonPageMixin` and the generic
-`common/templates/common/scoped_list.html` so every simple list page stays a few
-lines.
+`common/` is a Django app with no models. Its `ready()` registers the row-ownership
+filter for the dynamic-modal lookup, the permission-editor visibility and the wording
+signals. It holds `ScopedListView`, `RibbonPageMixin`, the generic
+`common/templates/common/scoped_list.html`, form/table/filter helpers, the translation
+and wording layer, protected stored-file serving, the CRM options group, the `asset`
+template tag and the Workspace dashboard, so every simple list page stays a few lines.
 
 ## Public/staff URL split
 
 The split is owned by Django URLconf and DLux settings, not by Caddy path routing.
-Caddy proxies `switchlibya.ly`/`www.switchlibya.ly` to Django; the optional legacy
-`erp.switchlibya.ly` host redirects to `https://switchlibya.ly/staff/`.
+Caddy proxies the hosts in `CADDY_SITE_ADDRESS` (set in `.secrets/.env`; the
+`compose.yml` default `:80` serves plain HTTP on any host) to Django; the optional
+legacy host in `CADDY_ERP_ADDRESS` redirects to `CADDY_PRIMARY_URL/staff/`.
 
 - Public routes: `/`, `/shop/`, `/shop/items/<slug>/`,
-  `/shop/items/<slug>/modal/`, and `/contact/modal/`.
+  `/shop/items/<slug>/modal/`, `/contact/modal/`, and the `/health/` probe.
 - Staff routes: `/staff/`, `/staff/accounts/...`, `/staff/sys/...`,
   `/staff/workspace/`, `/staff/catalog/`, `/staff/sales/`, `/staff/finance/`,
-  `/staff/automotive/` (when enabled), `/staff/shop-builder/`,
-  `/staff/shop-builder/homepage/`, `/staff/app-modals/...`, and `/staff/admin/`.
+  `/staff/automotive/` and `/staff/machinery/` (when enabled), `/staff/shop-builder/`,
+  `/staff/shop-builder/homepage/`, `/staff/files/...` and `/staff/app-modals/...`.
+  There is no Django admin site.
 - `dlux.urls` is mounted below `/staff/`, so `reverse("login")` resolves to
   `/staff/accounts/login/`; staff-only views still use normal Django auth
   (`LoginRequiredMixin`, permissions, and `LOGIN_URL = "login"`).
-- DLux `SystemSettings.home_url` is `/staff/workspace/`, while public-root settings
-  are enabled with public root URL `/`; logout lands on `/`.
+- `DLUX_CONFIG` in `config/settings.py` sets `home_url` to `/staff/workspace/` and enables
+  the public root at `/`; logout lands on `/`. `/staff/` itself redirects a signed-in user
+  to the Workspace dashboard and a signed-out one to the login page.
 
 `public_catalog.PublicCatalogListing` links exactly one internal `Product` or
 `Service` to a public slug and public copy. Public pages read from those linked
@@ -113,21 +160,25 @@ mounted via `public_catalog.staff_urls`), not Django admin. The builder lists ev
 active `Product`/`Service` — backed by its real `PublicCatalogListing` or an unsaved
 transient one — and its `POST`-only AJAX endpoints (`toggle-publish`, `update-listing`,
 `reorder`, `settings`, gated by `public_catalog.change_publiccataloglisting`) create/
-update listings, reorder featured items, and flip global storefront settings. Those
+update listings, reorder them, and flip global storefront settings. Those
 write endpoints never mutate on GET: passive probes return 204 and direct browser
 navigation redirects back to `/staff/shop-builder/`. They are marked
-`sidebar_exclude=True` so only `public_catalog_staff:builder` is discoverable for
-sidebar navigation. Global config lives in the DLux app-settings namespace
-`switch_pos.public_catalog`: the builders own the live toggles and featured limit,
-while the remaining DLux Options tile exposes only shop identity, contact endpoints,
-and new-listing show-price/show-availability defaults. When `shop_enabled` is off
-the public shop/detail/modal views return `coming_soon.html` with HTTP 503 — except
-staff with `view_publiccataloglisting`, who may preview the storefront while offline
-via `?preview=1`.
+`sidebar_exclude=True` so only the two builder pages (`public_catalog_staff:builder` and
+`public_catalog_staff:homepage_builder`) are discoverable for sidebar navigation. Global
+config lives in the DLux app-settings namespace `sales_crm.public_catalog`: the builders
+own the live toggles (the shop toggle in the shop builder, the homepage toggle in the
+Homepage Builder), and the `settings` endpoint also accepts the featured limit (default 4),
+which has no UI control. The *Public catalog* section of the CRM options tile exposes the
+Public site master switch, shop identity, contact endpoints, and the show-price/
+show-availability defaults applied to listings the builder creates. While the Public site is
+off, the builders and their endpoints are unavailable and the public pages redirect to the
+staff entry. When `shop_enabled` is off the public shop and item-detail views return
+`coming_soon.html` with HTTP 503 (the item modal answers 404) — except staff with
+`view_publiccataloglisting`, who may preview the storefront while offline via `?preview=1`.
 
 The **public landing page** is composed from the Homepage Builder
 (`/staff/shop-builder/homepage/`), a live-preview-iframe editor whose config lives in
-its own app-settings namespace `switch_pos.public_homepage` (`public_catalog/homepage.py`:
+its own app-settings namespace `sales_crm.public_homepage` (`public_catalog/homepage.py`:
 hero copy/CTA/background mode/overlay, primary and secondary accent colours, visual
 style preset, hero layout/height/focus, nav/card/density/background/motion treatments,
 and an ordered, toggleable list of sections — featured, categories, services, story,
@@ -147,13 +198,13 @@ and the rest emits class hooks consumed by `public_catalog.css`. The builder pre
 uses `?preview=1&lang=<code>` with a request-local language override: it renders the
 iframe's homepage content, direction, strings, and language-aware `APP_CONFIG` in the
 edited language without writing to the staff user's display-language session; normal
-public header `?lang=` clicks still persist in the visitor session. Its `homepage_save`
+public header `?lang=` clicks persist in the visitor session. Its `homepage_save`
 endpoint shares the same POST-only `mutation_endpoint` + `sidebar_exclude` treatment
 as the catalog builder. The Homepage Builder is the only UI surface for homepage
-copy, sections, visual style, and the homepage live toggle; its config still persists
-under `SystemSettings.extra_config['app']['switch_pos.public_homepage']` for backups
+copy, sections, visual style, and the homepage live toggle; its config persists
+under `SystemSettings.extra_config['app']['sales_crm.public_homepage']` for backups
 and settings exports. If `shop_enabled` is off while `homepage_enabled` remains on,
-homepage listing cards may still appear as public teasers, but they do not render
+homepage listing cards may appear as public teasers, but they do not render
 item-detail links or the Quick view item-modal button.
 
 Storefront text is localized like the staff UI: templates read `DLUX_STRINGS.public_*`
@@ -161,11 +212,11 @@ keys from `public_catalog/translations.py` (with the English text as the templat
 default), code-keyed labels such as availability and product/service kind resolve
 through `listing.availability_key` / `listing.source_kind_key` and dlux's `get_item`
 filter, and `contact_links()` / `PublicContactForm` use `common.i18n.t`. Homepage
-copy fields that still equal their English `HOMEPAGE_DEFAULTS` seed resolve to the
+copy fields that equal their English `HOMEPAGE_DEFAULTS` seed resolve to the
 visitor-language `hp_seed_<field>` string in `resolve_homepage()`; anything edited in
 the Homepage Builder is shown as saved.
 
-`PublicContactMessage` is the first public write path. Contact form posts carry a
+`PublicContactMessage` is the public write path. Contact form posts carry a
 stable hidden idempotency key enforced by a database unique constraint; repeated
 submits with the same key return success without creating a second row or sending
 a second email. Email delivery uses the public catalog contact recipient when
@@ -187,16 +238,18 @@ For **simple models** (products, services, categories, rates, deposits, customer
 - The list page's "Add" button and the `DluxTable` row context menu open those modals.
 
 `Product.stock_qty` and `ProductVariant.stock_qty` are running balances, applied once per movement by
-`StockMovement.save()` — the ledger is the source of truth and the column is a cache of it. Anything that writes
-movements in bulk therefore leaves the balance stale, which is why `catalog/stock_balance.py` rebuilds it from the
+`StockMovement.save()` — the ledger is the source of truth and the column is a cache of it. The ledger is
+append-only: `StockMovement.delete()` raises, and a movement is undone by posting a compensating one. Anything
+that writes movements in bulk leaves the balance stale, which is why `catalog/stock_balance.py` rebuilds it from the
 live ledger and runs on dlux's `data_reset_finished` signal. Call `rebuild_stock_balances()` after any other bulk
 write to that table.
 
-Images are held in the **dlux asset library**, never as a plain `ImageField`. `Product.image_asset`,
+Images are held in the **dlux asset library**. `Product.image_asset`,
 `Service.image_asset` and `PublicCatalogListing.image_override_asset` are `ManagedAssetField`s namespaced after
 their own model, so one model's photos stay out of another's picker; the listing override also `reads` the catalog
-pools because it exists to show a different shot of the same item. Always read `image_url`, never the field: the
-old columns stay populated until `adopt_image_assets --apply` has adopted every stored file.
+pools because it exists to show a different shot of the same item. The plain `image` / `image_override` columns
+remain readable fallbacks until `manage.py adopt_image_assets --apply` has adopted every stored file, so always
+read `image_url`, never either field.
 
 Every staff page carries the **dlux ribbon** — its title, description, filters
 and actions. A list gets it from `ScopedListView`; a page with no model, table or
@@ -208,10 +261,10 @@ both build their buttons by overriding `get_ribbon_action_specs()`. An action
 whose markup needs the page's own context (the homepage builder's live toggle,
 language switch and save status) is raw `html` and the view calls
 `refresh_ribbon(ctx)` at the end of `get_context_data`, because `RibbonMixin`
-otherwise builds the ribbon before a subclass has added anything.
+otherwise builds the ribbon ahead of anything a subclass adds to the context.
 
 A `.btn-group` inside the ribbon's action area needs
-`common/css/ribbon_actions.css` (already on `ScopedListView.base_styles`): the
+`common/css/ribbon_actions.css` (on `ScopedListView.base_styles`): the
 panel skin pills every action button individually, which breaks a segmented
 control into loose half-pills.
 
@@ -223,8 +276,9 @@ their in-stock `ProductVariant`s) and services (image or `service_type` icon);
 `invoice_editor.js` renders a filterable tile grid where a colour/size variant is
 picked *at add-time* and dropped into a cart list (`_invoice_cart_row.html`) with
 editable price/qty. The formset fields (`product/service/variant/color/size/kind`)
-are hidden inputs the picker fills; the server save path (`_apply_item_price` +
-the per-variant issue/cancel stock guard) is unchanged.
+are hidden inputs the picker fills; the server save path is `_apply_item_price`
+plus the per-variant stock guard in `issue_invoice` and the stock restoration in
+`cancel_invoice`.
 
 Naming convention is load-bearing: `<Model>Form`, `<Model>Table`, `<Model>Filter`
 let dlux discovery wire modals, tables and filters automatically.
@@ -235,10 +289,10 @@ The Products page renders three ways. The effective layout resolves
 **per-user override → global admin default → `table`**, in
 `catalog/product_layouts.py::get_products_layout(request)`:
 
-- **Per-user override** — `Profile.preferences['app']['switch_pos.products_layout']`
-  (a scalar; same app-preference store as the workspace dashboard).
+- **Per-user override** — `Profile.preferences['app']['sales_crm.products_layout']`
+  (a scalar; same app-preference store as the Workspace dashboard).
 - **Global admin default** — a superuser setting saved to
-  `SystemSettings.extra_config['app']['switch_pos.products_layout']['default_layout']`,
+  `SystemSettings.extra_config['app']['sales_crm.products_layout']['default_layout']`,
   edited in the *Products layout* section of the **CRM options** tile (see
   below) and read via `dlux.utils.get_app_system_config`.
 
@@ -246,11 +300,11 @@ The Products page renders three ways. The effective layout resolves
 
 - **table** — the full `ProductTable`.
 - **light** — a minimal `ProductLightTable` (name · price · stock · active); the
-  rest stays in the record's dlux detail modal (`Product.get_modal_context`).
+  rest stays on the Product *Item card* (`catalog:product_card`).
 - **grid** — `catalog/product_grid.html`, a store-style card grid (image, price,
-  stock, in-stock colour/size variants) whose Expand action opens the same dlux
-  detail modal the table rows use (`scoped_modal_manager … ?action=view`). Reuses
-  the table's filtered + paginated rows and the themed `.dlux-table-shell` surface.
+  stock, in-stock colour/size variants) whose *Details* button opens the same Item
+  card modal the table rows use. Reuses the table's filtered + paginated rows and
+  the themed `.dlux-table-shell` surface.
 
 Per-user switching has two surfaces sharing one component
 (`catalog/_products_layout_toggle.html`) and one script
@@ -259,30 +313,33 @@ Per-user switching has two surfaces sharing one component
 then reloads only after a successful save): an inline header toggle and a
 `/staff/sys/options` card registered with `dlux.options.register_card`
 (`catalog/dlux_options.py`, gated on `catalog.view_product`). The global default
-is the *Products layout* section of the **CRM options** tile. The shared
-`templates/common/scoped_list.html` exposes a `{% block list_body %}` so alternate
-layouts can replace the table body while keeping the header, filter and modal-CRUD
-wiring.
+is the *Products layout* section of the **CRM options** tile.
+`common/scoped_list.html` extends DjangoLux's `dlux/list_page.html` and adds a
+`scoped_before_ribbon` slot; the grid layout replaces the inherited
+`{% block list_body %}` while keeping the header, filter and modal-CRUD wiring.
 
 ### CRM options tile
 
 The store-wide settings are one **CRM options** tile on the Options page — a
-DjangoLux settings group (dlux ≥ 1.10.0). `common/dlux_options.py` registers
+DjangoLux settings group. `common/dlux_options.py` registers
 it with `register_app_settings_group(id=CRM_OPTIONS_GROUP)`
-(`switch_pos.crm_options`, order 50), and each app registers its settings with
-`register_app_settings(..., group=CRM_OPTIONS_GROUP)`: *Products layout*
-(`catalog`), *Public catalog* (`public_catalog`) and *Point of sale* (`sales`).
+(`sales_crm.crm_options`, order 50), and each app registers its settings with
+`register_app_settings(..., group=CRM_OPTIONS_GROUP)`: *Pricing currency*
+(`finance`, order 5), *Products layout* (`catalog`, 10), *Public catalog*
+(`public_catalog`, 20) and *Point of sale* (`sales`, 30).
 DjangoLux draws them as sections of one modal under its own section headings,
 validates them together and saves every namespace in **one** write of the
-settings row, so readers such as `get_pos_config()` are unchanged. The same
-registrations appear as sections of the first-run setup wizard's *Project
-settings* step. *Optional enhancements* (store types) stay a separate tile.
+settings row, so readers such as `get_pos_config()` read their own namespace
+directly. The same registrations appear as sections of the first-run setup
+wizard's *Project settings* step. *Optional enhancements*
+(`automotive/dlux_options.py`, order 70) is a separate tile.
 
 A settings form's `to_app_config()` must only *return* its value: the setup
 wizard saves the whole settings row once, so anything a form saves on its own
 is overwritten. Side effects that must follow a saved value hang off the row's
-`post_save` instead — the store wording does
-(`common.wording.sync_wording`).
+signals instead — the store wording does (`common.wording.sync_wording` on
+`post_save`) and so does the default-currency conversion
+(`finance.currency.convert_on_switch` on `pre_save`).
 
 Settings that depend on a master toggle follow dlux's rule that a disabled
 master locks its dependents rather than hiding them: `common/settings_forms.py`
@@ -290,48 +347,58 @@ wraps them in `dependent_block(form, master, …)` (greyed, with dlux's
 `settings_dependent_disabled` tooltip) and `lock_dependents()` disables the
 fields server-side while the master is off, so a save keeps their stored
 values. `common/js/dependent_settings.js` (loaded from
-`templates/dlux/includes/custom_scripts.html`) follows the toggle live.
+`common/templates/dlux/includes/custom_scripts.html`) follows the toggle live.
+
+## Workspace dashboard
+
+`common.views.WorkspaceDashboardView` (`/staff/workspace/`, `common:workspace_dashboard`)
+needs only a login: the server decides which tiles exist from the user's permissions and
+ownership scope (invoices, stock, finance, the exchange card built from `rate_overview()`,
+and quick actions that include the till and the vehicle and machinery browsers while those
+are enabled). Order, hidden state and size are saved per user in the app-preference
+namespace `sales_crm.workspace_dashboard.v1` through `update_app_preference`, with
+`localStorage` as the fallback (`common/js/workspace_dashboard.js`).
 
 ## Static assets
 
 Project CSS and JS are linked with `{% load asset_tags %}{% asset 'app/css/file.css' %}`,
 which appends a short hash of the file's contents. Caddy serves `/static/` as
 `immutable` for a year, so the URL must change whenever the file does; hand-written
-`?v=` stamps were forgotten, and `{% dlux_static %}` only changes with the DjangoLux
+`?v=` stamps are forgotten, and `{% dlux_static %}` only changes with the DjangoLux
 release. Keep `dlux_static` for DjangoLux's own files.
 
 ## Money & currency
 
 `finance/services.py` is the **single source of conversion math**:
 
-- `get_current_rate(currency=None)` — the live currency→LYD rate (newest
-  matching `ExchangeRate` row, cached independently for USD and EUR); without a
-  currency it is the store's **default currency** (`finance.currency`).
+- `get_current_rate(currency=None)` — the live currency→LYD rate: the newest
+  `ExchangeRate` row for the currency (cached for an hour, independently for USD and
+  EUR), else the cached market (EAN) quote, then the official (CBL) quote, then a fixed
+  fallback; without a currency it is the store's **default currency** (`pricing_currency()`).
 - `usd_to_lyd()` / `lyd_to_usd()` / `eur_to_lyd()` / `quantize_lyd()` —
-  conversions with consistent 2-dp rounding. The `usd` names are historic: like
+  conversions with consistent 2-dp rounding. The `usd` names are kept: like
   the `*_usd` columns they mean the associated record's foreign currency.
 - `rate_overview()` — both currencies' store, CBL and EAN rates with their
-  ages, for the Workspace exchange card and the Sales Overview.
+  ages, for the Workspace exchange card, the Sales Overview and the Exchange Rates page.
 
 `finance/currency.py` holds the default currency and `both_active` flag under
-`switch_pos.pricing`. Products store their own `currency`; `pricing_rate()` and
+`sales_crm.pricing`. Products store their own `currency`; `Product.pricing_rate()` and
 `selling_price_lyd()` resolve the product's rate. Purchase headers expose active
-currencies under the existing `catalog.add_purchaseinvoice` permission, rejecting
+currencies under the `catalog.add_purchaseinvoice` permission, rejecting
 inactive or unauthorized posted choices. Intake converts invoice-currency amounts
 into the target product currency; line snapshots remain in the invoice currency.
-`catalog.0010` backfills existing product currencies from persisted store settings,
-including soft-deleted products, without changing amounts. It removes recognized
-legacy currency-label overrides while preserving custom wording, and adds Product.alias;
-`automotive.0004` adds VehicleModel.alias.
+`Product.alias`, `MachineModel.alias` and `VehicleModel.alias` hold local names.
 
-`convert_on_switch` still re-expresses services and draft sales invoices inside a
-transaction before the new default is written. Product currencies/prices remain
-unchanged. `Invoice.currency` and `PurchaseInvoice.currency` default to the store
-currency; issued documents retain their snapshots. `sales.0011` adds six-decimal
-`InvoiceItem.unit_cost_lyd` for product-currency COGS. Financial reports prefer that
-snapshot and retain the legacy fallback for older lines. Stock valuation and
-workspace aggregates convert each product independently; foreign totals are shown
-separately by currency rather than adding USD and EUR amounts together.
+`finance.currency.convert_on_switch` (a `pre_save` on `SystemSettings`, connected in
+`finance/apps.py`) re-expresses services and draft sales invoices inside a
+transaction when the default currency changes, ahead of the settings write. Product
+currencies and prices are unchanged. `Invoice.currency` and `PurchaseInvoice.currency`
+default to the store currency; issued documents retain their snapshots.
+`InvoiceItem.unit_cost_lyd` is a six-decimal product-currency cost snapshot used for
+COGS: financial reports prefer it and fall back to cost × invoice rate for lines without
+it. Stock valuation and workspace aggregates convert each product independently;
+foreign totals are shown separately by currency rather than adding USD and EUR amounts
+together.
 
 ### Store wording
 
@@ -349,40 +416,89 @@ Reuse these everywhere instead of multiplying by a rate inline.
 See [BUSINESS_RULES.md](BUSINESS_RULES.md) for pricing and the frozen-rate rule, and
 [PERMISSIONS.md](PERMISSIONS.md) for the role model.
 
+## Runtime topology and background tasks
+
+`compose.yml` (project `sales`, stack contract `DLUX_STACK_SCHEMA` 5) runs one
+application image in several roles; [OPERATIONS.md](OPERATIONS.md) has the service table
+and the procedures.
+
+- **`web`** serves Django on port 8000 (gunicorn; the development server when
+  `DEBUG_STATUS=True`) behind `caddy`. It applies no migrations: `entrypoint.sh` waits
+  until `migrate --check` passes.
+- **`worker`** runs DjangoLux's task worker (`manage.py dlux_worker`: queued tasks,
+  `DLUX_TASK_SCHEDULE`, backups) and applies the migrations through its `pre_start` steps
+  (`dlux_reconcile`, then `migrator`), with `DLUX_BOOT_GATE=apply` covering a restart that
+  skips `pre_start`.
+- **`celery`** runs the project's only Celery task, `finance.tasks.refresh_market_rates`
+  (`celery -A config worker -B`; `config/celery.py`). Beat runs it every 3 hours and the
+  `worker_ready` signal runs it once at start. It refreshes the CBL (official) and EAN
+  (market) quotes for USD and EUR into the Redis cache without expiry: a later successful
+  scrape replaces a value and a failing site keeps its last one. `celery` has no internet
+  access, so the page fetches go through the Composer agent's relay
+  (`relay/operations.json`: `finance.cbl_rates_page`, `finance.ean_rates_page`); `web`
+  only reads the cache. The service stays until the task moves to `dlux.taskrunner`
+  (`compose.yml` notes that Celery leaves DjangoLux in 1.17).
+- **`db`** (PostgreSQL) and **`redis`**: Redis database 1 holds the Django cache and the
+  sessions (`SESSION_ENGINE` is cache-backed), 2 the Celery broker and 3 the Celery result
+  backend; it runs with an append-only file.
+- **`caddy`** is the only published ingress (`frontend` network): TLS, `/static/`, the
+  `/media/` access check, the maintenance page and the proxy to `web`.
+- **`smtp-relay`** (`python -m dlux.smtp_relay`) receives the app's mail on port 1025
+  (`EMAIL_HOST`); it and `composer-agent` are the only services on the `egress` network.
+- **`composer-agent`** (image-update requests, the outbound relay, the maintenance page)
+  has no Docker authority: it reaches the Docker API only through `docker-socket-proxy`
+  (read-only, no POST) on the `docker_proxy` network, and `composer-executor` alone has
+  write access to the Docker socket and performs the updates.
+
+`internal` and `docker_proxy` have no internet access; no service sits on both `frontend`
+and `egress`. Volumes are `postgres_data`, `redis_data`, `static`, `dlux_runtime`,
+`composer_agent_state`, `composer_exec_sock`, `caddy_data` and `caddy_config`, plus the
+`./media/`, `./logs/` and `./imports/` bind mounts.
+
 ## Security baseline
 
-- Every domain model extends `dlux.models.ScopedModel`: created/updated/deleted
+- Every domain record extends `dlux.models.ScopedModel`: created/updated/deleted
   audit fields, soft-delete (`delete()` never hard-deletes), and optional scope
-  isolation.
-- Every view is `LoginRequiredMixin` + `PermissionRequiredMixin` with
-  `raise_exception=True`; lifecycle actions (issue/cancel/confirm) are POST-only
-  and permission-gated.
-- Project security settings (CSP, CSRF/session cookies, HSTS) come from the dlux
-  project scaffold in `config/settings.py`.
+  isolation. Line and child tables (`InvoiceItem`, `PurchaseInvoiceLine`,
+  `ProductVariant`, `StockTakeLine`) are plain models owned by a scoped parent.
+  `StockMovement`, `PaymentResolution` and `CustomerCreditUse` refuse deletion outright.
+- Staff views require a login. List pages (`ScopedListView`) send an anonymous visitor
+  to the login page and answer a signed-in user without the permission with 403; other
+  views combine `PermissionRequiredMixin` with `raise_exception = True`. The Workspace
+  dashboard needs only a login and builds its tiles from the user's permissions. Lifecycle
+  actions (issue, deposit and expense review, staff-ledger actions) accept POST only and
+  are permission-gated; cancellation and credit application show their form on GET and
+  change state only on POST.
+- Row visibility: a model with `OWNER_FIELDS` is filtered by `common.access.apply_ownership`
+  at the read boundaries (lists, the dynamic-modal lookup, invoice detail and reports), so an
+  employee sees only their own records unless they hold the model's `view_all_<model>`
+  permission.
+- `config/settings.py` sets the Content-Security-Policy (`csp.middleware.CSPMiddleware`),
+  CSRF and session cookies (secure when `BASE_URL` is https, `SameSite=Lax`, cache-backed
+  sessions of one week) and HSTS outside DEBUG.
 - Stored paperwork (`PurchaseInvoice.attachment`, `Expense.attachment`) uses
   `common.files.ProtectedFileField`: its `.url` is `common:stored_file`
   (`/staff/files/<app>/<model>/<pk>/<field>/`), which checks login, the record's
   `view_<model>` permission, scope and `OWNER_FIELDS` ownership, then answers with
   DjangoLux's `serve_file` (byte ranges, revalidation). Their folders are
-  `DLUX_APP_ONLY_MEDIA`, so the proxy refuses them at `/media/`.
-- Stored files are private by default (stack schema 4, DjangoLux 1.15.3): Caddy asks
-  `forward_auth` at `/staff/sys/files/media-access/` before serving any `/media/`
-  file outside the public folders. `DLUX_PUBLIC_MEDIA` keeps product, service and
-  listing images public for the storefront; other stored files need a signed-in user.
+  `DLUX_APP_ONLY_MEDIA`, so the `/media/` access check refuses them to everyone.
+- Stored files are private by default: Caddy serves a `/media/` file outside the public
+  folders only when `forward_auth` at `/staff/sys/files/media-access/` approves it. Branding, managed images and fonts, and `media/public/` are served to anyone;
+  `DLUX_PUBLIC_MEDIA` keeps product, service and listing images public for the storefront;
+  other stored files need a signed-in user, and `/media/dlux_backups/*` answers 404.
   `config/urls.py` also answers `/sys/files/media-access/` for Composer's generated fix.
 
-## Cancellation payments and customer credit (sales.0010)
+## Cancellation payments and customer credit
 
 `sales.PaymentResolution` records one immutable refund or customer-credit
 allocation per original `Payment` (OneToOne/PROTECT), with amount, method,
 customer, timestamp, actor, and optional notes. An unresolved cancellation is
-represented by cancelled-invoice receipts without a resolution; existing
-cancellations therefore need no invented migration history.
+represented by cancelled-invoice receipts without a resolution.
 
 `sales.CustomerCreditUse` links a credit resolution to a later invoice with a
 positive LYD amount and a unique request UUID. `Invoice.recalc_payments()` adds
 cash receipts and credit allocations, while credit availability excludes uses
-whose target invoice is cancelled. This releases credit without creating new
+whose target invoice is cancelled. This releases credit without creating
 cash or altering original receipts. Services lock the Customer first, then the
 invoice/source credit; receipt creation/deletion takes matching locks so a
 payment cannot be appended to a concurrently cancelled invoice.
@@ -394,9 +510,11 @@ allocations are separate from `Payment`, preventing reuse from double-counting
 cash/deposits. Financial-report refund outflows use settlement dates, while
 credit and pending-refund liabilities are current snapshots.
 
+## Rate and report pages
+
 The exchange-rate overview extends the scoped DLux list and renders its current-rate summary as two compact USD/EUR `dlux_card` control surfaces using the DLux control-panel stylesheet and theme variables. The scoped-list `scoped_before_ribbon` extension slot places this summary above the ribbon without copying the DLux list shell. The cards share a desktop row and stack on mobile, with working-rate/source badges and manual/market/CBL quotes.
 
-Sales Overview and Exchange Rates share `finance/includes/currency_wall.html`, using the same working-rate source, reference quotes, timestamps and responsive DLux cards. Exchange Rates places them above its ribbon; Sales Overview embeds them in its existing summary-card row with flexible columns that fill available space and stack on narrow screens.
+Sales Overview and Exchange Rates share `finance/includes/currency_wall.html`, using the same working-rate source, reference quotes, timestamps and responsive DLux cards. Exchange Rates places them above its ribbon; Sales Overview embeds them in its summary-card row with flexible columns that fill available space and stack on narrow screens.
 
 Sales Report date filters use `data-dlux-entry-clipboard="false"` to opt out of the DLux assisted-entry clipboard bar.
 
@@ -404,4 +522,4 @@ Inventory Valuation, Sales Overview, Sales Report and Financial Report use the s
 
 ## Independent machinery enhancement
 
-`machinery` references catalog products/services through model compatibility M2Ms, alongside the independent `automotive` app. Its type/manufacturer/model vocabulary has no vehicle qualifiers. `catalog.Category.parent` provides nested part branches; service-only leaves use `is_service`, and `Service.category` places Repair in the same browser tree. Legacy machine models/aliases/fitments are copied without deleting their original vehicle records or changing stock/prices. See [client diagram implementation](CLIENT_CATEGORIZATION.md).
+`machinery` references catalog products and services through compatibility many-to-many fields on `MachineModel` (`products`, `services`, plus `categories` for category branches), alongside the `automotive` app. Its type/manufacturer/model vocabulary (`MachineType`, `Manufacturer`, `MachineModel`) has no vehicle qualifiers; `MachineModel.legacy_vehicle_model` optionally links a machine to an `automotive.VehicleModel`. The machinery switch lives in `sales_crm.optional_enhancements`, and its routes answer 404 while it is off. `catalog.Category.parent` provides nested part branches; service-only leaves use `is_service`, and `Service.category` places Repair in the same browser tree. See [client diagram implementation](CLIENT_CATEGORIZATION.md).

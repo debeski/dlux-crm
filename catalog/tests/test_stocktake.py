@@ -101,7 +101,7 @@ class StockTakeViewTests(TestCase):
         return view.as_view()(req)
 
     def test_create_snapshots_and_builds_lines(self):
-        resp = self._post(StockTakeCreateView, {f"count_{self.a.pk}": "8", f"count_{self.b.pk}": "", "notes": "Q1"})
+        resp = self._post(StockTakeCreateView, {f"count_{self.a.pk}_0": "8", f"count_{self.b.pk}_0": "", "notes": "Q1"})
         self.assertEqual(resp.status_code, 302)
         take = StockTake.objects.get()
         self.assertEqual(take.lines.count(), 2)  # all active tracked products snapshotted

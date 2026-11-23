@@ -1,6 +1,6 @@
 """
 Generated with django-lux 1.2.1.
-Project name: switch-pos.
+Project name: dlux-crm-sales.
 Generated on: 2026-06-22.
 """
 from django.conf import settings
@@ -41,6 +41,14 @@ staff_urlpatterns = [
         "app-modals/<str:app_label>/<str:model_name>/<str:pk>/",
         FeatureAwareDynamicModalManagerView.as_view(show_table=False),
         name="scoped_modal_manager",
+    ),
+    # DjangoLux's own generic record modal goes through the same guarded view, so
+    # a switched-off feature and a project record view hold on both routes. No
+    # name: reverse("modal_manager") keeps resolving to DjangoLux's pattern,
+    # whose path this one shadows.
+    path(
+        "sys/modals/manager/<str:app_label>/<str:model_name>/<str:pk>/",
+        FeatureAwareDynamicModalManagerView.as_view(),
     ),
     path("", include(("common.urls", "common"), namespace="common")),
     path("", include("dlux.urls")),

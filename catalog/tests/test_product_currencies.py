@@ -145,7 +145,8 @@ class ProductCurrencyTests(TestCase):
     def test_currency_backfill_preserves_existing_eur_store_amounts(self):
         settings = SystemSettings.load()
         extra = settings.extra_config
-        extra["app"][PRICING_NS]["currency"] = "EUR"
+        # The migration ran before the settings moved to sales_crm.*, so it reads the old key.
+        extra["app"]["switch_pos.pricing"] = {**extra["app"][PRICING_NS], "currency": "EUR"}
         SystemSettings.objects.filter(pk=settings.pk).update(extra_config=extra, language_config={
             **settings.language_config, "translations_override": {
                 "en": {"label_product_cost_usd": "Import Cost (EUR)", "label_product_price_usd": "Custom price"},
