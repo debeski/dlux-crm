@@ -192,9 +192,10 @@ tiles, staff account pages, expense review and stored files.
   rejected), a payment only to a pending deposit the user may see, and a delivery
   only to a visible invoice.
 - Product cost and markup show on the product card only to holders of
-  `catalog.change_product` (who edit them anyway). DjangoLux's generic record
-  modal, reachable by a hand-typed URL, still lists every stored field; it has no
-  hook for hiding one.
+  `catalog.change_product` (who edit them anyway). A product's record view on
+  either modal route (`/staff/app-modals/...` and DjangoLux's
+  `/staff/sys/modals/manager/...`) is that item card, never DjangoLux's generic
+  field list.
 
 ## Store scope
 

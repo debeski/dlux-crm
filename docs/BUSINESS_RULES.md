@@ -562,15 +562,16 @@ shelves and reconcile it against what the system thinks you have:
 
 1. Start a count (`StockTake`) — it snapshots the current system quantity for
    every active stock-tracked product and gives you a sheet to enter the counted
-   quantity per item (blank = not counted). Counts are per product, not per variant. Opens in `open` status.
+   quantity (blank = not counted). A product with colour/size buckets has one row
+   per bucket, plus a row *Outside colour/size* when its total holds stock outside
+   them; a product without buckets has one row. Opens in `open` status.
 2. The count's page shows a **variance report**: system vs counted, the signed
    variance, and the LYD value of each discrepancy (variance × unit cost).
 3. **Apply** it (needs `apply_stocktake`) — the system posts one **Adjustment**
    `StockMovement` per real discrepancy on a tracked product, so `stock_qty`
    becomes the counted figure, and the take locks as `applied` (can't re-apply).
-   A product with a single colour/size bucket gets the adjustment on that bucket
-   too, so the bucket the invoices check follows the count; a product with several
-   buckets is adjusted on its total only, and its buckets need manual adjustments.
+   Each row's adjustment moves its own bucket and the product total together, so
+   the buckets the invoices check follow the count.
    Adjustments flow through the same append-only ledger as every other stock
    change, so the correction is fully auditable.
 
