@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runtime smoke tests for a built Switch POS image.
+# Runtime smoke tests for a built Sales CRM image.
 #
 #   Usage: scripts/smoke-test.sh <image-ref>
 #

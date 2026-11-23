@@ -1,4 +1,4 @@
-# Releasing Switch POS
+# Releasing Sales CRM
 
 The app ships as the Docker image **`debeski/dlux-crm` (edition tag `sales`)**. Releases are **tag-driven**:
 pushing a `v*` git tag runs `.github/workflows/release.yml`, which builds the

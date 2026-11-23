@@ -1,4 +1,4 @@
-# Switch POS — Architecture
+# Sales CRM — Architecture
 
 A web-based sales system (منظومة مبيعات), built on **DjangoLux (dlux 1.10.1)**.
 It is a single Django/DLux project with a public catalog surface and an authenticated

@@ -8,7 +8,7 @@
 
 ## Objective
 
-Add vehicle compatibility to Switch POS without turning the shared `Product`
+Add vehicle compatibility to Sales CRM without turning the shared `Product`
 model into a car-parts-only model. A product remains one SKU, one stock balance,
 and one purchasing/sales history. Separate fitment records answer which vehicles
 that product fits.

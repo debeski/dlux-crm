@@ -1,6 +1,6 @@
 """
 Generated with django-lux 1.2.1.
-Project name: switch-pos.
+Project name: dlux-crm-sales.
 Generated on: 2026-06-22.
 """
 from django.conf import settings

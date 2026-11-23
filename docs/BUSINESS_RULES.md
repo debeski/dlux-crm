@@ -1,4 +1,4 @@
-# Switch POS — Business Rules
+# Sales CRM — Business Rules
 
 ## Currency
 

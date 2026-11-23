@@ -1,4 +1,4 @@
-# Project Tracker (switch-pos) [Max 100 lines total]
+# Project Tracker (Sales CRM) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
 - 2026-11-17: v0.13.0 on branch `feat/dlux-1-16-1` (from v0.12.0 `042195e`), pushed 2026-11-18, PR https://github.com/debeski/dlux-crm/pull/2 open, UNMERGED/UNTAGGED: DjangoLux 1.16.1 + Composer 1.10.1, stack schema 5 (`worker` beside project `celery`), F3 fix in `sales/reports.py`, one pin line. Version v0.13.0 (not v0.12.1: schema/service/Composer minimum change) is the owner's call. v0.12.0 (tag `c43e305`, DjangoLux 1.15.3, schema 4) is the published release.
