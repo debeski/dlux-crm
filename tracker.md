@@ -1,8 +1,8 @@
 # Project Tracker (Sales CRM) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-11-23: v0.13.0 on DjangoLux 1.16.3 + Composer 1.10.3 (stack schema 5, 1.16.3 scaffold stack files incl. Fetch Metadata gate) accepted on the testbed from published v0.12.0 and v0.11.4; being released from `feat/dlux-1-16-1` via PR https://github.com/debeski/dlux-crm/pull/2.
-- Phase B release steps: push, merge #2, tag `v0.13.0`, CI release, re-test from the published image, fresh install from `dist/crm-sales-0.13.0-deploy.zip`.
+- 2026-11-24: **v0.13.0 released** (DjangoLux 1.16.3, Composer 1.10.3, schema 5): PR #2 merged as `8c65cfc`, tag `v0.13.0`, `debeski/dlux-crm:sales-v0.13.0` = `:sales` (`sha256:38661ad2…`, amd64+arm64), GitHub release published. Deploy zip `dist/crm-sales-0.13.0-deploy.zip` (from the tag tree, sha256 `5060067b…`).
+- Published image re-tested on the testbed (v0.12.0 → zip + `:sales`) and a fresh install from the zip; testbed left on the published image, stopped.
 - Product name is **Sales CRM** (repo/image `debeski/dlux-crm:sales`, project slug `dlux-crm-sales`); the old name "Switch POS" and the customer brand are gone from docs, code defaults and stored identifiers (`sales_crm_*` cookies, `sales_crm.*` settings moved by `common.0001`).
 - Public `/`, `/shop/...`, `/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS and redirects the legacy ERP host.
 ### Current Project Adopted Standards: [Max 5 lines]
@@ -24,8 +24,9 @@
 - Live VM likely runs a stale stack (old portfolio on apex/www, stored files open to v0.11.4): one-hop upgrade per `deploy/README.md`; check its project and database names first: v0.1.0 `switch_pos`/`switch_pos_db`, v0.1.2 `sales-crm`/`sales_crm_db`, v0.1.3+ `sales`/`sales_db` (a pre-v0.1.3 server would start empty volumes under `name: sales`).
 - SMTP credentials unset on the deployment, so the contact relay cannot authenticate. Updates card can show a stale "Could not read the DjangoLux release index" until a check completes.
 ### Incomplete Tasks: [Max 20 lines]
-- **Priority 1 — release v0.13.0 (in progress):**
-  - [ ] Push, merge #2, tag `v0.13.0`, CI release; testbed re-run from `debeski/dlux-crm:sales-v0.13.0` (drop `WEB_IMAGE`); fresh install from the zip; deploy zip from the tag.
+- **Priority 1 — follow-ups:**
+  - [ ] `deploy/README.md` first-install step 5: a fresh install also shows an `app-permissions` advisory until `./start.sh check --fix` (docs only; this tracker commit is local on `feat/dlux-1-16-1`, after the merge).
+  - [ ] Live VM upgrade to v0.13.0 per `deploy/README.md` (check its project/database names first).
 - **Priority 2 — owner decisions and follow-ups:**
   - [ ] Keep the project `celery` until DjangoLux 1.17 or move `refresh_market_rates` to `dlux.taskrunner` (about 2-3 h plus a testbed run; no test covers the task). `currency-switch` and `automotive-parts-first` carry uncommitted work on old pins.
   - [ ] Ask upstream (DjangoLux) for a per-model detail template or field-visibility hook, so the project need not shadow its `modal_manager` route.
@@ -46,7 +47,7 @@
 ### Global Rulesets:
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
-- Branch `feat/dlux-1-16-1` (upstream set): push only that branch (`git push origin feat/dlux-1-16-1`), never `main`; merge/tag/release only with the owner's go-ahead (given for Phase B once 1.16.3 + Composer 1.10.3 are stable). Owner said "proceed" for the v0.13.0 release on 2026-11-23. Composer 1.10.x uses `agent run`/`executor run` (the 1.16.3 scaffold emits it too).
+- Branch `feat/dlux-1-16-1` (upstream set): push only that branch (`git push origin feat/dlux-1-16-1`), never `main`; merge/tag/release only with the owner's go-ahead (given for Phase B once 1.16.3 + Composer 1.10.3 are stable). v0.13.0 released 2026-11-24; new work goes on a new branch from `main`. Composer 1.10.x uses `agent run`/`executor run` (the 1.16.3 scaffold emits it too).
 - Testbed `~/Desktop/depy/testbeds/crm-sales`: stop what you start, `docker update --restart=no`; one heavy Docker job at a time.
 ### References and Links:
 - Releasing: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`; bundle: `deploy/README.md`; PR: https://github.com/debeski/dlux-crm/pull/2.
