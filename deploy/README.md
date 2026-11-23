@@ -212,7 +212,9 @@ means restoring the backup from step 1, in this order:
    `check --fix` restamped it, change the first line back to the old
    `# dlux stack schema` number (its copy is in `.xclude/composer-check/`).
 3. `./start.sh`, then restore the backup (Options > Backup & Restore, or your
-   database dump).
+   database dump). The database still carries this release's DjangoLux
+   migrations, so the in-app restore may report a database version mismatch:
+   choose to ignore it, since the backup is from the version now running.
 4. Clear the cache, which still holds this release's settings, and restart:
 
    ```bash
