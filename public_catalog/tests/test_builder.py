@@ -43,8 +43,8 @@ class PublicCatalogBuilderTests(TestCase):
 
         settings = dict(options._SETTINGS_REGISTRY)
 
-        self.assertNotIn("switch_pos.public_homepage", settings)
-        self.assertIn("switch_pos.public_catalog", settings)
+        self.assertNotIn("sales_crm.public_homepage", settings)
+        self.assertIn("sales_crm.public_catalog", settings)
         from public_catalog.options_forms import PublicCatalogSettingsForm
 
         field_names = list(PublicCatalogSettingsForm().fields)

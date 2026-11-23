@@ -18,7 +18,7 @@ User = get_user_model()
 
 def pos_on(**overrides):
     return patch("dlux.utils.get_app_system_config", side_effect=lambda namespace, default=None: (
-        {**POS_DEFAULTS, "enabled": True, **overrides} if namespace == "switch_pos.point_of_sale" else default
+        {**POS_DEFAULTS, "enabled": True, **overrides} if namespace == "sales_crm.point_of_sale" else default
     ))
 
 

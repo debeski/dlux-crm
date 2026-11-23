@@ -18,7 +18,7 @@ from sales.translations import DLUX_STRINGS as SALES_STRINGS
 
 User = get_user_model()
 rf = RequestFactory()
-WORKSPACE_PREF_NAMESPACE = "switch_pos.workspace_dashboard.v1"
+WORKSPACE_PREF_NAMESPACE = "sales_crm.workspace_dashboard.v1"
 
 
 def _perm(code):
@@ -222,8 +222,8 @@ class WorkspaceEnhancementTilesTests(TestCase):
         from django.core.cache import cache
         from dlux.options import write_app_system_config
 
-        write_app_system_config("switch_pos.point_of_sale", {"enabled": pos})
-        write_app_system_config("switch_pos.optional_enhancements", {"automotive": {"enabled": automotive}})
+        write_app_system_config("sales_crm.point_of_sale", {"enabled": pos})
+        write_app_system_config("sales_crm.optional_enhancements", {"automotive": {"enabled": automotive}})
         cache.clear()
 
     def quick_urls(self, tiles):

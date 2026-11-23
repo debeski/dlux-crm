@@ -1,7 +1,7 @@
 """Per-user Products list layout preference.
 
 The choice lives in the user's DjangoLux profile preferences
-(`Profile.preferences['app']['switch_pos.products_layout']`) — the same
+(`Profile.preferences['app']['sales_crm.products_layout']`) — the same
 reserved app-namespace store the workspace dashboard uses — so every user
 picks their own product view. It is read server-side here to decide which
 template/table `ProductListView` renders, and written client-side via the
@@ -9,7 +9,7 @@ staff-prefixed app-preference URL exposed by Django URL reversing (options card
 + inline toggle).
 """
 
-PRODUCTS_LAYOUT_NS = "switch_pos.products_layout"
+PRODUCTS_LAYOUT_NS = "sales_crm.products_layout"
 #: Field name inside the global admin-default settings blob (extra_config).
 PRODUCTS_LAYOUT_DEFAULT_FIELD = "default_layout"
 

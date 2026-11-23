@@ -9,8 +9,8 @@
         if (!root) return;
         const grid = root.querySelector('[data-dashboard-grid]');
         if (!grid) return;
-        const storageKey = root.dataset.storageKey || 'switch.workspace.dashboard.v1';
-        const appPrefNamespace = root.dataset.appPrefNamespace || 'switch_pos.workspace_dashboard.v1';
+        const storageKey = root.dataset.storageKey || 'sales_crm.workspace.dashboard.v1';
+        const appPrefNamespace = root.dataset.appPrefNamespace || 'sales_crm.workspace_dashboard.v1';
         const appPrefUrlTemplate = root.dataset.appPrefUrlTemplate || '';
         const sizeOrder = ['s', 'm', 'l', 'xl'];
         const originalOrder = Array.from(grid.querySelectorAll('[data-widget-id]')).map((tile) => tile.dataset.widgetId);

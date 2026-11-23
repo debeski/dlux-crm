@@ -167,7 +167,7 @@ def _fetch_page(url, operation, timeout):
         except relay.RelayError as exc:
             if exc.code != "writer":
                 raise
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (switch-pos)"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (sales-crm)"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", "replace")
 

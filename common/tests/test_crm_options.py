@@ -16,7 +16,7 @@ User = get_user_model()
 def field(name):
     """The posted name of a section field: "<section>-<field>" -> dlux's prefixed name."""
     section, _, rest = name.partition("-")
-    return f"{app_settings_form_prefix('switch_pos.' + section)}-{rest}"
+    return f"{app_settings_form_prefix('sales_crm.' + section)}-{rest}"
 
 
 class CrmOptionsTileTests(TestCase):
@@ -66,9 +66,9 @@ class CrmOptionsTileTests(TestCase):
         tiles = {tile["id"]: tile for tile in get_visible_app_settings_tiles(self.request())}
         self.assertEqual(
             [section["namespace"] for section in tiles[CRM_OPTIONS_GROUP]["sections"]],
-            ["switch_pos.pricing", "switch_pos.products_layout", "switch_pos.public_catalog", "switch_pos.point_of_sale"],
+            ["sales_crm.pricing", "sales_crm.products_layout", "sales_crm.public_catalog", "sales_crm.point_of_sale"],
         )
-        for old in ("switch_pos.products_layout", "switch_pos.public_catalog", "switch_pos.point_of_sale"):
+        for old in ("sales_crm.products_layout", "sales_crm.public_catalog", "sales_crm.point_of_sale"):
             self.assertNotIn(old, tiles)
 
     def test_each_section_saves_its_own_namespace(self):
@@ -78,11 +78,11 @@ class CrmOptionsTileTests(TestCase):
         response = self.post()
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json().get("success"), response.json().get("html", "")[:500])
-        self.assertEqual(get_app_system_config("switch_pos.products_layout")["default_layout"], "grid")
-        public = get_app_system_config("switch_pos.public_catalog")
+        self.assertEqual(get_app_system_config("sales_crm.products_layout")["default_layout"], "grid")
+        public = get_app_system_config("sales_crm.public_catalog")
         self.assertEqual((public["shop_title"], public["show_price"], public["show_availability"]), ("Heavy Parts", True, False))
         self.assertTrue(public["shop_enabled"], "keys the tile does not edit are kept")
-        pos = get_app_system_config("switch_pos.point_of_sale")
+        pos = get_app_system_config("sales_crm.point_of_sale")
         self.assertEqual((pos["enabled"], pos["receipt_size"], pos["max_discount_percent"]), (True, "58", "15"))
         self.assertIsNone(get_app_system_config(CRM_OPTIONS_GROUP))
 
@@ -92,7 +92,7 @@ class CrmOptionsTileTests(TestCase):
         set_public_catalog_config({"shop_title": "Kept", "homepage_enabled": False, "featured_limit": 7})
         response = self.post(**{"public_catalog-public_enabled": "", "public_catalog-shop_title": "Ignored"})
         self.assertTrue(response.json().get("success"), response.json().get("html", "")[:500])
-        public = get_app_system_config("switch_pos.public_catalog")
+        public = get_app_system_config("sales_crm.public_catalog")
         self.assertFalse(public["enabled"])
         self.assertEqual(public["shop_title"], "Kept", "a locked field keeps its stored value")
         self.assertEqual((public["homepage_enabled"], public["featured_limit"]), (False, 7), "builder keys are kept")
@@ -104,7 +104,7 @@ class CrmOptionsTileTests(TestCase):
     def test_an_invalid_section_saves_nothing(self):
         response = self.post(**{"point_of_sale-max_discount_percent": "150"})
         self.assertNotIn("success", response.json())
-        self.assertIsNone(get_app_system_config("switch_pos.products_layout"))
+        self.assertIsNone(get_app_system_config("sales_crm.products_layout"))
 
     def test_modal_shows_every_section_heading(self):
         html = self.client.get(self.url).json()["html"]
@@ -122,7 +122,7 @@ class CrmOptionsTileTests(TestCase):
             "point_of_sale-max_discount_percent": "", "point_of_sale-receipt_size": "",
         })
         self.assertTrue(response.json().get("success"), response.json().get("html", "")[:500])
-        pos = get_app_system_config("switch_pos.point_of_sale")
+        pos = get_app_system_config("sales_crm.point_of_sale")
         self.assertEqual((pos["enabled"], pos["max_discount_percent"], pos["receipt_size"]), (False, "15", "58"))
         self.assertTrue(pos["methods"]["cash"])
         html = self.client.get(self.url).json()["html"]

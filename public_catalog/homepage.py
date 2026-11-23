@@ -12,7 +12,7 @@ from dlux.options import write_app_system_config
 from dlux.translations import get_strings
 from dlux.utils import get_app_system_config, get_system_config
 
-HOMEPAGE_NS = "switch_pos.public_homepage"
+HOMEPAGE_NS = "sales_crm.public_homepage"
 
 # Order matters: this is the default section order on a fresh install.
 SECTION_KEYS = ("featured", "categories", "services", "story", "contact")

@@ -857,7 +857,7 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
         user_key = getattr(self.request.user, "pk", "anonymous") or "anonymous"
         ctx.update({
             "workspace_tiles": tiles,
-            "workspace_storage_key": f"switch.workspace.dashboard.v1.{user_key}",
+            "workspace_storage_key": f"sales_crm.workspace.dashboard.v1.{user_key}",
             "workspace_tile_count": len(tiles),
         })
         return ctx

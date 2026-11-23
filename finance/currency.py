@@ -6,7 +6,7 @@ recorded currencies. Historical ``*_usd`` columns store foreign amounts.
 """
 from decimal import ROUND_HALF_UP, Decimal
 
-PRICING_NS = "switch_pos.pricing"
+PRICING_NS = "sales_crm.pricing"
 CURRENCY_USD = "USD"
 CURRENCY_EUR = "EUR"
 PRICING_CURRENCIES = (CURRENCY_USD, CURRENCY_EUR)

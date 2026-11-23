@@ -160,7 +160,7 @@ class ProductsLayoutPreferenceEndpointTests(TestCase):
 
     def test_staff_prefixed_endpoint_persists_products_layout(self):
         url = reverse("update_app_preference", kwargs={"namespace": PRODUCTS_LAYOUT_NS})
-        self.assertEqual(url, "/staff/sys/api/preferences/app/switch_pos.products_layout/")
+        self.assertEqual(url, "/staff/sys/api/preferences/app/sales_crm.products_layout/")
 
         client = Client()
         self.assertTrue(client.login(username="layout_writer", password="x"))
@@ -205,21 +205,21 @@ class ProductsLayoutOptionCardTests(TestCase):
         options = _import_options_or_skip(self)
         # Importing the module triggers registration if autodiscovery hasn't run.
         import catalog.dlux_options  # noqa: F401
-        self.assertIn("switch_pos.products_layout", options._REGISTRY)
+        self.assertIn("sales_crm.products_layout", options._REGISTRY)
 
     def test_card_visible_only_with_view_product(self):
         options = _import_options_or_skip(self)
         import catalog.dlux_options  # noqa: F401
         req_super = _attach(rf.get("/sys/options/"), self.super)
         ids = [c["id"] for c in options.get_visible_cards(req_super)]
-        self.assertIn("switch_pos.products_layout", ids)
+        self.assertIn("sales_crm.products_layout", ids)
 
         req_plain = _attach(rf.get("/sys/options/"), self.plain)
         ids_plain = [c["id"] for c in options.get_visible_cards(req_plain)]
-        self.assertNotIn("switch_pos.products_layout", ids_plain)
+        self.assertNotIn("sales_crm.products_layout", ids_plain)
 
     def test_global_default_is_a_crm_options_section(self):
         options = _import_options_or_skip(self)
         import catalog.dlux_options  # noqa: F401
 
-        self.assertEqual(options._SETTINGS_REGISTRY["switch_pos.products_layout"]["group"], "switch_pos.crm_options")
+        self.assertEqual(options._SETTINGS_REGISTRY["sales_crm.products_layout"]["group"], "sales_crm.crm_options")

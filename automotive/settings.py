@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 
-OPTIONAL_ENHANCEMENTS_NS = "switch_pos.optional_enhancements"
+OPTIONAL_ENHANCEMENTS_NS = "sales_crm.optional_enhancements"
 
 AUTOMOTIVE_CRITERIA = (
     "equipment_type",

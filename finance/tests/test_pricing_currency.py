@@ -34,7 +34,7 @@ class PricingCurrencyTests(TestCase):
         ExchangeRate.objects.create(currency="EUR", rate=Decimal("10.0000"))
         self.admin = User.objects.create_superuser("pricing-admin", "pricing@example.com", "x")
         self.client.force_login(self.admin)
-        self.url = reverse("dlux_app_settings_group_modal", args=["switch_pos.crm_options"])
+        self.url = reverse("dlux_app_settings_group_modal", args=["sales_crm.crm_options"])
         self.filter = Product.objects.create(name="Oil Filter", cost_usd=Decimal("100.00"), markup_percent=Decimal("50"))
         self.fitting = Service.objects.create(name="Fitting", price_usd=Decimal("20.00"))
 

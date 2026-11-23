@@ -1,7 +1,7 @@
 (function () {
     "use strict";
 
-    var DEFAULT_NS = "switch_pos.products_layout";
+    var DEFAULT_NS = "sales_crm.products_layout";
 
     function csrfToken() {
         var meta = document.querySelector('meta[name="csrf-token"]');
