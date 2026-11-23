@@ -1,10 +1,9 @@
-# Sales CRM 0.13.0 — deployment files
+# Sales CRM — deployment files
 
-This folder runs the published Sales CRM image (`debeski/dlux-crm:sales`, 0.13.0,
-DjangoLux 1.16.1) with Docker Compose, and Composer (`debeski/composer:latest`,
-1.10.1 or newer) deploys, updates and repairs the stack. It holds no application
-source and no data: the database, the uploaded files and the certificates live in
-Docker volumes and in `media/`.
+This folder runs the published Sales CRM image (`debeski/dlux-crm:sales`) with
+Docker Compose, and Composer (`debeski/composer:latest`) deploys, updates and
+repairs the stack. It holds no application source and no data: the database, the
+uploaded files and the certificates live in Docker volumes and in `media/`.
 
 | File | Purpose |
 | --- | --- |
@@ -21,30 +20,32 @@ Docker volumes and in `media/`.
 
 - Linux with Docker Engine and Docker Compose 5.3 or later (DjangoLux uses
   `pre_start` hooks), or Docker Desktop (Windows with the WSL 2 backend, or macOS).
-- Internet access on the first start, to pull the images.
+- Internet access on the first start, to pull the images. The deployer
+  (`debeski/composer:latest`) must be 1.10.1 or newer; `./start.sh update self`
+  refreshes it.
 - For a public site: DNS records for every hostname in `CADDY_SITE_ADDRESS`
   pointing at this machine, and inbound TCP 80 and 443 open.
 
-## What changed for operators (since 0.12.0)
+## How the stack runs
 
-- DjangoLux 1.16.1 runs its own task worker. A **`worker`** service now applies the
-  database migrations before the application starts, runs backups and DjangoLux's
-  scheduled work. The **`celery`** service stays for the one project task, the
-  exchange-rate refresh (every 3 hours and once at start); it no longer applies
-  migrations.
-- The stack files are **stack schema 5**. Stored files stay private (the proxy asks
-  the app before sending any attachment), and that only works with this release's
-  image behind the new `.proxy/Caddyfile`: the upgrade pulls the image first.
-- New setting **`DLUX_FRONT_PROXY`**: the address of a proxy or TLS terminator in
-  front of this server. Unset, Caddy trusts every private address for
-  `X-Forwarded-For`, and `./start.sh check` shows a `front-proxy` warning. That
-  warning is by design and harmless when Caddy itself faces the internet (see
+- The **`worker`** service applies the database migrations before the application
+  starts, and runs backups and DjangoLux's scheduled work. The **`celery`** service
+  runs the one project task, the exchange-rate refresh (every 3 hours and once at
+  start); it applies no migrations.
+- Stored files (purchase-invoice and expense attachments) are private: the proxy
+  asks the app before sending any of them. That works only with the application
+  image behind this folder's `.proxy/Caddyfile`, so an upgrade pulls the image
+  first.
+- **`DLUX_FRONT_PROXY`** is the address of a proxy or TLS terminator in front of
+  this server. Unset, Caddy trusts every private address for `X-Forwarded-For`,
+  and `./start.sh check` shows a `front-proxy` warning. That warning is by design
+  and harmless when Caddy itself faces the internet (see
   [DLUX_FRONT_PROXY](#dlux_front_proxy)).
-- The database container's environment no longer follows the application's, so
-  later image updates stop restarting it. It restarts once, for a few seconds, at
-  this upgrade.
-- Sales Report to Excel writes customer names, descriptions and numbers as text:
-  a value starting with `=` can no longer run as a spreadsheet formula.
+- The database container's environment is only what PostgreSQL reads, so changing
+  the application image never restarts it. The database name is `POSTGRES_DB`
+  (default `sales_db`); keep the name your server's database already has.
+- Sales Report to Excel writes customer names, descriptions and numbers as text: a
+  value starting with `=` never runs as a spreadsheet formula.
 
 ## First installation
 
@@ -74,11 +75,11 @@ Docker volumes and in `media/`.
 5. Run `./start.sh check`. It must exit 0. The `front-proxy` line stays a warning
    until `DLUX_FRONT_PROXY` is set.
 
-## Upgrading an existing deployment (v0.11.x or v0.12.0 → 0.13.0)
+## Upgrading an existing deployment
 
-This is **one upgrade, whichever release the server runs now**. A server that is
-still on v0.11.x, or that never got v0.12.0, does not need an intermediate step:
-the steps below also deliver what v0.12.0 changed. In particular, **stored files
+This is **one upgrade, whichever release the server runs now**. A server on v0.11.x
+or v0.12.x does not need an intermediate step: the steps below also deliver what
+the releases in between changed. In particular, **stored files
 (purchase-invoice and expense attachments) were reachable without signing in up to
 v0.11.4**; this upgrade closes that, and the order in steps 2, 4 and 7 is what
 closes it: image first, then the release files, then `./start.sh restart caddy`.
@@ -95,7 +96,9 @@ that card installs only the application image and keeps the old `compose.yml`, a
 an image older than DjangoLux 1.16 cannot update itself to this one.
 
 1. **Back up.** In the app, create a backup under Options > Backups and download
-   it, and copy the `media/` folder. Keep a database dump too if you have one.
+   it, and copy the `media/` folder. Keep a database dump too if you have one. Note
+   the database name (`docker compose exec db psql -U <POSTGRES_USER> -l`): if it is
+   not `sales_db`, `.secrets/.env` must set `POSTGRES_DB` to it before step 5.
 2. **Pull the new application image first.** This restarts nothing: the stack keeps
    running the old image until step 5. The new proxy file asks the app's media
    check, which only the new image answers.
@@ -125,10 +128,11 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
    with no stamp, from before v0.12.0, is only noted: nothing to do). If it
    says `composer-agent` must be running to publish the maintenance page, run
    step 5 and then `check --fix` once more.
-5. **Deploy:** `./start.sh`. This adds the `worker` service, restarts the database
-   once (its environment changed; its data stays in the volume) and the
-   application containers, and applies DjangoLux's own migrations. This release
-   adds no migration of its own. Wait for the first start to finish.
+5. **Deploy:** `./start.sh`. This adds the `worker` service, restarts the
+   application containers, applies DjangoLux's own migrations and, on a server
+   coming from an earlier stack, restarts the database once for a few seconds (its
+   environment changed; its data stays in the volume). The CRM adds no migration of
+   its own. Wait for the first start to finish.
 6. **Remove containers the new stack no longer has.** Compose leaves the container
    of a service that left `compose.yml` running. The new stack has exactly these
    services: `db`, `redis`, `smtp-relay`, `caddy`, `web`, `worker`, `celery`,
@@ -182,11 +186,10 @@ facing the internet directly there is nothing to name: the default
 
 ### Rolling back
 
-0.13.0 runs DjangoLux 1.16.1, which adds its own database tables. To go back,
-restore the backup from step 1 with the previous `compose.yml`, `start.sh`,
-`start.ps1` and `.proxy/Caddyfile`, put `WEB_IMAGE=debeski/dlux-crm:sales-v0.12.0`
-(or the version you came from) in `.secrets/.env`, then run `./start.sh` and
-`./start.sh restart caddy`. Going back to v0.11.4 or older reopens the
+This release's DjangoLux adds its own database tables. To go back, restore the
+backup from step 1 with the previous `compose.yml`, `start.sh`, `start.ps1` and
+`.proxy/Caddyfile`, put `WEB_IMAGE=debeski/dlux-crm:sales-v<the version you came
+from>` in `.secrets/.env`, then run `./start.sh` and `./start.sh restart caddy`. Going back to v0.11.4 or older reopens the
 stored-files exposure: do it only to recover.
 
 ## Updating later
