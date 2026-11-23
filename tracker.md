@@ -20,7 +20,7 @@
 - 2026-11-23 docs audit (Phase A, static): rename, README, OPERATIONS/RELEASING rebuilt, BUSINESS_RULES/PERMISSIONS/ARCHITECTURE/AUTOMOTIVE checked against code. Report: `docs-audit-crm-sales.md` in the session notes folder.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
 - Soft-resetting `OpeningStockDraft` leaves the scope uniqueness constraint on trashed rows, blocking replacement drafts (permanent reset works).
-- DjangoLux's generic record modal (hand-typed URL) still lists product cost to `view_product` holders: no field-hiding hook upstream. A stock take on a product with several variant buckets adjusts only the total. Not fixed yet: POS `VehicleProductsView` needs only POS perms; bulk fit/assign forms are unscoped for superusers; the Vehicle Models dashboard tile counts inactive/migrated rows.
+- DjangoLux's generic record modal (hand-typed URL) still lists product cost to `view_product` holders: no field-hiding hook upstream. A stock take on a product with several variant buckets adjusts only the total.
 - Live VM likely runs a stale stack (old portfolio on apex/www, stored files open to v0.11.4): one-hop upgrade per `deploy/README.md`; check its project and database names first: v0.1.0 `switch_pos`/`switch_pos_db`, v0.1.2 `sales-crm`/`sales_crm_db`, v0.1.3+ `sales`/`sales_db` (a pre-v0.1.3 server would start empty volumes under `name: sales`).
 - SMTP credentials unset on the deployment, so the contact relay cannot authenticate. Updates card can show a stale "Could not read the DjangoLux release index" until a check completes.
 ### Incomplete Tasks: [Max 20 lines]
@@ -35,9 +35,9 @@
 - **Completed Recently:**
   - [x] 2026-11-18: v0.13.0 prepared, pushed, PR #2; testbed acceptance from v0.12.0 and v0.11.4 passed.
   - [x] 2026-11-23: docs audit Phase A (rename to Sales CRM, real README and app READMEs, OPERATIONS/RELEASING rebuilt, doc fixes).
-  - [x] 2026-11-23: ownership on writes (customer, deposit, delivery, deposit review), issued invoices undeletable, cost on the card, POS CSRF, stock-take bucket, Add Stock gating, machinery live uniqueness, stored-identifier renames + `common.0001`, neutral defaults, `portfolio/` retired.
+  - [x] 2026-11-23: ownership on writes (customer, deposit, delivery, deposit review), issued invoices undeletable, cost on the card, POS CSRF, stock-take bucket, Add Stock gating, machinery live uniqueness, till vehicle-panel permissions, no cross-store bulk links, browsable-only vehicle tile, stored-identifier renames + `common.0001`, neutral defaults, `portfolio/` retired.
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-11-18 (DjangoLux 1.16.1): 490 pass in the amd64 image (6 PostgreSQL-only skips; those modules' 30 cases pass on PostgreSQL 17); testbed upgrade from v0.12.0 and v0.11.4 passed. Evidence: `testbeds/crm-sales/.xclude/acceptance-1.16.1/`. 2026-11-23: 518 pass in the arm64 candidate image on SQLite (6 PostgreSQL-only skips), `check` and `makemigrations --check` clean; on PostgreSQL 17 the PG-only modules plus every new test (71) pass.
+- 2026-11-18 (DjangoLux 1.16.1): 490 pass in the amd64 image (6 PostgreSQL-only skips; those modules' 30 cases pass on PostgreSQL 17); testbed upgrade from v0.12.0 and v0.11.4 passed. Evidence: `testbeds/crm-sales/.xclude/acceptance-1.16.1/`. 2026-11-23: 524 pass in the arm64 candidate image on SQLite (6 PostgreSQL-only skips), `check` and `makemigrations --check` clean; on PostgreSQL 17 the PG-only modules plus every new test pass.
 ### One-line info about last time edited Docs: [Max 2 lines]
 - 2026-11-23: README, per-app READMEs, `docs/*` (OPERATIONS, RELEASING, PERMISSIONS, BUSINESS_RULES, ARCHITECTURE, automotive/QA docs), `deploy/README.md`, template and comment fixes; CHANGELOG history untouched.
 ## Part 2: Global [Max 20 lines]

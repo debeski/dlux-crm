@@ -177,7 +177,7 @@ Permissions each surface requires (`automotive.` and `machinery.` prefixes):
 | `/staff/automotive/products/<pk>/fitments/` | Manage compatibility editor for one product |
 | `/staff/automotive/vehicles/search/?q=` | JSON vehicle suggestions (`jump=1` omits shared-engine suggestions) |
 | `/staff/automotive/fits/source/` | JSON: products that have fitments (`q=`), or one product's fitments as unsaved tags (`product=`) |
-| `/staff/automotive/fits/bulk/` | Assign vehicles modal |
+| `/staff/automotive/fits/bulk/` | Assign vehicles modal. A product and a vehicle of different stores (scopes) are never linked; global vehicle data fits every store. The machinery *Assign* modal follows the same rule. |
 | `/staff/automotive/dependencies/` | JSON models, generations, engines and trims for the dependent selectors |
 | `/staff/machinery/` | Machines Hub: Browse machinery, Machine types, Manufacturers, Machine models, Category branches, Parts, Services (each card needs its view permission) |
 | `/staff/machinery/browse/` | Browse machinery |

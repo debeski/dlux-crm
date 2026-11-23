@@ -283,6 +283,9 @@ switched on. A till sale is an invoice owned by the seller, issued and paid in
 one step. A discount above `max_discount_percent` (default 10) is refused unless
 the seller holds `pos_unlimited_discount`. The till's add-product shortcut shows
 with `catalog.add_product`. A receipt opens only for an invoice the user may see.
+The till's *By vehicle* panel and its vehicle search show, and answer, only for a
+user who also holds the vehicle browser's permissions (`automotive.view_vehiclemake`,
+`view_vehiclemodel`, `view_productfitment` and `catalog.view_product`).
 
 **Inventory.** Product, service, category and supplier changes use their model
 permissions. A purchase invoice needs `add_purchaseinvoice`, `add_product`,

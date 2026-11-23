@@ -254,8 +254,8 @@ The optional enhancements add to it only while they are on and the user can use
 them: the **till** puts *Open the till* first in Quick Actions and a *Point of
 Sale* tile with today's till sales (total and count of `PosSale` invoices the
 user may see); **automotive** adds *Browse by vehicle* to Quick Actions and a
-tile with the number of vehicle models and of active products fitted
-to at least one. Independent **machinery** adds its own browsing action and a machine-model tile
+tile with the number of vehicle models the browser offers (active, of an active
+make, not moved to machinery) and of active products fitted to at least one. Independent **machinery** adds its own browsing action and a machine-model tile
 with type → manufacturer → model → nested categories, without changing vehicle wording.
 
 Users may hide, reorder, and resize tiles. Those layout preferences are stored
