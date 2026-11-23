@@ -32,7 +32,7 @@ from finance.services import (
 )
 
 from .filters import CustomerFilter, DeliveryFilter, InvoiceFilter, PaymentFilter
-from .forms import CustomerForm, InvoiceForm, InvoiceItemFormSet, PaymentForm
+from .forms import CustomerForm, InvoiceForm, InvoiceItemFormSet, PaymentForm, attachable_deposits
 from .models import Customer, Delivery, Invoice, Payment
 from .reports import (
     available_fiscal_years,
@@ -350,7 +350,7 @@ class InvoiceDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView)
         invoice = self.object
         ctx["items"] = invoice.items.all()
         ctx["payments"] = invoice.payments.all()
-        ctx["payment_form"] = PaymentForm()
+        ctx["payment_form"] = PaymentForm(user=self.request.user)
         from .payment_resolution_views import visible_credits
         ctx["available_credit"] = sum((credit.available_amount for credit in visible_credits(invoice, self.request.user)), Decimal("0.00"))
         ctx["credit_uses"] = invoice.credit_uses.select_related("credit__payment")
@@ -358,7 +358,7 @@ class InvoiceDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView)
         ctx["payment_resolutions"] = PaymentResolution.objects.filter(payment__invoice=invoice).select_related("payment", "created_by")
         # Feeds the deposit combobox <datalist> (search-and-add batches by reference).
         ctx["cash_deposits"] = scope_filtered_queryset(
-            CashDeposit.objects.exclude(reference="").order_by("-deposited_at"),
+            attachable_deposits(self.request.user).exclude(reference="").order_by("-deposited_at"),
             self.request.user,
         )
         return ctx
@@ -445,7 +445,7 @@ class PaymentCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if invoice.status in (Invoice.STATUS_DRAFT, Invoice.STATUS_CANCELLED):
             messages.error(request, _("Issue the invoice before recording payments."))
             return redirect("sales:invoice_detail", pk=pk)
-        form = PaymentForm(request.POST)
+        form = PaymentForm(request.POST, user=request.user)
         if form.is_valid():
             payment = form.save(commit=False)
             payment.invoice = invoice
@@ -476,13 +476,15 @@ class PaymentCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         if not reference:
             payment.deposit = None
             return
-        qs = scope_filtered_queryset(CashDeposit.objects.all(), request.user)
+        qs = scope_filtered_queryset(attachable_deposits(request.user), request.user)
         deposit = qs.filter(reference__iexact=reference).first()
         if deposit is None:
             # amount starts at 0 (NOT NULL) and is set to the batch total by
             # CashDeposit.recalc_amount() the moment payment.save() runs below.
-            deposit = CashDeposit(reference=reference, method=payment.method, amount=Decimal("0.00"))
-            deposit.save()  # scope / created_by come from the request (ScopedModel)
+            deposit = CashDeposit(
+                reference=reference, method=payment.method, amount=Decimal("0.00"), created_by=request.user,
+            )
+            deposit.save()  # scope comes from the request (ScopedModel)
         payment.deposit = deposit
 
 

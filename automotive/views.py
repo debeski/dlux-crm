@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -93,7 +94,13 @@ class FeatureAwareDynamicModalDeleteView(
     OptionalEnhancementModalGuardMixin,
     DynamicModalDeleteView,
 ):
-    pass
+    def post(self, request, *args, **kwargs):
+        # A record that refuses deletion (an issued invoice, a stock movement's
+        # history) says why instead of failing the request.
+        try:
+            return super().post(request, *args, **kwargs)
+        except ValidationError as exc:
+            return JsonResponse({"error": "; ".join(exc.messages)}, status=400)
 
 
 class AutomotiveHubView(
