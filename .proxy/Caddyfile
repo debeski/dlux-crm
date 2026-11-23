@@ -19,7 +19,7 @@
 #
 # Public and staff paths are split inside Django/DLux, not by Caddy:
 #
-#   CADDY_SITE_ADDRESS  → Django app (e.g. "switchlibya.ly www.switchlibya.ly")
+#   CADDY_SITE_ADDRESS  → Django app (e.g. "crm.example.com www.crm.example.com")
 #   CADDY_ERP_ADDRESS   → optional legacy host redirected to /staff/
 #
 # Automatic HTTPS: when an address is a real hostname (prod), Caddy obtains AND

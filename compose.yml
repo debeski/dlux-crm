@@ -18,9 +18,9 @@ x-environment:
   # Web app settings (override these in compose.dev.yml or .env)
   # Django/DLux owns the public/staff path split on the canonical host.
   # The legacy erp.<domain> host may redirect to /staff/ at Caddy.
-  ALLOWED_HOSTS: "${ALLOWED_HOSTS:-web,localhost,127.0.0.1,switchlibya.ly,www.switchlibya.ly,erp.switchlibya.ly,caddy}"
-  ALLOWED_URLS: "${ALLOWED_URLS:-https://switchlibya.ly,https://www.switchlibya.ly}"
-  BASE_URL: "${BASE_URL:-https://switchlibya.ly}"
+  ALLOWED_HOSTS: "${ALLOWED_HOSTS:-web,localhost,127.0.0.1,caddy}"
+  ALLOWED_URLS: "${ALLOWED_URLS:-http://localhost}"
+  BASE_URL: "${BASE_URL:-http://localhost}"
   DEBUG_STATUS: "${DEBUG_STATUS:-False}"
   # DjangoLux verified inline updater (generated Compose deployments only)
   DLUX_INLINE_UPDATES_ENABLED: "True"
@@ -113,11 +113,12 @@ services:
       - "${HTTPS_PORT:-443}:443"
     environment:
       # Canonical Django/DLux host(s), space-separated; Caddy auto-provisions certs.
-      # e.g. "switchlibya.ly www.switchlibya.ly"
-      CADDY_SITE_ADDRESS: "${CADDY_SITE_ADDRESS:-switchlibya.ly www.switchlibya.ly}"
+      # e.g. "crm.example.com www.crm.example.com". Set it in .secrets/.env; the
+      # default serves plain HTTP on any host name.
+      CADDY_SITE_ADDRESS: "${CADDY_SITE_ADDRESS:-:80}"
       # Optional legacy ERP hostname redirected to CADDY_PRIMARY_URL/staff/.
-      CADDY_ERP_ADDRESS: "${CADDY_ERP_ADDRESS:-erp.switchlibya.ly}"
-      CADDY_PRIMARY_URL: "${CADDY_PRIMARY_URL:-https://switchlibya.ly}"
+      CADDY_ERP_ADDRESS: "${CADDY_ERP_ADDRESS:-http://erp.localhost}"
+      CADDY_PRIMARY_URL: "${CADDY_PRIMARY_URL:-http://localhost}"
       # Max upload size (Caddy units, e.g. 10MB).
       CADDY_MAX_SIZE: "${CADDY_MAX_SIZE:-10MB}"
       # Trusted front proxy (TLS terminator): unset trusts every private address,

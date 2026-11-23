@@ -122,7 +122,7 @@ class Command(BaseCommand):
                 defaults={
                     "first_name": first_name,
                     "last_name": last_name,
-                    "email": f"{username}@switch.local",
+                    "email": f"{username}@demo.local",
                     "is_staff": is_staff,
                 },
             )
@@ -187,11 +187,11 @@ class Command(BaseCommand):
         # (name, category, barcode, cost_usd, markup%, unit, reorder,
         #  initial_stock, lyd_override, track_stock, color, size)
         specs = [
-            ("Switch Pro Deadbolt", "Smart Locks", "6291041500213", 85, 30, "piece", 6, 42, None, True, Product.COLOR_BLACK, "ANSI / 70 mm"),
-            ("Switch Pro Deadbolt - Brass", "Smart Locks", "6291041500214", 88, 32, "piece", 4, 18, None, True, Product.COLOR_GOLD, "ANSI / 70 mm"),
-            ("Switch Lite Keypad", "Smart Locks", "6291041500220", 45, 35, "piece", 8, 6, None, True, Product.COLOR_WHITE, "Slim / 160x68 mm"),
-            ("Switch Glass Door Lock", "Smart Locks", "6291041500221", 115, 28, "piece", 3, 12, None, True, Product.COLOR_GRAY, "Glass 10-12 mm"),
-            ("Switch Hotel Lock", "Smart Locks", "6291041500222", 92, 34, "piece", 5, 16, None, True, Product.COLOR_GOLD, "RFID / 60 mm"),
+            ("Pro Deadbolt", "Smart Locks", "6291041500213", 85, 30, "piece", 6, 42, None, True, Product.COLOR_BLACK, "ANSI / 70 mm"),
+            ("Pro Deadbolt - Brass", "Smart Locks", "6291041500214", 88, 32, "piece", 4, 18, None, True, Product.COLOR_GOLD, "ANSI / 70 mm"),
+            ("Lite Keypad", "Smart Locks", "6291041500220", 45, 35, "piece", 8, 6, None, True, Product.COLOR_WHITE, "Slim / 160x68 mm"),
+            ("Glass Door Lock", "Smart Locks", "6291041500221", 115, 28, "piece", 3, 12, None, True, Product.COLOR_GRAY, "Glass 10-12 mm"),
+            ("Hotel Lock", "Smart Locks", "6291041500222", 92, 34, "piece", 5, 16, None, True, Product.COLOR_GOLD, "RFID / 60 mm"),
             ("Outdoor Gate Controller", "Controllers", "6291041500223", 64, 42, "piece", 5, 10, None, True, Product.COLOR_NAVY, "Weatherproof IP65"),
             ("Wi-Fi Bridge", "Controllers", "6291041500224", 22, 50, "piece", 10, 35, None, True, Product.COLOR_WHITE, "2.4 GHz"),
             ("Bluetooth Gateway", "Controllers", "6291041500225", 28, 48, "piece", 8, 30, None, True, Product.COLOR_BLACK, "BLE / USB-C"),
@@ -214,21 +214,24 @@ class Command(BaseCommand):
         ]
         out = {}
         for name, cat, barcode, cost, markup, unit, reorder, stock, override, track, color, size in specs:
-            p, created = Product.objects.get_or_create(
-                name=name,
-                defaults={
-                    "category": cats[cat],
-                    "barcode": barcode,
-                    "cost_usd": D(cost),
-                    "markup_percent": D(markup),
-                    "unit": unit,
-                    "reorder_level": D(reorder),
-                    "price_lyd_override": override,
-                    "track_stock": track,
-                    "color": color,
-                    "size": size,
-                },
-            )
+            # Matched by barcode, so a re-run over an older demo database finds the
+            # same rows even where a demo name has changed since.
+            p = Product.objects.filter(barcode=barcode).first()
+            created = p is None
+            if created:
+                p = Product.objects.create(
+                    name=name,
+                    category=cats[cat],
+                    barcode=barcode,
+                    cost_usd=D(cost),
+                    markup_percent=D(markup),
+                    unit=unit,
+                    reorder_level=D(reorder),
+                    price_lyd_override=override,
+                    track_stock=track,
+                    color=color,
+                    size=size,
+                )
             variant = ProductVariant.get_or_create_for(p, color, size)
             # Seed opening stock exactly once (idempotent: only if no ledger rows).
             if created and track and stock and not p.movements.exists():
@@ -330,9 +333,9 @@ class Command(BaseCommand):
             self._purchase_invoice(
                 S["Tripoli Secure Imports"], 24,
                 [
-                    (P["Switch Pro Deadbolt"], 12),
-                    (P["Switch Glass Door Lock"], 6),
-                    (P["Switch Hotel Lock"], 8),
+                    (P["Pro Deadbolt"], 12),
+                    (P["Glass Door Lock"], 6),
+                    (P["Hotel Lock"], 8),
                     (P["Wi-Fi Bridge"], 20),
                 ],
             ),
@@ -458,9 +461,9 @@ class Command(BaseCommand):
         invoices = []
         cases = [
             (customers[0], "paid", 45, 0, rep1, cash_batch, Payment.METHOD_CASH,
-             [("product", P["Switch Pro Deadbolt"], 1), ("service", S["Standard Installation"], 1)]),
+             [("product", P["Pro Deadbolt"], 1), ("service", S["Standard Installation"], 1)]),
             (customers[1], "partial", 41, 0, rep2, cash_batch, Payment.METHOD_CASH,
-             [("product", P["Switch Lite Keypad"], 2), ("product", P["Spare Key Fob"], 3)]),
+             [("product", P["Lite Keypad"], 2), ("product", P["Spare Key Fob"], 3)]),
             (customers[2], "issued", 38, 10, rep1, None, Payment.METHOD_CASH,
              [("product", P["Fingerprint Module"], 2), ("service", S["Annual Maintenance"], 1)]),
             (customers[3], "cancelled", 34, 0, rep2, None, Payment.METHOD_CASH,
@@ -468,13 +471,13 @@ class Command(BaseCommand):
             (None, "draft", 30, 0, rep1, None, Payment.METHOD_CASH,
              [("custom", "On-site consultation", 150, 1), ("service", S["City Delivery"], 1)]),
             (customers[4], "paid", 26, 0, rep1, bank_batch, Payment.METHOD_BANK,
-             [("product", P["Switch Glass Door Lock"], 2), ("service", S["Glass Door Installation"], 2)]),
+             [("product", P["Glass Door Lock"], 2), ("service", S["Glass Door Installation"], 2)]),
             (customers[5], "partial", 23, 5, rep2, cash_batch, Payment.METHOD_CASH,
              [("product", P["Wi-Fi Bridge"], 4), ("product", P["Bluetooth Gateway"], 2), ("service", S["Access Audit"], 1)]),
             (customers[6], "issued", 20, 0, rep1, None, Payment.METHOD_CASH,
              [("product", P["Outdoor Gate Controller"], 1), ("product", P["Door Sensor Pair"], 3)]),
             (customers[7], "paid", 17, 12.5, rep2, bank_batch, Payment.METHOD_BANK,
-             [("product", P["Switch Hotel Lock"], 6), ("product", P["RFID Card Pack"], 3), ("service", S["Enterprise Warranty"], 1)]),
+             [("product", P["Hotel Lock"], 6), ("product", P["RFID Card Pack"], 3), ("service", S["Enterprise Warranty"], 1)]),
             (customers[8], "partial", 14, 0, rep1, cash_batch, Payment.METHOD_CASH,
              [("product", P["Battery Pack CR123"], 4), ("product", P["NFC Sticker Roll"], 2)]),
             (customers[9], "issued", 11, 0, rep2, None, Payment.METHOD_CASH,
@@ -486,7 +489,7 @@ class Command(BaseCommand):
             (customers[0], "paid", 5, 0, rep1, bank_batch, Payment.METHOD_BANK,
              [("product", P["Gift Card (unrelated goods)"], 2)]),
             (customers[2], "issued", 4, 7.5, rep2, None, Payment.METHOD_CASH,
-             [("product", P["Switch Pro Deadbolt - Brass"], 1), ("service", S["Premium Door Retrofit"], 1)]),
+             [("product", P["Pro Deadbolt - Brass"], 1), ("service", S["Premium Door Retrofit"], 1)]),
             (customers[4], "partial", 3, 0, rep1, cash_batch, Payment.METHOD_CASH,
              [("product", P["Magnetic Contact Heavy"], 4), ("product", P["Relay Board 2CH"], 3)]),
             (customers[5], "paid", 2, 0, rep2, bank_batch, Payment.METHOD_BANK,
@@ -602,7 +605,7 @@ class Command(BaseCommand):
             created_by=self.actor,
         )
         for name, counted_delta in [
-            ("Switch Pro Deadbolt", None),
+            ("Pro Deadbolt", None),
             ("Wi-Fi Bridge", D("0.00")),
             ("Mounting Plate", D("-1.00")),
         ]:
