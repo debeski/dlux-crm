@@ -43,12 +43,14 @@
                 <strong>{{ product.price_usd|floatformat:2 }} {{ product.currency }}</strong>
             </div>
         </div>
+        {% if can_view_cost %}
         <div class="col-6 col-lg-3">
             <div class="product-card-stat">
                 <span>{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }}</span>
                 <strong>{{ product.cost_usd|floatformat:2 }} {{ product.currency }}</strong>
             </div>
         </div>
+        {% endif %}
     </div>
 
     {% if show_automotive_fitments %}
@@ -79,7 +81,7 @@
                 <div class="product-card-heading"><i class="bi bi-info-circle me-1"></i>{{ DLUX_STRINGS.ui_item_details|default:"Item details" }}</div>
                 <dl class="row small mb-0">
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_unit|default:"Unit" }}</dt><dd class="col-7">{{ product.get_unit_display }}</dd>
-                    <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup" }}</dt><dd class="col-7">{{ product.markup_percent|floatformat:2 }}%</dd>
+                    {% if can_view_cost %}<dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup" }}</dt><dd class="col-7">{{ product.markup_percent|floatformat:2 }}%</dd>{% endif %}
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_reorder_level|default:"Reorder level" }}</dt><dd class="col-7">{{ product.reorder_level|floatformat:"-2" }}</dd>
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_alias|default:"Local alias" }}</dt><dd class="col-7">{{ product.alias|default:"—" }}</dd>
                     <dt class="col-5 text-muted">{{ DLUX_STRINGS.label_product_price_lyd_override|default:"Manual LYD" }}</dt><dd class="col-7">{% if product.price_lyd_override != None %}{{ product.price_lyd_override|floatformat:2 }} LYD{% else %}—{% endif %}</dd>

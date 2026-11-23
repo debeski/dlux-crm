@@ -3,6 +3,10 @@ from django.db import models
 from django.db.models.functions import Lower
 from dlux.models import ScopedModel
 
+#: Uniqueness applies to rows that are not soft-deleted, so a deleted name can
+#: be created again (the automotive lookups follow the same rule).
+LIVE = models.Q(deleted_at__isnull=True)
+
 
 class MachineReference(ScopedModel):
     name = models.CharField(max_length=120, verbose_name="Name")
@@ -15,14 +19,22 @@ class MachineReference(ScopedModel):
     def __str__(self):
         return self.name
 
+    def validate_constraints(self, exclude=None):
+        # The name constraints apply to live rows (deleted_at IS NULL). deleted_at
+        # is never on a form, and Django skips a constraint whose condition reads
+        # an excluded field, so keep it in for the duplicate check.
+        if exclude:
+            exclude = set(exclude) - {"deleted_at"}
+        super().validate_constraints(exclude=exclude)
+
 
 class MachineType(MachineReference):
     class Meta(MachineReference.Meta):
         verbose_name = "Machine type"
         verbose_name_plural = "Machine types"
         constraints = [
-            models.UniqueConstraint(Lower("name"), "scope", name="machine_type_scoped_name"),
-            models.UniqueConstraint(Lower("name"), condition=models.Q(scope__isnull=True), name="machine_type_global_name"),
+            models.UniqueConstraint(Lower("name"), "scope", condition=LIVE, name="machine_type_scoped_name"),
+            models.UniqueConstraint(Lower("name"), condition=LIVE & models.Q(scope__isnull=True), name="machine_type_global_name"),
         ]
 
 
@@ -31,8 +43,8 @@ class Manufacturer(MachineReference):
         verbose_name = "Manufacturer"
         verbose_name_plural = "Manufacturers"
         constraints = [
-            models.UniqueConstraint(Lower("name"), "scope", name="machine_make_scoped_name"),
-            models.UniqueConstraint(Lower("name"), condition=models.Q(scope__isnull=True), name="machine_make_global_name"),
+            models.UniqueConstraint(Lower("name"), "scope", condition=LIVE, name="machine_make_scoped_name"),
+            models.UniqueConstraint(Lower("name"), condition=LIVE & models.Q(scope__isnull=True), name="machine_make_global_name"),
         ]
 
 
@@ -50,8 +62,8 @@ class MachineModel(MachineReference):
         verbose_name = "Machine model"
         verbose_name_plural = "Machine models"
         constraints = [
-            models.UniqueConstraint("machine_type", "manufacturer", Lower("name"), name="machine_model_type_make_name"),
-            models.UniqueConstraint("machine_type", Lower("name"), condition=models.Q(manufacturer__isnull=True), name="machine_model_type_name_no_make"),
+            models.UniqueConstraint("machine_type", "manufacturer", Lower("name"), condition=LIVE, name="machine_model_type_make_name"),
+            models.UniqueConstraint("machine_type", Lower("name"), condition=LIVE & models.Q(manufacturer__isnull=True), name="machine_model_type_name_no_make"),
         ]
 
     def __str__(self):

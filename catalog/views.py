@@ -282,6 +282,9 @@ class ProductCardView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
             .order_by("-created_at", "-pk")[:30]
         )
         ctx["price_lyd"] = self.object.selling_price_lyd()
+        # Cost and markup are a manager's figures: the edit form already needs
+        # change_product, so the card shows them on the same condition.
+        ctx["can_view_cost"] = self.request.user.has_perm("catalog.change_product")
         from automotive.services import fitment_label
         from automotive.settings import get_automotive_config
 
@@ -376,6 +379,7 @@ class StockMovementListView(ScopedListView):
         if (
             user.has_perm("catalog.add_purchaseinvoice")
             and user.has_perm("catalog.add_product")
+            and user.has_perm("catalog.change_product")
             and user.has_perm("catalog.add_stockmovement")
         ):
             actions.append({
@@ -414,6 +418,7 @@ class PurchaseInvoiceListView(ScopedListView):
         if not (
             user.has_perm("catalog.add_purchaseinvoice")
             and user.has_perm("catalog.add_product")
+            and user.has_perm("catalog.change_product")
             and user.has_perm("catalog.add_stockmovement")
         ):
             return []

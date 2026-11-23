@@ -908,14 +908,21 @@ class StockTake(ScopedModel):
         if self.status != self.STATUS_OPEN:
             raise ValidationError("Only an open stock take can be applied.")
         with transaction.atomic():
-            for line in self.lines.select_related("product"):
+            for line in self.lines.select_related("product").prefetch_related("product__variants"):
                 variance = line.variance
                 if variance in (None, Decimal("0.00"), 0):
                     continue
                 if not line.product.track_stock:
                     continue
+                # A take counts the product as a whole. When it has a single
+                # stock bucket the adjustment goes to that bucket, so the
+                # variant balance the invoices check moves with the total; with
+                # several buckets there is no way to tell which one differs, and
+                # the adjustment stays on the product total.
+                buckets = list(line.product.variants.all())
                 StockMovement.objects.create(
                     product=line.product,
+                    variant=buckets[0] if len(buckets) == 1 else None,
                     movement_type=StockMovement.TYPE_ADJUST,
                     quantity=variance,  # signed delta counted − system
                     reason=f"Stock take {self.number}",

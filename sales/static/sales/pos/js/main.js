@@ -62,9 +62,12 @@
             });
     }
 
+    // The token comes from the page (dlux/base.html renders it as a meta tag):
+    // the project renames the CSRF cookie, so a cookie lookup by Django's
+    // default name finds nothing.
     function csrf() {
-        const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-        if (match) return decodeURIComponent(match[1]);
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.getAttribute("content")) return meta.getAttribute("content");
         const input = document.querySelector("input[name=csrfmiddlewaretoken]");
         return input ? input.value : "";
     }
