@@ -199,11 +199,29 @@ facing the internet directly there is nothing to name: the default
 
 ### Rolling back
 
-This release's DjangoLux adds its own database tables. To go back, restore the
-backup from step 1 with the previous `compose.yml`, `start.sh`, `start.ps1` and
-`.proxy/Caddyfile`, put `WEB_IMAGE=debeski/dlux-crm:sales-v<the version you came
-from>` in `.secrets/.env`, then run `./start.sh` and `./start.sh restart caddy`. Going back to v0.11.4 or older reopens the
-stored-files exposure: do it only to recover.
+This release adds database tables and renames stored settings, so going back
+means restoring the backup from step 1, in this order:
+
+1. Stop the whole stack while this release's `compose.yml` is still in place:
+   `./start.sh --down`. Starting the old files first would leave `worker`
+   running on this release's image, since Composer does not remove services that
+   left `compose.yml`.
+2. Put back the previous `compose.yml`, `start.sh`, `start.ps1`,
+   `.proxy/Caddyfile`, `.composer-channel` and `relay/`. In `.secrets/.env` set
+   `WEB_IMAGE=debeski/dlux-crm:sales-v<the version you came from>` and, if
+   `check --fix` restamped it, change the first line back to the old
+   `# dlux stack schema` number (its copy is in `.xclude/composer-check/`).
+3. `./start.sh`, then restore the backup (Options > Backup & Restore, or your
+   database dump).
+4. Clear the cache, which still holds this release's settings, and restart:
+
+   ```bash
+   docker compose exec redis redis-cli -n 1 FLUSHDB
+   ./start.sh restart web worker celery caddy
+   ```
+
+   Everyone signs in again. Going back to v0.11.4 or older reopens the
+   stored-files exposure: do it only to recover.
 
 ## Updating later
 

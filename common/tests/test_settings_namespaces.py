@@ -28,7 +28,8 @@ class NamespaceMigrationTests(TestCase):
             },
             "unrelated": {"kept": True},
         }
-        self.settings_row.save(update_fields=["extra_config"])
+        # A queryset update: saving the row would rename the old keys (rename_on_save).
+        SystemSettings.objects.filter(pk=self.settings_row.pk).update(extra_config=self.settings_row.extra_config)
         user = get_user_model().objects.create_user("rep", password="x")
         self.profile, _ = Profile.objects.get_or_create(user=user)
         self.profile.preferences = {"app": {"switch_pos.products_layout": "grid", "switch_pos.workspace_dashboard.v1": {"order": [1]}}}
@@ -61,6 +62,52 @@ class NamespaceMigrationTests(TestCase):
         migration.backwards(django_apps, None)
         self.profile.refresh_from_db()
         self.assertIn("switch_pos.products_layout", self.profile.preferences["app"])
+
+
+class StaleSettingsGuardTests(TestCase):
+    """An old copy of the settings row neither survives in the cache nor saves back."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        from dlux.models import SystemSettings
+
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.row = SystemSettings.load()
+
+    def test_a_cached_row_with_old_keys_is_dropped(self):
+        from django.core.cache import cache
+        from common.settings_namespaces import CACHE_KEY, drop_stale_cache
+
+        self.row.extra_config = {"app": {"switch_pos.pricing": {"currency": "EUR"}}}
+        cache.set(CACHE_KEY, self.row)
+        drop_stale_cache()
+        self.assertIsNone(cache.get(CACHE_KEY))
+
+    def test_a_current_cached_row_is_kept(self):
+        from django.core.cache import cache
+        from common.settings_namespaces import CACHE_KEY, drop_stale_cache
+
+        self.row.extra_config = {"app": {"sales_crm.pricing": {"currency": "EUR"}}}
+        cache.set(CACHE_KEY, self.row)
+        drop_stale_cache()
+        self.assertIsNotNone(cache.get(CACHE_KEY))
+
+    def test_saving_an_old_copy_stores_the_new_keys(self):
+        from dlux.models import SystemSettings
+
+        self.row.extra_config = {"app": {"switch_pos.point_of_sale": {"enabled": True}, "sales_crm.pricing": {"currency": "EUR"}}}
+        self.row.save()
+        stored = SystemSettings.objects.get(pk=self.row.pk).extra_config["app"]
+        self.assertEqual(stored, {"sales_crm.point_of_sale": {"enabled": True}, "sales_crm.pricing": {"currency": "EUR"}})
+
+    def test_a_save_of_other_fields_leaves_extra_config_alone(self):
+        from dlux.models import SystemSettings
+
+        SystemSettings.objects.filter(pk=self.row.pk).update(extra_config={"app": {"switch_pos.pricing": {}}})
+        row = SystemSettings.objects.get(pk=self.row.pk)
+        row.save(update_fields=["is_configured"])
+        self.assertIn("switch_pos.pricing", SystemSettings.objects.get(pk=row.pk).extra_config["app"])
 
 
 class RenamedIdentifierTests(SimpleTestCase):
