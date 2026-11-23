@@ -1,42 +1,25 @@
-# Switch POS — Documentation
+# Sales CRM — Documentation
 
-Project documentation for the Switch sales system (منظومة مبيعات):
+Project documentation for the Sales CRM (منظومة مبيعات):
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — apps, layering, the dlux build pattern, money/security baseline
-- [BUSINESS_RULES.md](BUSINESS_RULES.md) — currency, hybrid pricing, frozen-rate rule, invoice lifecycle, inventory
-- [PERMISSIONS.md](PERMISSIONS.md) — roles (Admin vs Sales Staff), `seed_roles`, custom permissions
-- [OPERATIONS.md](OPERATIONS.md) — setup, first-run checklist, key URLs, local dev, migrations
-- [AUTOMOTIVE_FITMENT_PLAN.md](AUTOMOTIVE_FITMENT_PLAN.md) — phased optional vehicle-compatibility module and retailer rollout
+- [ARCHITECTURE.md](ARCHITECTURE.md) — apps, layering, DjangoLux patterns, URL structure, money and security baseline
+- [BUSINESS_RULES.md](BUSINESS_RULES.md) — currency and pricing, invoices, payments, catalog, stock, purchasing, POS, finance, public shop
+- [PERMISSIONS.md](PERMISSIONS.md) — roles, `seed_roles`, custom permissions, per-employee visibility
+- [OPERATIONS.md](OPERATIONS.md) — the container stack, settings, HTTPS, first-run checklist, key URLs, scheduled work, updating, local development, commands
+- [RELEASING.md](RELEASING.md) — tag-driven Docker image releases for `debeski/dlux-crm:sales`, the deployment bundle, CI
+- [AUTOMOTIVE_FITMENT.md](AUTOMOTIVE_FITMENT.md) — the optional vehicle and machinery compatibility modules
+- [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md) — machinery categories and compatibility vocabulary
+- [QA_WORKFLOWS.md](QA_WORKFLOWS.md) — manual QA workflows
 
-See also the root `CHANGELOG.md` and `VERSION`.
+See also the root [README.md](../README.md), [CHANGELOG.md](../CHANGELOG.md), `VERSION` and
+[deploy/README.md](../deploy/README.md) (the deployment bundle's README).
 
----
+## Conventions
 
-# Switch Pos Notes (DjangoLux scaffold notes)
-
-## Recommended Structure
-
-- Put project-owned runtime defaults in `DLUX_CONFIG`
-- Keep DjangoLux integration in `settings.py` via `dlux_settings(globals())`
-- Build full-page forms on `dlux/form_base.html`
-- Build list/filter pages on `dlux/list_base.html`
-- Use `translations.py`, `forms.py`, `filters.py`, and `tables.py` in each app so discovery stays predictable
-- Use `config/celery.py` as the shared Celery entrypoint and keep app tasks in app-local `tasks.py`
-- Use `/health/` as the project health endpoint when checking container readiness
-- Keep secret bootstrap values in `.secrets/.env`; the generated compose file itself stays in the standard inline-env pattern
-
-## Suggested App Pattern
-
-- Use `ScopedModel` for business models that should inherit DjangoLux audit and scope behavior
-- Mark simple lookup datasets with `is_section = True` when they fit the sections workflow
-- Use custom views when the model needs a project-owned flow instead of the system sections screen
-- Keep shared scripts and CSS in the DjangoLux extension hooks instead of overriding the whole base template when possible
-
-## Useful Commands
-
-- `python manage.py dlux_check`
-- `python manage.py dlux_setup`
-- `python -m dlux startapp app_name`
-- `python -m dlux startapp app_name --register`
-- `docker compose -f compose.yml -f compose.dev.yml up`
-- `./start.sh -d`
+- Project defaults live in `DLUX_CONFIG` in `config/settings.py`; DjangoLux is wired by `dlux_settings(globals())`.
+- Business models extend `ScopedModel` (DjangoLux audit and store-scope behaviour).
+- Each app keeps `translations.py`, `forms.py`, `filters.py`, `tables.py`, `views.py` and `urls.py` under the conventional names so DjangoLux discovery finds them.
+- `config/celery.py` is the Celery entrypoint; app tasks live in app-local `tasks.py`.
+- `/health/` is the health endpoint.
+- Secrets live in `.secrets/.env`; `compose.yml` keeps the standard inline-environment pattern and never reads that file into services directly.
+- Useful commands: `python manage.py dlux_check`, `python manage.py dlux_setup`; with Docker `./start.sh -d`.
