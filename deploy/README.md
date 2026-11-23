@@ -72,8 +72,10 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
    The first start pulls the images, applies the migrations, imports
    `config.json` and starts every service.
 4. Open `BASE_URL/staff/` and sign in as `admin` with `ADMIN_PASS`.
-5. Run `./start.sh check`. It must exit 0. The `front-proxy` line stays a warning
-   until `DLUX_FRONT_PROXY` is set.
+5. Run `./start.sh check --fix`, then `./start.sh check`. It must exit 0. The fix
+   gives the app's non-root user group access to `media/`, `logs/` and the data
+   volumes (without it `check` shows an `app-permissions` warning). The
+   `front-proxy` line stays a warning until `DLUX_FRONT_PROXY` is set.
 
 ## Upgrading an existing deployment
 
