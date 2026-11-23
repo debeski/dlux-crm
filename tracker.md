@@ -25,7 +25,6 @@
 - SMTP credentials unset on the deployment, so the contact relay cannot authenticate. Updates card can show a stale "Could not read the DjangoLux release index" until a check completes.
 ### Incomplete Tasks: [Max 20 lines]
 - **Priority 1 — follow-ups:**
-  - [ ] `deploy/README.md` first-install step 5: a fresh install also shows an `app-permissions` advisory until `./start.sh check --fix` (docs only; this tracker commit is local on `feat/dlux-1-16-1`, after the merge).
   - [ ] Live VM upgrade to v0.13.0 per `deploy/README.md` (check its project/database names first).
 - **Priority 2 — owner decisions and follow-ups:**
   - [ ] Keep the project `celery` until DjangoLux 1.17 or move `refresh_market_rates` to `dlux.taskrunner` (about 2-3 h plus a testbed run; no test covers the task). `currency-switch` and `automotive-parts-first` carry uncommitted work on old pins.
@@ -33,6 +32,7 @@
   - [ ] POS phase 2 (phone as scanner, parked sales, guided certificate install, shifts/Z-report, returns); Automotive Phases 0/4 (retailer workbook, reviewed import); ribbon tab strips; storefront polish (mobile `/shop/` search, hero kicker contrast).
 - **Completed Recently:**
   - [x] 2026-11-18: v0.13.0 prepared, pushed, PR #2; testbed acceptance from v0.12.0 and v0.11.4 passed.
+  - [x] 2026-11-24: `deploy/README.md` first install runs `check --fix` (app-permissions advisory).
   - [x] 2026-11-23: Phase B on DjangoLux 1.16.3: stack files, storefront images exempt from the cross-site gate, stale-settings-cache guard (`common.settings_namespaces`), tested rollback order in `deploy/README.md`; testbed paths A and C passed.
   - [x] 2026-11-23: docs audit Phase A (rename to Sales CRM, real README and app READMEs, OPERATIONS/RELEASING rebuilt, doc fixes).
   - [x] 2026-11-23: ownership on writes (customer, deposit, delivery, deposit review), issued invoices undeletable, cost on the card, POS CSRF, stock-take bucket, Add Stock gating, machinery live uniqueness, till vehicle-panel permissions, no cross-store bulk links, browsable-only vehicle tile, product record view = item card on both modal routes, per-bucket stock takes (`catalog.0014`), stored-identifier renames + `common.0001`, neutral defaults, `portfolio/` retired.
