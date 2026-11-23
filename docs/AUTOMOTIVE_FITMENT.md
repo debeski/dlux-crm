@@ -41,7 +41,7 @@ enhancements**. All routes below sit under `/staff/`.
 
 ## Settings
 
-The value is stored in `SystemSettings.extra_config["app"]["switch_pos.optional_enhancements"]`:
+The value is stored in `SystemSettings.extra_config["app"]["sales_crm.optional_enhancements"]`:
 
 ```text
 machinery.enabled        false

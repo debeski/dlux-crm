@@ -5,7 +5,7 @@
 - Products keep their own **USD** or **EUR** pricing currency (`Product.currency`).
   The `cost_usd` / `price_usd` column names store amounts in that currency.
   Local selling prices use the corresponding live rate, or a manual LYD override.
-- CRM options → Default currency (`switch_pos.pricing`) offers **USD / EUR / BOTH** in one selector. USD or EUR sets the default currency for products, invoices, purchase invoices and services. BOTH keeps the current default and
+- CRM options → Default currency (`sales_crm.pricing`) offers **USD / EUR / BOTH** in one selector. USD or EUR sets the default currency for products, invoices, purchase invoices and services. BOTH keeps the current default and
   allows buyers to choose either currency per purchase invoice. Existing purchase
   permissions apply (`catalog.add_purchaseinvoice`); there is no additional currency-selection permission.
 - In single-currency mode, currency controls are hidden in product/intake forms and the purchase header; purchases use the default currency. Posting an
@@ -162,13 +162,13 @@ pricing, stock or invoices.
 
 ## Products list layout
 
-Each user chooses a **Table**, **Grid** or **Light** layout for the Products list (per-user preference `switch_pos.products_layout`).
+Each user chooses a **Table**, **Grid** or **Light** layout for the Products list (per-user preference `sales_crm.products_layout`).
 CRM options → Products layout sets the store-wide default (Table); a user's own choice overrides it.
 
 ## Public catalog
 
 **Public site switch.** System settings → CRM options → Public catalog starts with a
-*Public site* toggle (`switch_pos.public_catalog.enabled`, default on;
+*Public site* toggle (`sales_crm.public_catalog.enabled`, default on;
 `public_catalog.options_forms.PublicCatalogSettingsForm`). Off makes the install
 staff-only: `/`, `/shop/` and item pages redirect to `/staff/` (`staff_entry`), the item
 and contact modals return 404, both builders redirect to the staff home with a notice and
@@ -260,7 +260,7 @@ with type → manufacturer → model → nested categories, without changing veh
 
 Users may hide, reorder, and resize tiles. Those layout preferences are stored
 per user in DjangoLux's reserved app-preferences namespace:
-`Profile.preferences["app"]["switch_pos.workspace_dashboard.v1"]`. Browser
+`Profile.preferences["app"]["sales_crm.workspace_dashboard.v1"]`. Browser
 `localStorage` is used only as a fallback. Layout preferences do not grant access to hidden data, change business
 records, or affect another user's layout. The `/staff/sales/dashboard/`
 page is available as **Sales Overview** for a sales-centric screen.
@@ -568,6 +568,9 @@ shelves and reconcile it against what the system thinks you have:
 3. **Apply** it (needs `apply_stocktake`) — the system posts one **Adjustment**
    `StockMovement` per real discrepancy on a tracked product, so `stock_qty`
    becomes the counted figure, and the take locks as `applied` (can't re-apply).
+   A product with a single colour/size bucket gets the adjustment on that bucket
+   too, so the bucket the invoices check follows the count; a product with several
+   buckets is adjusted on its total only, and its buckets need manual adjustments.
    Adjustments flow through the same append-only ledger as every other stock
    change, so the correction is fully auditable.
 

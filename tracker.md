@@ -3,7 +3,7 @@
 ### Current Verified Snapshot: [Max 5 lines]
 - 2026-11-23: v0.13.0 (DjangoLux 1.16.1, Composer 1.10.1, stack schema 5: `worker` beside the project `celery`, F3 report fix) is on `feat/dlux-1-16-1`, PR https://github.com/debeski/dlux-crm/pull/2 open and held, UNMERGED/UNTAGGED. Published release is still v0.12.0 (DjangoLux 1.15.3, schema 4).
 - Sales skips DjangoLux 1.16.2: it goes 1.16.1 -> 1.16.3 (+ Composer 1.10.3) in one step once both are stable (Phase B, owner's OK already given: stack files from the 1.16.3 scaffold, image, tests, testbeds incl. stress, push, merge #2, tag, deployment zip).
-- Product name is **Sales CRM** (repo/image `debeski/dlux-crm:sales`, project slug `dlux-crm-sales`); the old name "Switch POS" is gone from docs and comments. Stored identifiers keep the legacy `switch_pos` name (see Known Bugs).
+- Product name is **Sales CRM** (repo/image `debeski/dlux-crm:sales`, project slug `dlux-crm-sales`); the old name "Switch POS" and the customer brand are gone from docs, code defaults and stored identifiers (`sales_crm_*` cookies, `sales_crm.*` settings moved by `common.0001`).
 - Public `/`, `/shop/...`, `/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS and redirects the legacy ERP host.
 ### Current Project Adopted Standards: [Max 5 lines]
 - Scoped models via `dlux.ScopedModel`; lists are `common.ScopedListView` on the dlux Ribbon + `dlux/list_page.html` (non-list pages use `common.RibbonPageMixin`), CRUD through the modal manager.
@@ -20,24 +20,24 @@
 - 2026-11-23 docs audit (Phase A, static): rename, README, OPERATIONS/RELEASING rebuilt, BUSINESS_RULES/PERMISSIONS/ARCHITECTURE/AUTOMOTIVE checked against code. Report: `docs-audit-crm-sales.md` in the session notes folder.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
 - Soft-resetting `OpeningStockDraft` leaves the scope uniqueness constraint on trashed rows, blocking replacement drafts (permanent reset works).
-- Stored identifiers still carry the old name: cookies `switch_pos_sessionid`/`switch_pos_csrftoken`, the `switch_pos.*` settings/preference namespaces, the `switch.workspace.dashboard.v1` localStorage key, the `switch-pos` User-Agent in `relay/operations.json` + `finance/services.py`, the `switch_pos_db` fallback in `config/settings.py`. Renaming is a Phase B decision with an upgrade test.
+- DjangoLux's generic record modal (hand-typed URL) still lists product cost to `view_product` holders: no field-hiding hook upstream. A stock take on a product with several variant buckets adjusts only the total. Not fixed yet: POS `VehicleProductsView` needs only POS perms; bulk fit/assign forms are unscoped for superusers; the Vehicle Models dashboard tile counts inactive/migrated rows.
 - Live VM likely runs a stale stack (old portfolio on apex/www, stored files open to v0.11.4): one-hop upgrade per `deploy/README.md`; check its project and database names first: v0.1.0 `switch_pos`/`switch_pos_db`, v0.1.2 `sales-crm`/`sales_crm_db`, v0.1.3+ `sales`/`sales_db` (a pre-v0.1.3 server would start empty volumes under `name: sales`).
 - SMTP credentials unset on the deployment, so the contact relay cannot authenticate. Updates card can show a stale "Could not read the DjangoLux release index" until a check completes.
 ### Incomplete Tasks: [Max 20 lines]
 - **Priority 1 — Phase B (wait for the parent session's message that 1.16.3 + Composer 1.10.3 are stable):**
   - [ ] Pin `django-lux[updater]==1.16.3`; regenerate stack files from that scaffold (drops dead `BACKUP_INTERVAL`/`pgadmin_data`; keep `agent run`/`executor run` if the template still emits the flat form); `check --fix` on a scratch copy and diff; re-test the Caddyfile comment edits.
-  - [ ] Rebuild image; suite on amd64 + PostgreSQL-only modules; testbed upgrade from the published v0.12.0 state AND the v0.11.4 state; stress tests (stored-file/media attacks, load, rollback cycle, relay refresh); click through POS checkout (its JS reads cookie `csrftoken`, the project names it `switch_pos_csrftoken`).
+  - [ ] Rebuild image; suite on amd64 + PostgreSQL-only modules; testbed upgrade from the published v0.12.0 state AND the v0.11.4 state; stress tests (stored-file/media attacks, load, rollback cycle, relay refresh); click through POS checkout with CSRF enforced; prove the `common.0001` key move, the cookie rename (one sign-out) and the re-locked relay on the upgraded testbed; `.secrets/.env` must carry the site variables (compose defaults are localhost).
   - [ ] Push, merge #2, tag `v0.13.0` (or the next version), let CI release, re-run the testbed from the published image, build `dist/crm-sales-<version>-deploy.zip`.
-  - [ ] Decide the stored-identifier renames (list above) with an upgrade test that proves data and sessions survive; unsafe ones stay with a docs note.
 - **Priority 2 — owner decisions and follow-ups:**
   - [ ] Keep the project `celery` until DjangoLux 1.17 or move `refresh_market_rates` to `dlux.taskrunner` (about 2-3 h plus a testbed run; no test covers the task). `currency-switch` and `automotive-parts-first` carry uncommitted work on old pins.
-  - [ ] Client-brand defaults in code: `DLUX_CONFIG` public title "Switch Libya", `switchlibya.ly` defaults in `compose.yml`, `deploy/env.template` and `ALLOWED_HOSTS`; `portfolio/` is no longer used by the stack; CI tests on Python 3.13, the image runs 3.14.
+  - [ ] Ask upstream (DjangoLux) for a per-field visibility hook on the generic record detail, then hide product cost there too.
   - [ ] POS phase 2 (phone as scanner, parked sales, guided certificate install, shifts/Z-report, returns); Automotive Phases 0/4 (retailer workbook, reviewed import); ribbon tab strips; storefront polish (mobile `/shop/` search, hero kicker contrast).
 - **Completed Recently:**
   - [x] 2026-11-18: v0.13.0 prepared, pushed, PR #2; testbed acceptance from v0.12.0 and v0.11.4 passed.
   - [x] 2026-11-23: docs audit Phase A (rename to Sales CRM, real README and app READMEs, OPERATIONS/RELEASING rebuilt, doc fixes).
+  - [x] 2026-11-23: ownership on writes (customer, deposit, delivery, deposit review), issued invoices undeletable, cost on the card, POS CSRF, stock-take bucket, Add Stock gating, machinery live uniqueness, stored-identifier renames + `common.0001`, neutral defaults, `portfolio/` retired.
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-11-18 (DjangoLux 1.16.1): 490 pass in the amd64 image (6 PostgreSQL-only skips; those modules' 30 cases pass on PostgreSQL 17); testbed upgrade from v0.12.0 and v0.11.4 passed. Evidence: `testbeds/crm-sales/.xclude/acceptance-1.16.1/`. Phase A (2026-11-23) ran no tests, only `py_compile`.
+- 2026-11-18 (DjangoLux 1.16.1): 490 pass in the amd64 image (6 PostgreSQL-only skips; those modules' 30 cases pass on PostgreSQL 17); testbed upgrade from v0.12.0 and v0.11.4 passed. Evidence: `testbeds/crm-sales/.xclude/acceptance-1.16.1/`. 2026-11-23: 518 pass in the arm64 candidate image on SQLite (6 PostgreSQL-only skips), `check` and `makemigrations --check` clean; on PostgreSQL 17 the PG-only modules plus every new test (71) pass.
 ### One-line info about last time edited Docs: [Max 2 lines]
 - 2026-11-23: README, per-app READMEs, `docs/*` (OPERATIONS, RELEASING, PERMISSIONS, BUSINESS_RULES, ARCHITECTURE, automotive/QA docs), `deploy/README.md`, template and comment fixes; CHANGELOG history untouched.
 ## Part 2: Global [Max 20 lines]

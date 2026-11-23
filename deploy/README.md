@@ -98,7 +98,12 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
 1. **Back up.** In the app, create a backup under Options > Backup & Restore and download
    it, and copy the `media/` folder. Keep a database dump too if you have one. Note
    the database name (`docker compose exec db psql -U <POSTGRES_USER> -l`): if it is
-   not `sales_db`, `.secrets/.env` must set `POSTGRES_DB` to it before step 5.
+   not `sales_db`, `.secrets/.env` must set `POSTGRES_DB` to it before step 5. Note
+   the Compose project name too (`docker compose ls`): this stack is `sales`. A
+   server still running under another name (`switch_pos` or `sales-crm`, the
+   earliest releases) keeps its data in volumes of that name, which the new stack
+   does not see: stop here and move the data first (back up, start the new stack,
+   restore the backup).
 2. **Pull the new application image first.** This restarts nothing: the stack keeps
    running the old image until step 5. The new proxy file asks the app's media
    check, which only the new image answers.
@@ -116,7 +121,11 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
    copies, and `.proxy/maintenance.html` (Composer now serves the update progress
    page), into `.xclude/` first. Do not touch `.secrets/.env`; if the old
    `compose.yml` had local edits, move them into `.secrets/.env` variables first.
-   Then repair and check:
+   `compose.yml` carries no site address of its own (its defaults are plain HTTP on
+   `localhost`), so `.secrets/.env` must set `BASE_URL`, `ALLOWED_URLS`,
+   `ALLOWED_HOSTS`, `CADDY_SITE_ADDRESS` and `CADDY_PRIMARY_URL` (and
+   `CADDY_ERP_ADDRESS` if the old hostname is kept); copy any that are missing from
+   `.secrets/.env.template` and fill them in. Then repair and check:
 
    ```bash
    ./start.sh check --fix
@@ -131,8 +140,10 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
 5. **Deploy:** `./start.sh`. This adds the `worker` service, restarts the
    application containers, applies DjangoLux's own migrations and, on a server
    coming from an earlier stack, restarts the database once for a few seconds (its
-   environment changed; its data stays in the volume). The CRM adds no migration of
-   its own. Wait for the first start to finish.
+   environment changed; its data stays in the volume). Its migrations move the
+   stored settings and preferences to their new names. Everyone is signed out once
+   (the session cookie is renamed), and a form left open across the upgrade asks to
+   be reloaded. Wait for the first start to finish.
 6. **Remove containers the new stack no longer has.** Compose leaves the container
    of a service that left `compose.yml` running. The new stack has exactly these
    services: `db`, `redis`, `smtp-relay`, `caddy`, `web`, `worker`, `celery`,
@@ -156,10 +167,10 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
    - `./start.sh check` exits 0: `stack-schema` 5, `stored-files` and the task
      worker check OK (`front-proxy` stays a warning until it is set).
    - Signed out, a stored attachment must answer `403`. With your `BASE_URL` in
-     place of `https://switchlibya.ly`:
+     place of `https://crm.example.com`:
 
      ```bash
-     f=$(find media/purchase_invoices media/finance/expenses -type f 2>/dev/null | head -n1); echo "${f:-no stored attachments}"; [ -z "$f" ] || curl -s -o /dev/null -w '%{http_code}\n' "https://switchlibya.ly/$f"
+     f=$(find media/purchase_invoices media/finance/expenses -type f 2>/dev/null | head -n1); echo "${f:-no stored attachments}"; [ -z "$f" ] || curl -s -o /dev/null -w '%{http_code}\n' "https://crm.example.com/$f"
      ```
 
      On Windows, open `BASE_URL/media/purchase_invoices/<a file in that folder>` in a

@@ -30,7 +30,7 @@ The CRM's own views never test `is_staff`; DjangoLux's user-directory screens do
 | **Admin / owner** (المسؤول) | The store owner | Django superuser, no group | Everything, in every scope. |
 | **Sales Manager** | Back-office and dispatch | `Sales Manager` | Every user's invoices, customers, payments, deliveries, deposits, expenses and staff accounts. Reassigns salespeople and couriers, cancels invoices, runs the sales and financial reports, manages the catalog, purchases, stock movements, stock takes, valuation and opening stock, sets exchange rates, confirms deposits, posts expenses, keeps staff ledgers, uses the till without a discount cap, maintains vehicle and machine reference data. |
 | **Sales Representative** (مندوب المبيعات) | Counter or field seller | `Sales Representative` | Own invoices, customers and payments only. Creates and edits own drafts, issues them, records payments, applies customer credit, uses the till, looks up products, services, vehicles and machines read-only, records cash deposits, sees own staff account and ledger. |
-| **Delivery Courier** | Driver | `Delivery Courier` | Only the deliveries assigned to them, which they update. Records cash deposits and sees own staff account and ledger. No access to invoices, customers, catalog or reports. |
+| **Delivery Courier** | Driver | `Delivery Courier` | Only the deliveries assigned to them, whose status and notes they update (not the invoice, recipient, phone, address or date). Records cash deposits and sees own staff account and ledger. No access to invoices, customers, catalog or reports. |
 
 A user may belong to several groups; their permissions add up.
 
@@ -186,10 +186,15 @@ tiles, staff account pages, expense review and stored files.
   machine data and the public site.
 - Not ownership-filtered by design: the financial report, the product and
   service picker of the invoice editor (it lists every active product and
-  service in the user's scope and needs only `add_invoice` or `change_invoice`),
-  and the deposit-reference picker (see Cash deposits).
-- No permission separates product cost from product price: the product card
-  (`catalog.view_product`) shows both.
+  service in the user's scope and needs only `add_invoice` or `change_invoice`).
+- Writes follow the same ownership as reads: an invoice can be bound only to a
+  customer the user may see (a posted customer id outside the user's book is
+  rejected), a payment only to a pending deposit the user may see, and a delivery
+  only to a visible invoice.
+- Product cost and markup show on the product card only to holders of
+  `catalog.change_product` (who edit them anyway). DjangoLux's generic record
+  modal, reachable by a hand-typed URL, still lists every stored field; it has no
+  hook for hiding one.
 
 ## Store scope
 
@@ -208,10 +213,10 @@ The settings below are tiles in System settings that only superusers see.
 
 | Feature | Stored under | Default | Effect while off |
 | --- | --- | --- | --- |
-| Point of sale | `switch_pos.point_of_sale` | off | The till and its endpoints answer 404. |
-| Vehicles (automotive) | `switch_pos.optional_enhancements` | off | Vehicle pages, endpoints and modals answer 404. |
-| Machinery | `switch_pos.optional_enhancements` | off | Machinery pages, endpoints and modals answer 404. |
-| Public site | `switch_pos.public_catalog` | on | Public pages redirect to the staff entry, the builders redirect, and builder writes answer 404. |
+| Point of sale | `sales_crm.point_of_sale` | off | The till and its endpoints answer 404. |
+| Vehicles (automotive) | `sales_crm.optional_enhancements` | off | Vehicle pages, endpoints and modals answer 404. |
+| Machinery | `sales_crm.optional_enhancements` | off | Machinery pages, endpoints and modals answer 404. |
+| Public site | `sales_crm.public_catalog` | on | Public pages redirect to the staff entry, the builders redirect, and builder writes answer 404. |
 
 While a feature is off its permissions (`automotive`, `machinery`,
 `public_catalog`, and `use_pos`, `pos_unlimited_discount` and the `PosSale` model
@@ -219,8 +224,8 @@ permissions) are hidden from the group and user permission editors. Hiding is
 display only: saving a group or user keeps the hidden grants, so they show,
 unchanged, whenever the feature is on (`common/permission_visibility.py`).
 
-The pricing currency (`switch_pos.pricing`) and the shop-wide default Products
-layout (`switch_pos.products_layout`) are settings of the same superuser tiles
+The pricing currency (`sales_crm.pricing`) and the shop-wide default Products
+layout (`sales_crm.products_layout`) are settings of the same superuser tiles
 and do not change who can see what. Each user's own Products layout is a card
 for holders of `catalog.view_product`. Choosing the purchase-invoice currency
 needs only `catalog.add_purchaseinvoice`; there is no separate currency
@@ -244,7 +249,7 @@ their view permissions. A quick action needs the permissions of its target: the
 add permissions for creating screens, the report permissions for the reports.
 
 Tile order, hidden state and size are stored per user in the DjangoLux app
-preferences `switch_pos.workspace_dashboard.v1` (`Profile.preferences`), with
+preferences `sales_crm.workspace_dashboard.v1` (`Profile.preferences`), with
 `localStorage` as a fallback. They are presentation only.
 
 `/staff/sales/dashboard/` (Sales Overview) needs sign-in only. Its figures cover
@@ -293,9 +298,11 @@ change or delete one. A stock take is created with `add_stocktake`, viewed with
 
 **Cash deposits.** Any holder of `add_cashdeposit` records a deposit; a deposit
 is pending until a holder of `confirm_cashdeposit` confirms or rejects it
-(POST-only). The deposit form cannot set status or confirmation. A payment's
-deposit reference is matched against the deposits of the user's whole store scope,
-not only the user's own, and an unknown reference creates a pending deposit.
+(POST-only), and a decided deposit cannot be decided again. The reviewer reaches
+only deposits they may see (`view_all_cashdeposit` for other users'). The deposit
+form cannot set status or confirmation. A payment joins a deposit only while it
+is pending and only one the user may see: a typed reference is matched among
+those, and an unknown reference creates a new pending deposit owned by the user.
 
 **Expenses.** Expenses are saved as posted. `post_expense` gates the post and
 void endpoint, which also passes the expense ownership filter. Only posted

@@ -35,20 +35,22 @@ reach the optional `automotive` and `machinery` extensions, and `finance.currenc
 
 App-level settings live in DjangoLux's app-settings store,
 `SystemSettings.extra_config['app'][<namespace>]`, and per-user preferences in
-`Profile.preferences['app'][<key>]`. These namespaces and keys carry the stored prefix
-`switch_pos.` (for example `switch_pos.pricing`, `switch_pos.point_of_sale`). The prefix is
-kept as is because it identifies data that is already stored.
+`Profile.preferences['app'][<key>]`. These namespaces and keys use the prefix
+`sales_crm.` (for example `sales_crm.pricing`, `sales_crm.point_of_sale`). Stores
+installed under the product's earlier name held them as `switch_pos.*`; the data
+migration `common/migrations/0001_sales_crm_settings_namespaces.py` moves both JSON
+columns to the new keys (and back on reverse).
 
 | Key | Owner | Holds |
 | --- | --- | --- |
-| `switch_pos.pricing` | `finance` | Default currency and the both-currencies flag |
-| `switch_pos.optional_enhancements` | `automotive` | Machinery and Automotive switches, Automotive criteria and wording mode |
-| `switch_pos.point_of_sale` | `sales` | Till switch, accepted methods, discount cap, receipt size |
-| `switch_pos.public_catalog` | `public_catalog` | Public-site switch, shop identity, contact endpoints, shop and homepage live flags, featured limit |
-| `switch_pos.public_homepage` | `public_catalog` | Homepage Builder configuration |
-| `switch_pos.products_layout` | `catalog` | Shop-wide default Products layout; also the per-user preference key |
-| `switch_pos.workspace_dashboard.v1` | `common` | Per-user Workspace dashboard layout (preference key) |
-| `switch_pos.crm_options` | `common` | Id of the CRM options group (no stored value of its own) |
+| `sales_crm.pricing` | `finance` | Default currency and the both-currencies flag |
+| `sales_crm.optional_enhancements` | `automotive` | Machinery and Automotive switches, Automotive criteria and wording mode |
+| `sales_crm.point_of_sale` | `sales` | Till switch, accepted methods, discount cap, receipt size |
+| `sales_crm.public_catalog` | `public_catalog` | Public-site switch, shop identity, contact endpoints, shop and homepage live flags, featured limit |
+| `sales_crm.public_homepage` | `public_catalog` | Homepage Builder configuration |
+| `sales_crm.products_layout` | `catalog` | Shop-wide default Products layout; also the per-user preference key |
+| `sales_crm.workspace_dashboard.v1` | `common` | Per-user Workspace dashboard layout (preference key) |
+| `sales_crm.crm_options` | `common` | Id of the CRM options group (no stored value of its own) |
 
 Four features are switchable: Automotive and Machinery (Optional enhancements), Point of
 sale, and the Public site. While one is off, its routes answer 404 or redirect to the staff
@@ -61,7 +63,7 @@ defaults to off, except the Public site, which defaults to on.
 `automotive/` is an optional extension above `catalog`. Its make/model,
 generation, engine, trim and fitment tables reference `catalog.Product`, but no
 automotive fields exist on Product, ProductVariant, stock, purchasing or sales
-tables. `switch_pos.optional_enhancements` is the single shop-wide configuration source
+tables. `sales_crm.optional_enhancements` is the single shop-wide configuration source
 for both extensions; the Automotive criteria affect only extension UI/query behavior, and
 model year, engine and transmission are always on.
 When enabled, `/staff/automotive/` is the reference-data hub and the Product
@@ -104,7 +106,7 @@ are left out of the vehicle lists, pickers, filters and browser.
 invoice with the editor's own pricing helper (`_apply_item_price`), then reuses
 `issue_invoice` and `Payment`, so the till adds no parallel sales model — only
 `PosSale` (retry key, till name, cash tendered, change). Settings live in the
-`switch_pos.point_of_sale` app config (`sales.pos_settings`; form in
+`sales_crm.point_of_sale` app config (`sales.pos_settings`; form in
 `sales/pos_options_forms.py`, registered in `sales/dlux_options.py` as a section of
 the CRM options tile). While the till is off its routes answer 404; it needs
 `sales.use_pos` plus the invoice-add, invoice-issue and payment-add permissions, and a
@@ -122,10 +124,9 @@ template tag and the Workspace dashboard, so every simple list page stays a few 
 ## Public/staff URL split
 
 The split is owned by Django URLconf and DLux settings, not by Caddy path routing.
-Caddy proxies the hosts in `CADDY_SITE_ADDRESS` (`compose.yml` defaults to
-`switchlibya.ly www.switchlibya.ly`) to Django; the optional legacy host in
-`CADDY_ERP_ADDRESS` (default `erp.switchlibya.ly`) redirects to
-`CADDY_PRIMARY_URL/staff/`.
+Caddy proxies the hosts in `CADDY_SITE_ADDRESS` (set in `.secrets/.env`; the
+`compose.yml` default `:80` serves plain HTTP on any host) to Django; the optional
+legacy host in `CADDY_ERP_ADDRESS` redirects to `CADDY_PRIMARY_URL/staff/`.
 
 - Public routes: `/`, `/shop/`, `/shop/items/<slug>/`,
   `/shop/items/<slug>/modal/`, `/contact/modal/`, and the `/health/` probe.
@@ -164,7 +165,7 @@ write endpoints never mutate on GET: passive probes return 204 and direct browse
 navigation redirects back to `/staff/shop-builder/`. They are marked
 `sidebar_exclude=True` so only the two builder pages (`public_catalog_staff:builder` and
 `public_catalog_staff:homepage_builder`) are discoverable for sidebar navigation. Global
-config lives in the DLux app-settings namespace `switch_pos.public_catalog`: the builders
+config lives in the DLux app-settings namespace `sales_crm.public_catalog`: the builders
 own the live toggles (the shop toggle in the shop builder, the homepage toggle in the
 Homepage Builder), and the `settings` endpoint also accepts the featured limit (default 4),
 which has no UI control. The *Public catalog* section of the CRM options tile exposes the
@@ -177,7 +178,7 @@ staff entry. When `shop_enabled` is off the public shop and item-detail views re
 
 The **public landing page** is composed from the Homepage Builder
 (`/staff/shop-builder/homepage/`), a live-preview-iframe editor whose config lives in
-its own app-settings namespace `switch_pos.public_homepage` (`public_catalog/homepage.py`:
+its own app-settings namespace `sales_crm.public_homepage` (`public_catalog/homepage.py`:
 hero copy/CTA/background mode/overlay, primary and secondary accent colours, visual
 style preset, hero layout/height/focus, nav/card/density/background/motion treatments,
 and an ordered, toggleable list of sections — featured, categories, services, story,
@@ -201,7 +202,7 @@ public header `?lang=` clicks persist in the visitor session. Its `homepage_save
 endpoint shares the same POST-only `mutation_endpoint` + `sidebar_exclude` treatment
 as the catalog builder. The Homepage Builder is the only UI surface for homepage
 copy, sections, visual style, and the homepage live toggle; its config persists
-under `SystemSettings.extra_config['app']['switch_pos.public_homepage']` for backups
+under `SystemSettings.extra_config['app']['sales_crm.public_homepage']` for backups
 and settings exports. If `shop_enabled` is off while `homepage_enabled` remains on,
 homepage listing cards may appear as public teasers, but they do not render
 item-detail links or the Quick view item-modal button.
@@ -288,10 +289,10 @@ The Products page renders three ways. The effective layout resolves
 **per-user override → global admin default → `table`**, in
 `catalog/product_layouts.py::get_products_layout(request)`:
 
-- **Per-user override** — `Profile.preferences['app']['switch_pos.products_layout']`
+- **Per-user override** — `Profile.preferences['app']['sales_crm.products_layout']`
   (a scalar; same app-preference store as the Workspace dashboard).
 - **Global admin default** — a superuser setting saved to
-  `SystemSettings.extra_config['app']['switch_pos.products_layout']['default_layout']`,
+  `SystemSettings.extra_config['app']['sales_crm.products_layout']['default_layout']`,
   edited in the *Products layout* section of the **CRM options** tile (see
   below) and read via `dlux.utils.get_app_system_config`.
 
@@ -322,7 +323,7 @@ is the *Products layout* section of the **CRM options** tile.
 The store-wide settings are one **CRM options** tile on the Options page — a
 DjangoLux settings group. `common/dlux_options.py` registers
 it with `register_app_settings_group(id=CRM_OPTIONS_GROUP)`
-(`switch_pos.crm_options`, order 50), and each app registers its settings with
+(`sales_crm.crm_options`, order 50), and each app registers its settings with
 `register_app_settings(..., group=CRM_OPTIONS_GROUP)`: *Pricing currency*
 (`finance`, order 5), *Products layout* (`catalog`, 10), *Public catalog*
 (`public_catalog`, 20) and *Point of sale* (`sales`, 30).
@@ -355,7 +356,7 @@ needs only a login: the server decides which tiles exist from the user's permiss
 ownership scope (invoices, stock, finance, the exchange card built from `rate_overview()`,
 and quick actions that include the till and the vehicle and machinery browsers while those
 are enabled). Order, hidden state and size are saved per user in the app-preference
-namespace `switch_pos.workspace_dashboard.v1` through `update_app_preference`, with
+namespace `sales_crm.workspace_dashboard.v1` through `update_app_preference`, with
 `localStorage` as the fallback (`common/js/workspace_dashboard.js`).
 
 ## Static assets
@@ -381,7 +382,7 @@ release. Keep `dlux_static` for DjangoLux's own files.
   ages, for the Workspace exchange card, the Sales Overview and the Exchange Rates page.
 
 `finance/currency.py` holds the default currency and `both_active` flag under
-`switch_pos.pricing`. Products store their own `currency`; `Product.pricing_rate()` and
+`sales_crm.pricing`. Products store their own `currency`; `Product.pricing_rate()` and
 `selling_price_lyd()` resolve the product's rate. Purchase headers expose active
 currencies under the `catalog.add_purchaseinvoice` permission, rejecting
 inactive or unauthorized posted choices. Intake converts invoice-currency amounts
@@ -521,4 +522,4 @@ Inventory Valuation, Sales Overview, Sales Report and Financial Report use the s
 
 ## Independent machinery enhancement
 
-`machinery` references catalog products and services through compatibility many-to-many fields on `MachineModel` (`products`, `services`, plus `categories` for category branches), alongside the `automotive` app. Its type/manufacturer/model vocabulary (`MachineType`, `Manufacturer`, `MachineModel`) has no vehicle qualifiers; `MachineModel.legacy_vehicle_model` optionally links a machine to an `automotive.VehicleModel`. The machinery switch lives in `switch_pos.optional_enhancements`, and its routes answer 404 while it is off. `catalog.Category.parent` provides nested part branches; service-only leaves use `is_service`, and `Service.category` places Repair in the same browser tree. See [client diagram implementation](CLIENT_CATEGORIZATION.md).
+`machinery` references catalog products and services through compatibility many-to-many fields on `MachineModel` (`products`, `services`, plus `categories` for category branches), alongside the `automotive` app. Its type/manufacturer/model vocabulary (`MachineType`, `Manufacturer`, `MachineModel`) has no vehicle qualifiers; `MachineModel.legacy_vehicle_model` optionally links a machine to an `automotive.VehicleModel`. The machinery switch lives in `sales_crm.optional_enhancements`, and its routes answer 404 while it is off. `catalog.Category.parent` provides nested part branches; service-only leaves use `is_service`, and `Service.category` places Repair in the same browser tree. See [client diagram implementation](CLIENT_CATEGORIZATION.md).
