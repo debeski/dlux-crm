@@ -728,7 +728,11 @@ class WorkspaceDashboardView(LoginRequiredMixin, TemplateView):
             from catalog.models import Product
 
             user = self.request.user
-            machines = scope_filtered_queryset(VehicleModel.objects.all(), user).count()
+            # The same vehicle models the browser offers: active, of an active make,
+            # and not moved to machinery.
+            machines = scope_filtered_queryset(
+                VehicleModel.objects.filter(is_active=True, make__is_active=True, migrated_machine__isnull=True), user,
+            ).count()
             fitted = scope_filtered_queryset(
                 Product.objects.filter(
                     is_active=True, automotive_fitments__isnull=False, automotive_fitments__deleted_at__isnull=True,
