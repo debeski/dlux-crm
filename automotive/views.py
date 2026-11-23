@@ -87,7 +87,18 @@ class FeatureAwareDynamicModalManagerView(
     OptionalEnhancementModalGuardMixin,
     DynamicModalManagerView,
 ):
-    pass
+    #: Models whose record view is a project modal, not DjangoLux's generic field
+    #: list (which shows every stored field, product cost included).
+    DETAIL_VIEWS = {("catalog", "product"): "catalog.views.ProductCardView"}
+
+    def get(self, request, *args, **kwargs):
+        key = (kwargs.get("app_label", "").lower(), kwargs.get("model_name", "").lower())
+        pk = kwargs.get("pk") or request.GET.get("id")
+        if key in self.DETAIL_VIEWS and pk and pk != "new" and request.GET.get("action") == "view":
+            from django.utils.module_loading import import_string
+
+            return import_string(self.DETAIL_VIEWS[key]).as_view()(request, pk=pk)
+        return super().get(request, *args, **kwargs)
 
 
 class FeatureAwareDynamicModalDeleteView(
