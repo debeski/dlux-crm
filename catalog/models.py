@@ -1,5 +1,5 @@
 """
-Catalog domain models — everything Switch can put on an invoice.
+Catalog domain models — everything the store can put on an invoice.
 
 Two sellable families:
   * ``Product``  — stock items (smart locks, spare parts, unrelated goods).

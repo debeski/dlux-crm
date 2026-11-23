@@ -242,7 +242,7 @@ class InvoiceItem(models.Model):
     """A single line on an invoice. Prices are snapshots frozen at line creation.
 
     A line is a Product, a Service, or a free-text "custom" line (for the
-    occasional unrelated goods Switch resells). ``description`` is always stored
+    occasional unrelated goods the store resells). ``description`` is always stored
     so the printed invoice never changes if the source product is later renamed.
     """
 
