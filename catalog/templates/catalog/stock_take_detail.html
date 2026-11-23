@@ -61,7 +61,7 @@
                 <tbody>
                     {% for ln in lines %}
                     <tr>
-                        <td>{{ ln.product.name }}</td>
+                        <td>{{ ln.product.name }}{% if ln.variant %}<div class="small text-muted">{{ ln.variant.display_label }}</div>{% endif %}</td>
                         <td class="text-end text-muted">{{ ln.system_qty|floatformat:"-2" }}</td>
                         <td class="text-end">{% if ln.counted_qty is None %}<span class="text-muted">—</span>{% else %}{{ ln.counted_qty|floatformat:"-2" }}{% endif %}</td>
                         <td class="text-end {% if ln.variance and ln.variance < 0 %}text-danger fw-semibold{% elif ln.variance and ln.variance > 0 %}text-success fw-semibold{% endif %}">

@@ -26,15 +26,19 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for p in products %}
+                        {% for row in rows %}
                         <tr>
-                            <td>{{ p.name }}</td>
-                            <td class="text-muted">{{ p.sku }}</td>
-                            <td class="text-end text-muted">{{ p.stock_qty|floatformat:"-2" }}</td>
                             <td>
-                                <input type="number" step="any" min="0" name="count_{{ p.pk }}"
+                                {{ row.product.name }}
+                                {% if row.variant %}<div class="small text-muted">{{ row.variant.display_label }}</div>
+                                {% elif row.product.variants.all %}<div class="small text-muted">{{ DLUX_STRINGS.ui_stocktake_outside_buckets|default:"Outside colour/size" }}</div>{% endif %}
+                            </td>
+                            <td class="text-muted">{{ row.product.sku }}</td>
+                            <td class="text-end text-muted">{{ row.system_qty|floatformat:"-2" }}</td>
+                            <td>
+                                <input type="number" step="any" min="0" name="{{ row.input_name }}"
                                        class="form-control text-end" inputmode="decimal"
-                                       placeholder="{{ p.stock_qty|floatformat:'-2' }}">
+                                       placeholder="{{ row.system_qty|floatformat:'-2' }}">
                             </td>
                         </tr>
                         {% empty %}
