@@ -215,3 +215,11 @@ class ProjectScaffoldTests(SimpleTestCase):
         compose = (Path(__file__).resolve().parents[1] / "compose.yml").read_text(encoding="utf-8")
         self.assertRegex(service_block(compose, "composer-agent"), r"command:\n      - agent\n      - run\n")
         self.assertRegex(service_block(compose, "composer-executor"), r"command:\n      - executor\n      - run\n")
+
+    def test_cross_site_gate_exempts_exactly_the_public_storefront_folders(self):
+        caddy = (Path(__file__).resolve().parents[1] / ".proxy" / "Caddyfile").read_text(encoding="utf-8")
+        gate = re.search(r"@cross_site_request expression <<CEL\n(.*?)\n\t*CEL", caddy, re.S).group(1)
+        self.assertIn("respond @cross_site_request 403", caddy)
+        exempt = re.findall(r'"/media/([^"*]+)\*"', gate)
+        self.assertEqual(sorted(exempt), sorted(django_settings.DLUX_PUBLIC_MEDIA))
+        self.assertLess(caddy.index("respond @cross_site_request 403"), caddy.index("handle /media/* {"))

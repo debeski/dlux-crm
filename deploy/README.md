@@ -131,10 +131,11 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
    ./start.sh check --fix
    ```
 
-   With this release's files `check --fix` changes at most the
-   `docker-socket-proxy` image, which it pins to a digest, and it restamps
-   `.secrets/.env` if that file still carries an older stack-schema stamp (a file
-   with no stamp, from before v0.12.0, is only noted: nothing to do). If it
+   With this release's files `check --fix` leaves `compose.yml` as it is. It
+   restamps `.secrets/.env` if that file still carries an older stack-schema stamp
+   (a file with no stamp, from before v0.12.0, is only noted: nothing to do), and
+   gives the app's non-root user group access to the data folders (`media/`,
+   `logs/`; it prints a manifest that `composer app-permissions revert` undoes). If it
    says `composer-agent` must be running to publish the maintenance page, run
    step 5 and then `check --fix` once more.
 5. **Deploy:** `./start.sh`. This adds the `worker` service, restarts the

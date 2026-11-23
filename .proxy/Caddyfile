@@ -105,6 +105,9 @@
 		# health checks, server-to-server calls, older browsers). Everything above
 		# stays open to other sites on purpose: static files, public media, the
 		# update progress files, the maintenance page assets and the edge probe.
+		# The storefront's image folders (DLUX_PUBLIC_MEDIA in config/settings.py;
+		# keep the two lists in step) are public too but pass the app's media check
+		# below, so they are exempted here by name: another site may show them.
 		# Composer's fetch-metadata check looks for this matcher by name: keep
 		# @cross_site_request.
 		@cross_site_request expression <<CEL
@@ -112,6 +115,8 @@
 			&& !(method("GET", "HEAD")
 				&& {header.Sec-Fetch-Mode} == "navigate"
 				&& !({header.Sec-Fetch-Dest} in ["object", "embed"]))
+			&& !(method("GET", "HEAD")
+				&& path("/media/catalog/products/*", "/media/catalog/services/*", "/media/public_catalog/listings/*"))
 			CEL
 		respond @cross_site_request 403
 
