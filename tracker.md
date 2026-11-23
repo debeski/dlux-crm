@@ -1,8 +1,8 @@
 # Project Tracker (Sales CRM) [Max 100 lines total]
 ## Part 1: Project Related [Max 55 lines]
 ### Current Verified Snapshot: [Max 5 lines]
-- 2026-11-23: v0.13.0 (DjangoLux 1.16.1, Composer 1.10.1, stack schema 5: `worker` beside the project `celery`, F3 report fix) is on `feat/dlux-1-16-1`, PR https://github.com/debeski/dlux-crm/pull/2 open and held, UNMERGED/UNTAGGED. Published release is still v0.12.0 (DjangoLux 1.15.3, schema 4).
-- Sales skips DjangoLux 1.16.2: it goes 1.16.1 -> 1.16.3 (+ Composer 1.10.3) in one step once both are stable (Phase B, owner's OK already given: stack files from the 1.16.3 scaffold, image, tests, testbeds incl. stress, push, merge #2, tag, deployment zip).
+- 2026-11-23: v0.13.0 on DjangoLux 1.16.3 + Composer 1.10.3 (stack schema 5, 1.16.3 scaffold stack files incl. Fetch Metadata gate) accepted on the testbed from published v0.12.0 and v0.11.4; being released from `feat/dlux-1-16-1` via PR https://github.com/debeski/dlux-crm/pull/2.
+- Phase B release steps: push, merge #2, tag `v0.13.0`, CI release, re-test from the published image, fresh install from `dist/crm-sales-0.13.0-deploy.zip`.
 - Product name is **Sales CRM** (repo/image `debeski/dlux-crm:sales`, project slug `dlux-crm-sales`); the old name "Switch POS" and the customer brand are gone from docs, code defaults and stored identifiers (`sales_crm_*` cookies, `sales_crm.*` settings moved by `common.0001`).
 - Public `/`, `/shop/...`, `/contact/modal/`; staff under `/staff/...`; Caddy terminates automatic TLS and redirects the legacy ERP host.
 ### Current Project Adopted Standards: [Max 5 lines]
@@ -20,26 +20,25 @@
 - 2026-11-23 docs audit (Phase A, static): rename, README, OPERATIONS/RELEASING rebuilt, BUSINESS_RULES/PERMISSIONS/ARCHITECTURE/AUTOMOTIVE checked against code. Report: `docs-audit-crm-sales.md` in the session notes folder.
 ### Current Project's Unsolved Known Bugs: [Max 5 lines]
 - Soft-resetting `OpeningStockDraft` leaves the scope uniqueness constraint on trashed rows, blocking replacement drafts (permanent reset works).
-- Composer's `check` shows a new `relay-env` advisory (share the SMTP relay's settings through `x-environment`); take it with the Phase B stack regeneration.
+- Fetch Metadata gate exempts the storefront image folders by path: keep `.proxy/Caddyfile` in step with `DLUX_PUBLIC_MEDIA` (test enforces).
 - Live VM likely runs a stale stack (old portfolio on apex/www, stored files open to v0.11.4): one-hop upgrade per `deploy/README.md`; check its project and database names first: v0.1.0 `switch_pos`/`switch_pos_db`, v0.1.2 `sales-crm`/`sales_crm_db`, v0.1.3+ `sales`/`sales_db` (a pre-v0.1.3 server would start empty volumes under `name: sales`).
 - SMTP credentials unset on the deployment, so the contact relay cannot authenticate. Updates card can show a stale "Could not read the DjangoLux release index" until a check completes.
 ### Incomplete Tasks: [Max 20 lines]
-- **Priority 1 — Phase B (wait for the parent session's message that 1.16.3 + Composer 1.10.3 are stable):**
-  - [ ] Pin `django-lux[updater]==1.16.3`; regenerate stack files from that scaffold (drops dead `BACKUP_INTERVAL`/`pgadmin_data`; keep `agent run`/`executor run` if the template still emits the flat form); `check --fix` on a scratch copy and diff; re-test the Caddyfile comment edits.
-  - [ ] Rebuild image; suite on amd64 + PostgreSQL-only modules; testbed upgrade from the published v0.12.0 state AND the v0.11.4 state; stress tests (stored-file/media attacks, load, rollback cycle, relay refresh); repeat the 2026-11-23 testbed checks on the 1.16.3 image (key move, one sign-out, relay, till checkout); `.secrets/.env` must carry the site variables (compose defaults are localhost).
-  - [ ] Push, merge #2, tag `v0.13.0` (or the next version), let CI release, re-run the testbed from the published image, build `dist/crm-sales-<version>-deploy.zip`.
+- **Priority 1 — release v0.13.0 (in progress):**
+  - [ ] Push, merge #2, tag `v0.13.0`, CI release; testbed re-run from `debeski/dlux-crm:sales-v0.13.0` (drop `WEB_IMAGE`); fresh install from the zip; deploy zip from the tag.
 - **Priority 2 — owner decisions and follow-ups:**
   - [ ] Keep the project `celery` until DjangoLux 1.17 or move `refresh_market_rates` to `dlux.taskrunner` (about 2-3 h plus a testbed run; no test covers the task). `currency-switch` and `automotive-parts-first` carry uncommitted work on old pins.
   - [ ] Ask upstream (DjangoLux) for a per-model detail template or field-visibility hook, so the project need not shadow its `modal_manager` route.
   - [ ] POS phase 2 (phone as scanner, parked sales, guided certificate install, shifts/Z-report, returns); Automotive Phases 0/4 (retailer workbook, reviewed import); ribbon tab strips; storefront polish (mobile `/shop/` search, hero kicker contrast).
 - **Completed Recently:**
   - [x] 2026-11-18: v0.13.0 prepared, pushed, PR #2; testbed acceptance from v0.12.0 and v0.11.4 passed.
+  - [x] 2026-11-23: Phase B on DjangoLux 1.16.3: stack files, storefront images exempt from the cross-site gate, stale-settings-cache guard (`common.settings_namespaces`), tested rollback order in `deploy/README.md`; testbed paths A and C passed.
   - [x] 2026-11-23: docs audit Phase A (rename to Sales CRM, real README and app READMEs, OPERATIONS/RELEASING rebuilt, doc fixes).
   - [x] 2026-11-23: ownership on writes (customer, deposit, delivery, deposit review), issued invoices undeletable, cost on the card, POS CSRF, stock-take bucket, Add Stock gating, machinery live uniqueness, till vehicle-panel permissions, no cross-store bulk links, browsable-only vehicle tile, product record view = item card on both modal routes, per-bucket stock takes (`catalog.0014`), stored-identifier renames + `common.0001`, neutral defaults, `portfolio/` retired.
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-11-18 (DjangoLux 1.16.1): 490 pass in the amd64 image (6 PostgreSQL-only skips; those modules' 30 cases pass on PostgreSQL 17); testbed upgrade from v0.12.0 and v0.11.4 passed. Evidence: `testbeds/crm-sales/.xclude/acceptance-1.16.1/`. 2026-11-23: 526 pass in the arm64 candidate image on SQLite (6 PostgreSQL-only skips), `check` and `makemigrations --check` clean; on PostgreSQL 17 the PG-only modules plus the new tests pass. Testbed (phasea build): settings/preferences moved with identical hashes, old session signed out, till sale with CSRF, relay refresh, `check` exit 0 (`testbeds/crm-sales/.xclude/phasea-fixes-20261123/REPORT.md`).
+- 2026-11-23 (DjangoLux 1.16.3): 531 pass on SQLite (6 PG-only skips) and 531 on PostgreSQL 17 + Redis; testbed upgrade from published v0.12.0 and v0.11.4: data identical, settings moved, sign-out once, till sale, relay 4/4, journeys 20/20, edge probes 42/42, load 40 clients no 5xx, rollback + re-upgrade. Evidence `testbeds/crm-sales/.xclude/acceptance-1.16.3/REPORT.md`.
 ### One-line info about last time edited Docs: [Max 2 lines]
-- 2026-11-23: README, per-app READMEs, `docs/*` (OPERATIONS, RELEASING, PERMISSIONS, BUSINESS_RULES, ARCHITECTURE, automotive/QA docs), `deploy/README.md`, template and comment fixes; CHANGELOG history untouched.
+- 2026-11-23 (Phase B): `deploy/README.md` rollback order and check --fix effects, `deploy/env.template` + `docs/OPERATIONS.md` SMTP relay/registry settings, Composer 1.10.3. Earlier: README, per-app READMEs, `docs/*` (OPERATIONS, RELEASING, PERMISSIONS, BUSINESS_RULES, ARCHITECTURE, automotive/QA docs), `deploy/README.md`, template and comment fixes; CHANGELOG history untouched.
 ## Part 2: Global [Max 20 lines]
 ### Global Standard Helpers, Shortcuts, Info, etc.:
 - No project venv: run the suite in the amd64 image with the worktree copied over `/app` (`--entrypoint sh`; `.dockerignore` drops tests/docs), under `config.settings_dev_sqlite`. Validate releases with `python tools/validate_project_release_manifest.py --tag vX.Y.Z --repository debeski/dlux-crm`.
@@ -47,7 +46,7 @@
 ### Global Rulesets:
 - Keep tracker under 100 lines; preserve user work; update changelog/docs with feature/config changes.
 ### Agent Handoff Rules:
-- Branch `feat/dlux-1-16-1` (upstream set): push only that branch (`git push origin feat/dlux-1-16-1`), never `main`; merge/tag/release only with the owner's go-ahead (given for Phase B once 1.16.3 + Composer 1.10.3 are stable). Phase A commits are local until then. Composer 1.10.x uses `agent run`/`executor run`; the 1.16.1 scaffold template emits the flat form (upstream defect): never regenerate those blocks from it.
+- Branch `feat/dlux-1-16-1` (upstream set): push only that branch (`git push origin feat/dlux-1-16-1`), never `main`; merge/tag/release only with the owner's go-ahead (given for Phase B once 1.16.3 + Composer 1.10.3 are stable). Owner said "proceed" for the v0.13.0 release on 2026-11-23. Composer 1.10.x uses `agent run`/`executor run` (the 1.16.3 scaffold emits it too).
 - Testbed `~/Desktop/depy/testbeds/crm-sales`: stop what you start, `docker update --restart=no`; one heavy Docker job at a time.
 ### References and Links:
 - Releasing: `docs/RELEASING.md`; operations: `docs/OPERATIONS.md`; bundle: `deploy/README.md`; PR: https://github.com/debeski/dlux-crm/pull/2.
