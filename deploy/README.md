@@ -21,7 +21,7 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
 - Linux with Docker Engine and Docker Compose 5.3 or later (DjangoLux uses
   `pre_start` hooks), or Docker Desktop (Windows with the WSL 2 backend, or macOS).
 - Internet access on the first start, to pull the images. The deployer
-  (`debeski/composer:latest`) must be 1.10.1 or newer; `./start.sh update self`
+  (`debeski/composer:latest`) must be 1.10.3 or newer; `./start.sh update self`
   refreshes it.
 - For a public site: DNS records for every hostname in `CADDY_SITE_ADDRESS`
   pointing at this machine, and inbound TCP 80 and 443 open.

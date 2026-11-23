@@ -22,7 +22,7 @@ The files an operator receives (`compose.yml`, `.proxy/`, `relay/`, `start.sh`,
 | `worker` | app image | DjangoLux task worker (`manage.py dlux_worker`): queued tasks, `DLUX_TASK_SCHEDULE`, backups. Its `pre_start` steps run `dlux_reconcile` and `migrator`, so it applies the migrations before the application starts. | `internal` |
 | `celery` | app image | The project's own Celery worker with Beat (`celery -A config worker -B`): the exchange-rate refresh. Runs no migrations. | `internal` |
 | `caddy` | `caddy:latest` | Reverse proxy, automatic HTTPS, stored-file access check, maintenance page. | `frontend`, `internal` |
-| `docker-socket-proxy` | `tecnativa/docker-socket-proxy:latest` | Least-privilege Docker API for Composer. | `docker_proxy` |
+| `docker-socket-proxy` | `tecnativa/docker-socket-proxy:v0.5.0` (pinned by digest) | Least-privilege Docker API for Composer. | `docker_proxy` |
 | `composer-executor` | `debeski/composer:latest` | Holds Docker authority; performs the updates the agent requests. | `docker_proxy` |
 | `composer-agent` | `debeski/composer:latest` | Resident Composer: image-update requests from the app, the outbound relay, the maintenance page. No Docker authority. | `egress`, `docker_proxy` |
 
@@ -81,7 +81,8 @@ Compose reads them; nothing in `compose.yml` needs editing for a normal install.
 | `CADDY_PRIMARY_URL`, `CADDY_ERP_ADDRESS` | Canonical URL; optional legacy hostname that redirects to `CADDY_PRIMARY_URL/staff/`. |
 | `HTTP_PORT`, `HTTPS_PORT`, `CADDY_MAX_SIZE` | Published ports (80, 443) and the upload size cap (`10MB`). |
 | `DLUX_FRONT_PROXY` | Proxy or TLS terminator in front of Caddy. Unset trusts every private address, a space-separated list trusts only those, empty trusts none. |
-| `DEFAULT_FROM_EMAIL`, `SMTP_RELAY_*` | Fallback mail settings (normally configured in System Settings). |
+| `DEFAULT_FROM_EMAIL`, `SMTP_RELAY_*` | Fallback mail settings (normally configured in System Settings). `SMTP_RELAY_USE_SSL` (empty: SSL on port 465, STARTTLS otherwise), `SMTP_RELAY_TLS_VERIFY` and `SMTP_RELAY_CA_FILE` (a private CA bundle mounted into `smtp-relay`) govern the relay's connection; the password reaches `smtp-relay` only. |
+| `COMPOSER_REGISTRY_USERNAME`, `COMPOSER_REGISTRY_PASSWORD`, `COMPOSER_REGISTRY_HOST` | Login for a private `WEB_IMAGE` registry (a read-only deploy token); empty for the public image. |
 | `WEB_IMAGE` | Application image; default `debeski/dlux-crm:sales`. |
 | `DLUX_UPDATE_CHECK_INTERVAL` | Seconds between update checks (default 86400). |
 | `DEBUG_STATUS` | `True` only in development. |

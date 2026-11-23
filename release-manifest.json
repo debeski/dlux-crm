@@ -1,14 +1,15 @@
 {
   "schema_version": 1,
   "version": "0.13.0",
-  "summary": "DjangoLux 1.16.1 runtime with its own task worker: exchange-rate refresh keeps running on Celery, Excel sales reports write text as text, and the stack files move to schema 5.",
+  "summary": "DjangoLux 1.16.3 runtime with its own task worker, tighter record ownership, per-colour/size stock takes, and hardened stack files (schema 5).",
   "highlights": [
-    "Updated the application framework to DjangoLux 1.16.1; it needs Composer 1.10.1 or newer and the new stack files.",
+    "Updated the application framework to DjangoLux 1.16.3; it needs Composer 1.10.3 or newer and the new stack files.",
     "DjangoLux's tasks and backups run in a new worker service; the exchange-rate refresh keeps its own Celery service.",
     "Sales Report to Excel keeps customer names, descriptions and numbers as text, so a value starting with = can never run as a formula.",
     "Stored files stay private: a server still on an older release gets this fix in the same upgrade.",
     "New DLUX_FRONT_PROXY setting names the proxy in front of this server, so login lockout and the activity log record real client addresses.",
-    "The database container no longer restarts when the image or stack version changes."
+    "Invoices, payments, deposits and deliveries only link to records the user may see; issued invoices can no longer be deleted.",
+    "Stock takes count each colour and size on its own line, and product cost is shown only to product editors."
   ],
   "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.13.0"
 }

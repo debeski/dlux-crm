@@ -66,23 +66,6 @@
 			file_server
 		}
 
-		# Every other stored file is private: the app decides who gets it
-		# (signed in, and a registered document file only to users who may view
-		# its document) before the file server sends a byte. DjangoLux is mounted
-		# under /staff/. Storefront images are DLUX_PUBLIC_MEDIA; attachments and
-		# receipts are DLUX_APP_ONLY_MEDIA, served by /staff/files/... instead.
-		handle /media/* {
-			route {
-				forward_auth web:8000 {
-					uri /staff/sys/files/media-access/
-				}
-				uri strip_prefix /media
-				root * /app/media
-				header Cache-Control "private, no-cache"
-				file_server
-			}
-		}
-
 		# Live update status/log for the maintenance progress page. Served even
 		# during maintenance (Composer writes these on the shared dlux_runtime
 		# volume, which stays up while web is recreated).
@@ -112,6 +95,41 @@
 		# proxied to web, never gated by the maintenance flag.
 		handle /_edge-alive {
 			respond "ok" 200
+		}
+
+		# Fetch Metadata resource isolation (web.dev/articles/fetch-metadata):
+		# refuse requests another site makes in the background (images, scripts,
+		# fetch(), form posts, <object>/<embed>). A link from another site (a
+		# top-level GET navigation) still opens a page; same-origin, same-site and
+		# typed-in requests pass, and so do requests without the header (crawlers,
+		# health checks, server-to-server calls, older browsers). Everything above
+		# stays open to other sites on purpose: static files, public media, the
+		# update progress files, the maintenance page assets and the edge probe.
+		# Composer's fetch-metadata check looks for this matcher by name: keep
+		# @cross_site_request.
+		@cross_site_request expression <<CEL
+			{header.Sec-Fetch-Site} == "cross-site"
+			&& !(method("GET", "HEAD")
+				&& {header.Sec-Fetch-Mode} == "navigate"
+				&& !({header.Sec-Fetch-Dest} in ["object", "embed"]))
+			CEL
+		respond @cross_site_request 403
+
+		# Every other stored file is private: the app decides who gets it
+		# (signed in, and a registered document file only to users who may view
+		# its document) before the file server sends a byte. DjangoLux is mounted
+		# under /staff/. Storefront images are DLUX_PUBLIC_MEDIA; attachments and
+		# receipts are DLUX_APP_ONLY_MEDIA, served by /staff/files/... instead.
+		handle /media/* {
+			route {
+				forward_auth web:8000 {
+					uri /staff/sys/files/media-access/
+				}
+				uri strip_prefix /media
+				root * /app/media
+				header Cache-Control "private, no-cache"
+				file_server
+			}
 		}
 
 		# Hybrid health endpoint:
