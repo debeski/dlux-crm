@@ -217,7 +217,7 @@ means restoring the backup from step 1, in this order:
 
    ```bash
    docker compose exec redis redis-cli -n 1 FLUSHDB
-   ./start.sh restart web worker celery caddy
+   ./start.sh restart
    ```
 
    Everyone signs in again. Going back to v0.11.4 or older reopens the
