@@ -1,674 +1,359 @@
-# Automotive Fitment Module — Phased Delivery Plan
+# Sales CRM — Automotive and Machinery Fitment
 
-> Implementation status (2026-09-23): Phases 1–3 are implemented for v0.8.0.
-> The optional settings card, extension schema, role permissions, vehicle lookup
-> managers, multi-row Product fitment editor, Product-card reverse lookup and
-> compatibility keyword search, and guided vehicle browser are complete. Phase 0
-> retailer data collection and Phase 4 workbook import/pilot work remain open.
+Fitment records state which vehicles or machines a product fits. A product stays
+one SKU with one stock balance and one purchase and sales history, however many
+vehicles or machines it fits: compatibility lives in separate tables that point
+at the product.
 
-## Objective
+Two independent optional enhancements provide it:
 
-Add vehicle compatibility to Sales CRM without turning the shared `Product`
-model into a car-parts-only model. A product remains one SKU, one stock balance,
-and one purchasing/sales history. Separate fitment records answer which vehicles
-that product fits.
+- **Automotive compatibility** (app `automotive`): make, model and year, with
+  optional qualifiers (machine type, chassis/generation, engine, fuel type, trim,
+  transmission, part position).
+- **Machinery compatibility** (app `machinery`): machine type, manufacturer,
+  model and category branches. The category tree, the seed command and the
+  machine browser are described in [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md).
 
-The retailer-facing experience should still feel hierarchical:
+Both are off until a superuser enables them in System Settings → **Optional
+enhancements**. All routes below sit under `/staff/`.
+
+## Design rules
+
+- Product categories say what an item is; fitment says what it fits.
+- One product can have many fitments and one vehicle many products. Selling a
+  compatible product through any vehicle path moves the same stock balance.
+- Years are an inclusive range on one row (`year_from`, `year_to`), never one row
+  per year, and there is no year table. A fitment with both years blank fits all
+  years.
+- A blank qualifier on a fitment (generation, engine, trim, transmission,
+  position) means "all". Broad fitments stay compatible when a more specific
+  vehicle is chosen.
+- `Product`, `ProductVariant`, stock, purchase and sales tables carry no
+  automotive columns. Fitment belongs to the product, never to a variant.
+- Editing fitment never posts a stock movement and never touches an invoice.
+- A switch only controls exposure. Permissions stay authoritative.
+- Switching an enhancement off hides its screens, form fields, searches and
+  navigation and answers its direct routes with HTTP 404. Stored data is kept and
+  returns when the switch is turned on again.
+- Staff text exists in English and Arabic (`automotive/translations.py`,
+  `machinery/translations.py`). A test requires identical key sets for automotive.
+- The public shop (`public_catalog`) does not read compatibility data.
+
+## Settings
+
+The value is stored in `SystemSettings.extra_config["app"]["switch_pos.optional_enhancements"]`:
 
 ```text
-Make → Model → Year → Category → Compatible products
+machinery.enabled        false
+automotive.enabled       false
+automotive.terminology   "vehicle" | "equipment"
+automotive.criteria      equipment_type, model_year, generation_chassis, engine,
+                         fuel_type, trim, transmission, position   (each true by default)
 ```
 
-That hierarchy is a filtered query, not a duplicated product/category tree.
+A missing or malformed value reads as the defaults above, so both enhancements
+are off. `automotive.settings.get_optional_enhancements_config()` is the single
+reader and normalizes the value; `automotive_enabled()`,
+`automotive_criterion_enabled(name)` and `machinery.settings.machinery_enabled()`
+wrap it. `automotive_criterion_enabled` is false while the master switch is off
+and for an unknown criterion.
 
-## Decisions That Apply to Every Phase
+`model_year`, `engine` and `transmission` are always true, whatever is stored.
+Five criteria have switches: **Machine type**, **Chassis / generation**, **Fuel
+type**, **Trim** and **Part position**.
 
-- Product categories continue to answer **what the item is**. Vehicle fitment
-  answers **what the item fits**.
-- A product may have many fitments, and one vehicle may have many products.
-- A compatible product is never copied per make, model, or year. Selling it from
-  any vehicle path changes the same stock bucket.
-- Compatibility uses inclusive year ranges (`year_from`, `year_to`), not one row
-  per calendar year.
-- Automotive is the first entry in a shop-wide **Optional Enhancements** settings
-  card. The master switch is off by default, so an upgrade does not change any
-  existing installation's navigation, forms, searches, or daily workflow.
-- When automotive is enabled, make/model/year form its core. The admin can enable
-  or disable chassis/generation, engine, fuel type, trim, transmission, and part
-  position independently from the same card.
-- The first release's extension schema can support every listed criterion, but
-  each store sees and queries only the criteria its admin enables. Criteria are
-  structured dimensions, not fragments embedded in a product name or note.
-- Turning off the complete automotive enhancement hides its UI and queries but
-  preserves extension data so it can be restored by turning the switch back on.
-- No automotive column, flag, or nullable field is added to `Product`,
-  `ProductVariant`, stock, or invoice tables. The generic asset/catalog database
-  contract remains unchanged; optional fitment tables only reference Product.
-- Normal catalog search, invoices, purchases, stock movements, and variants must
-  continue to work when the automotive feature is disabled.
-- All new staff UI, validation messages, and exported/imported labels require
-  English and Arabic support, including RTL verification.
+The **Optional enhancements** card (superusers only):
 
-## Delivery Boundaries
+- Toggles **Machinery compatibility** and **Automotive compatibility**. Under the
+  automotive toggle, a **Vehicle criteria** block holds the five switches. While
+  the automotive toggle is off the block is greyed and disabled, and the stored
+  criteria are kept.
+- **Manage vehicle data** (→ `/staff/automotive/`) and **Manage machinery**
+  (→ `/staff/machinery/`) stay disabled until the enabled state has been saved;
+  an unsaved toggle shows a hint to save first.
+- Switching a criterion off is rejected while fitments use it, with the count in
+  the message. Usage is counted for chassis/generation, fuel type (engine fuel),
+  trim and part position; Machine type has no fitment usage and can always be
+  switched off. The check applies while automotive stays enabled.
+- The wording field is hidden and disabled; saving always stores
+  `terminology: "vehicle"`.
 
-| Milestone | Included phases | Result |
+Wording: `common/wording.py` registers a `terminology` axis. When a settings row
+carries `terminology: "equipment"` (for example from a settings import), saving
+the row rewrites "vehicle", "car" and their Arabic equivalents to machine wording
+in the translation overrides. Only overrides generated by the axis are withdrawn
+when the mode returns to `vehicle`; an administrator's own overrides are kept.
+
+## Data model (`automotive`)
+
+All records are scoped (`ScopedModel`: scope, audit fields, soft delete).
+
+| Model | Fields | Notes |
 |---|---|---|
-| Architecture approved | Phase 0 | Vocabulary, sample data, and scope agreed with retailer |
-| Technical foundation | Phase 1 | Off-by-default enhancement card, domain model, and permissions |
-| Usable fitment MVP | Phases 2–3 | Manage fitments and browse vehicle → products in the UI |
-| Retailer launch candidate | Phase 4 | Bulk migration, audit, pilot, and operational documentation |
-| Automotive v2 | Phase 5 | Refined matching, data-quality tooling, and faster counter workflows |
-| Catalog intelligence | Phase 6 | Part-number, cross-reference, VIN, or external-data capabilities |
+| `EquipmentType` | name, is_active | Shown when the Machine type criterion is on. Name unique, case-insensitive. |
+| `VehicleMake` | name, is_active | Name unique per scope, case-insensitive. |
+| `VehicleModel` | make, equipment_type (optional), name, alias, is_active | Name unique per make, case-insensitive. `alias` holds the local name. |
+| `VehicleGeneration` | vehicle_model, name, chassis_code, year_from, year_to, is_active | `year_from <= year_to`. Unique per model, name and years. |
+| `VehicleEngine` | vehicle_model (blank = shared engine), generation, manufacturer, fitted_models, engine_code, display_name, displacement, fuel_type, is_active | A shared engine lists the models it is fitted to. Fuel types: gasoline, diesel, hybrid, electric, LPG, other. |
+| `VehicleTrim` | vehicle_model, generation (optional), name, is_active | Unique per model, generation and name. |
+| `ProductFitment` | product, vehicle_model (optional), year_from, year_to (both or neither), generation, engine, trim, transmission, position, notes | Related name on `Product`: `automotive_fitments`. |
+| `PartProfile` | product (one-to-one), part_brand | Part identity beside the product. |
+| `ProductPartNumber` | product, kind (`oem` or `cross`), number, normalized | Unique per product, kind and normalized number. |
 
-Phases 0–4 are the recommended first commercial delivery and include the full
-configurable criterion set. Phases 5–6 should not block the first retailer launch.
-
-## Optional Enhancements Pattern
-
-The settings experience is designed to support other store-specific CRM
-enhancements later without turning the core catalog into a collection of nullable
-industry fields.
-
-```text
-Optional Enhancements
-└── Automotive Compatibility                 [Off by default]
-    ├── Chassis / Generation                 [On/Off]
-    ├── Engine                               [On/Off]
-    ├── Fuel Type                            [On/Off]
-    ├── Trim                                 [On/Off]
-    ├── Transmission                         [On/Off]
-    └── Part Position                        [On/Off]
-```
-
-For now, only Automotive Compatibility is registered. A future vertical feature
-can register another entry and its own settings, extension tables, UI, and query
-service while leaving Product and existing stores alone. Build only the small
-registry/configuration seam needed now; do not build a speculative plugin system.
-
----
-
-## Phase 0 — Retailer Discovery and Data Contract
-
-### Goal
-
-Turn the meeting example into an agreed compatibility vocabulary before schema
-or UI work begins.
-
-### Work
-
-1. Collect a representative sample of 50–100 stocked parts covering:
-   - parts fitting one model and one year range;
-   - parts fitting several models or makes;
-   - parts that differ by engine, chassis, trim, or axle position;
-   - products with existing SKU, barcode, OEM number, and supplier number;
-   - products with color/size variants, if the retailer uses them.
-2. Confirm what employees know when serving a customer:
-   - make/model/year only;
-   - chassis/platform code;
-   - engine size or engine code;
-   - VIN;
-   - OEM or aftermarket part number.
-3. Agree display terminology in English and Arabic for make, model, year range,
-   compatibility, and “fits vehicles.”
-4. Define canonical representations for chassis/generation, engine code and
-   displacement, trim, transmission, and position. Blank qualifier values must
-   have one agreed meaning: “applies to all values at this level.”
-5. Select the initial criterion switches for this retailer. The current car-parts
-   profile starts with every confirmed automotive criterion enabled, while other
-   stores may use a smaller subset.
-6. Decide whether current flat `Category` values are sufficient for launch.
-   Nested product categories are a separate catalog project and are not required
-   for correct vehicle fitment.
-7. Map the retailer's existing spreadsheet columns to the proposed data contract.
-
-### Deliverables
-
-- An anonymized sample inventory workbook.
-- Approved bilingual terms.
-- A list of fields required for launch versus fields merely requested “someday.”
-- Controlled values and matching rules for engine, chassis/generation, trim,
-  transmission, and position, including how “all” compatibility is represented.
-- The saved Optional Enhancements profile for the retailer.
-
-### Exit gate
-
-Every sample row can be represented without encoding compatibility in product
-names or categories. The retailer has resolved ambiguous spellings such as
-`1.8`, `1.8L`, and `1800cc`, and can identify the source columns for every
-criterion enabled for its launch profile.
-
----
-
-## Phase 1 — Optional Automotive Foundation
-
-### Goal
-
-Introduce the domain safely without changing generic catalog behavior.
-
-### Proposed app and models
-
-Create a separate `automotive` Django app. Its business records follow the
-project's `ScopedModel` conventions and existing audit behavior.
-
-```text
-VehicleMake
-  name
-  is_active
-
-VehicleModel
-  make → VehicleMake
-  name
-  is_active
-
-VehicleGeneration
-  vehicle_model → VehicleModel
-  name
-  chassis_code
-  year_from
-  year_to
-  is_active
-
-VehicleEngine
-  vehicle_model → VehicleModel
-  generation → VehicleGeneration (optional when shared across generations)
-  engine_code
-  display_name
-  displacement
-  fuel_type
-  is_active
-
-VehicleTrim
-  vehicle_model → VehicleModel
-  generation → VehicleGeneration (optional when shared across generations)
-  name
-  is_active
-
-ProductFitment
-  product → catalog.Product
-  vehicle_model → VehicleModel
-  year_from
-  year_to
-  generation → VehicleGeneration (optional means all matching generations)
-  engine → VehicleEngine (optional means all matching engines)
-  trim → VehicleTrim (optional means all matching trims)
-  transmission (controlled choice; blank means all)
-  position (controlled choice)
-  notes (optional, operational notes only)
-```
-
-Keeping `vehicle_model` on the fitment makes the base query direct; model-level
-validation must ensure any selected generation, engine, and trim belong to that
-model and agree with one another. If Phase 0 data shows that the retailer already
-has a stable “vehicle configuration” identifier, replace the three optional
-qualifier links with a normalized `VehicleConfiguration` lookup rather than
-duplicating that identifier's meaning.
+`ProductFitment` choices: transmission is automatic, manual, CVT, DCT or other;
+position is front, rear, front left, front right, rear left or rear right. Both
+blank means "all".
 
 ### Integrity rules
 
-- Make names are unique within the applicable store scope, case-insensitively.
-- Model names are unique per make within scope.
-- `year_from <= year_to` is enforced at model/form and database levels.
-- Fitment years must fall within the selected generation's supported range when
-  a generation is specified.
-- Engine, generation, and trim selections must belong to the selected model and
-  must describe a consistent configuration.
-- Years must be plausible, using an agreed lower bound and a small future-year
-  allowance rather than accepting arbitrary integers.
-- Exact duplicate product/model/year-range/qualifier/position fitments are rejected.
-- Deactivation is preferred to deletion when a make/model is no longer used.
-- Fitments use `PROTECT` where lookup removal would erase business meaning and
-  `CASCADE` only where removal is explicitly safe, such as deleting a product.
-- Add indexes for product reverse lookup, model/year compatibility, and the
-  qualifier joins exercised by the browser.
-
-### Optional Enhancements settings card
-
-Register one admin-only settings step/card backed by DjangoLux
-`SystemSettings.extra_config`, with a structure such as:
-
-```text
-app.switch_pos.optional_enhancements
-  automotive
-    enabled: false
-    criteria
-      generation_chassis: true
-      engine: true
-      fuel_type: true
-      trim: true
-      transmission: true
-      position: true
-```
-
-The missing-key fallback for `automotive.enabled` is always `false`. This is the
-release-compatibility guarantee: applying migrations or upgrading code does not
-activate anything for a running instance. The criterion defaults form the
-recommended profile shown when an admin elects to enable automotive; the admin
-may deselect criteria before saving.
-
-The card must:
-
-- explain that this is an optional presentation/search enhancement and does not
-  convert Product into an automotive asset;
-- reveal criterion switches only when the automotive master switch is selected;
-- show a preview of the staff navigation and search steps that will appear;
-- persist one shop-wide configuration, not a per-user preference;
-- require app-admin/superuser authority to change configuration;
-- link to fitment data management after the enhancement is enabled;
-- expose the same configuration if a future first-run setup wizard adds an
-  Optional Enhancements step, rather than maintaining a second source of truth.
-
-The feature helper is the sole reader of this JSON and returns validated defaults.
-Templates, views, forms, imports, and query services must not inspect raw settings
-independently.
-
-The setting controls navigation and UI exposure. Server-side permissions remain
-authoritative; a feature switch is never an authorization mechanism.
-
-### Criterion toggle semantics
-
-- A disabled criterion is absent from create/edit forms, the Vehicle Browser,
-  Product card fitment labels, search query construction, and spreadsheet
-  templates. Its database column/table still exists as part of the optional app.
-- Enabling a criterion does not invent data. Existing broad/all fitments remain
-  broad until an authorized user enriches them manually or through import.
-- Disabling the complete automotive enhancement is always allowed because all
-  compatibility UI and results disappear together; stored data is untouched.
-- Disabling one criterion after nonblank values exist needs an impact check. The
-  card shows the number of affected fitments and blocks the change until those
-  values are explicitly normalized to broad/all or otherwise resolved. Silently
-  ignoring engine/chassis constraints could return unsafe false-positive parts.
-- Criterion dependencies are validated on save. In the initial model, Fuel Type
-  requires Engine; the card explains and automatically selects the dependency
-  rather than permitting an incoherent configuration.
-- Re-enabling the enhancement or an unused criterion restores its UI without a
-  schema migration or deployment.
-
-### Permissions
-
-Add normal view/add/change permissions for makes, models, and fitments.
-
-- Admin/Owner: full management.
-- Sales Manager: full management and import.
-- Sales Representative: browse compatibility and view product fitments.
-- Delivery Courier: no automotive catalog access unless separately granted.
-
-Update `seed_roles`, `docs/PERMISSIONS.md`, navigation discovery, and permission
-tests together.
-
-### Validation
-
-- Migrations apply on a fresh database and an upgraded v0.7.3 database.
-- A missing settings namespace and an explicit master switch of `false` both
-  leave existing product/catalog screens, routes, navigation, and queries unchanged.
-- Enabling/disabling each unused criterion immediately changes the form, browser,
-  card labels, search service, and generated spreadsheet contract as documented.
-- Disabling a used criterion is blocked with an accurate affected-fitment count;
-  master disable/re-enable preserves and restores all extension data.
-- Permissions return 403 for unauthorized direct URL access.
-- Model constraints and scope boundaries have focused tests.
-
-### Exit gate
-
-The schema can represent one SKU fitting multiple model/year ranges without
-duplicating Product, ProductVariant, or stock records.
-
----
-
-## Phase 2 — Fitment Management and Reverse Lookup
-
-### Goal
-
-Let authorized staff maintain compatibility from the product they already know.
-
-### Staff UI
-
-1. Add Make and Model management screens plus management for each enabled
-   criterion using existing DjangoLux list/modal patterns. Each selector is
-   constrained by the relevant vehicle levels above it.
-2. Add a **Fits Vehicles** section to the operational Product card:
-   - make and model;
-   - inclusive year range;
-   - each enabled chassis/generation, engine/fuel, trim, transmission, and
-     position constraint;
-   - concise label such as `Toyota Corolla · 2014–2019`;
-   - edit/remove actions only for authorized users.
-3. Add a product fitment editor that supports several compatibility rows in one
-   save. Reuse existing products; never create product copies.
-4. Use dependent selectors so an invalid model/generation/engine/trim combination
-   cannot be submitted from the normal UI. Disabled criteria are not rendered.
-5. Show clear duplicate, overlapping-range, inconsistent-configuration, and
-   invalid-year messages.
-   Overlaps for the same product/model should be consolidated or explicitly
-   confirmed rather than accumulating confusing rows.
-6. Add reverse lookup to product keyword search so an employee can find a part
-   by make/model, chassis, or engine text as well as SKU, barcode, name, and
-   size/specification.
-
-### Product card behavior
-
-- “Fits Vehicles” is shown only when the feature is enabled, and its labels use
-  only the store's enabled criteria.
-- Empty state explains how an authorized manager adds compatibility.
-- Existing variants, quantity, pricing, and movement history remain unchanged.
-- A fitment describes the product, not a variant. Variant-level fitment is out of
-  scope unless Phase 0 proves that physically different SKUs are being modeled as
-  variants incorrectly.
-
-### Validation
-
-- Product → vehicles and vehicle → products queries return the same association.
-- Editing a fitment never posts a stock movement or changes invoice history.
-- A product compatible with four vehicles still has one aggregate stock balance.
-- Product card rendering is covered in English and Arabic.
-
-### Exit gate
-
-A manager can create Toyota/Corolla/E170, select the correct engine, trim,
-transmission, year range, and position, and attach them to a product. Any employee
-with view permission can see the complete relationship from the Product card.
-
----
-
-## Phase 3 — Vehicle Browser MVP
-
-> Implemented for v0.8.0. The browser is linked from the Products ribbon,
-> automotive hub and Product card only while the enhancement is enabled. The
-> hub is also available as one optional, permission-gated sidebar-builder entry;
-> its individual management lists stay behind the hub. Its
-> regression suite covers feature gating, distinct counts, broad/all matching,
-> selector skipping, direct search and query growth with 50 additional fitments.
-> Out-of-stock Products are shown with a status badge pending the retailer's
-> Phase 0/pilot decision.
-
-### Goal
-
-Deliver the retailer's requested pyramid as a fast, guided search experience.
-
-### Primary route and navigation
-
-Add a dedicated **Browse by Vehicle** entry when automotive is enabled. Preserve
-the chosen path in query parameters so browser Back, refresh, and shared URLs work:
-
-```text
-/staff/automotive/browse/?make=…&model=…&year=…&generation=…&engine=…&category=…
-```
-
-### User flow
-
-1. **Make** — active makes with a distinct compatible-product count.
-2. **Model** — models belonging to the selected make, with counts.
-3. **Year** — dynamically generated from stored ranges; no `VehicleYear` table.
-4. **Generation/Chassis** — only shown when more than one compatible choice can
-   change the result for the selected model/year and the criterion is enabled.
-5. **Engine** — code and human-readable displacement/fuel label.
-6. **Trim/Transmission** — progressively shown when they narrow compatibility.
-7. **Category** — current Product categories represented in the matching result.
-8. **Position** — available positions relevant to the category/result.
-9. **Products** — compatible products using the existing card/list components.
-
-The browser should skip a selector when its criterion is disabled or there is
-only one valid choice. It must also include broad fitments whose blank qualifier
-explicitly means “all,” rather than filtering them out when the customer supplies
-a more specific vehicle.
-
-The final query is conceptually:
-
-```text
-fitment.vehicle_model.make = selected make
-fitment.vehicle_model = selected model
-fitment.year_from <= selected year
-fitment.year_to >= selected year
-fitment.generation = selected generation OR fitment.generation is broad/all
-fitment.engine = selected engine OR fitment.engine is broad/all
-fitment.trim/transmission match OR the corresponding qualifier is broad/all
-product.category = selected category (when provided)
-```
-
-Use `distinct()` so overlapping or duplicate-compatible ranges cannot repeat a
-product. Product counts count distinct SKUs, not units on hand.
-
-### Result behavior
-
-- Default to active products and active makes/models.
-- Clearly mark out-of-stock and low-stock products; decide with the retailer
-  whether out-of-stock products are shown by default.
-- Open the existing Product card from every result.
-- Support direct SKU/barcode/name search without forcing a vehicle path.
-- Provide breadcrumb/back controls and a one-click “change vehicle” action.
-- Handle missing levels and empty results without resetting the whole path.
-- Verify touch targets and RTL flow on the devices used at the counter.
-
-### Performance
-
-- Use `select_related`/`prefetch_related` and aggregate counts; avoid per-card
-  compatibility queries.
-- Add query-count tests for the final product result.
-- Test with a realistic volume agreed in Phase 0, not a ten-row fixture only.
-- Cache stable make/model choices if profiling shows a real need; do not cache
-  live stock quantities in the compatibility layer.
-
-### Exit gate
-
-An employee can navigate Toyota → Corolla → 2017 → E170 → 1.8L → Brakes, open a
-compatible product, sell it through the existing invoice flow, and immediately
-see the same reduced stock when reaching that SKU through another compatible
-vehicle.
-
----
-
-## Phase 3.5 — Parts-First Entry (delivered in v0.9.0)
-
-A parts-only store adds parts daily; the Phase 2 editor (card → Manage → full-page
-formset) was too many steps per vehicle. Delivered without Product schema changes:
-
-- One *Fits vehicles* search-and-tag picker (`automotive.fits`) inside the Product
-  modal, with generation-year spans, typed years/ranges and engine-code matches.
-- *Same cars as…* copy, *Assign vehicles* bulk modal (additive), purchase-invoice
-  line tags (additive), and *Add part for this vehicle* from the browser.
-- `PartProfile` (brand) and `ProductPartNumber` (OEM/cross-reference, normalized)
-  as extension tables searched by the Products list and the browser.
-- Parts-mode navigation: Browse by Vehicle joins the workspace sidebar group and
-  the Products list gains Vehicle/Year filters. Landing on the browser after
-  login is DjangoLux's Home setting (`/staff/automotive/browse/`), not an
-  automotive redirect.
-
-The full editor remains the place for engine/trim/transmission/position/notes on
-existing rows and for confirming intentional overlaps.
-
-## Phase 3.6 — Heavy Machinery and Equipment (delivered in v0.9.0)
-
-The first retailer sells heavy-machinery parts, where parts fit engines across
-makes and years rarely identify a machine. Delivered on the same tables:
-machine types, shared engines with fitted-model lists and engine-only
-compatibility, optional years (blank = all years) with a *Model year* criterion,
-and a *Machines & equipment* wording switch. Serial-number ranges (Caterpillar
-serial prefixes) are the next candidate criterion.
-
----
-
-## Phase 4 — Bulk Migration, Audit, and Retailer Pilot
-
-### Customer revision (2026-10-03)
-
-- Client diagram received and implemented: independent machinery vocabulary, nested categories, and product/service compatibility. Repair is a service; ZOOM is under CIFA. Vehicle qualifiers remain in the automotive enhancement. See CLIENT_CATEGORIZATION.md.
-- Product/part and VehicleModel/machine now have an `alias` field for local
-  Libyan names alongside their official names, with form entry and keyword search.
-- The current field holds one local name at product/model level. Revisit its
-  aliases also live on the new MachineModel; original aliases are copied during migration.
-  Local-name aliases are distinct from OEM/cross-reference part numbers.
-
-### Goal
-
-Make launch data practical to load and safe to verify.
-
-### Fitment spreadsheet import
-
-Reuse the Opening Stock upload pattern: select `.xlsx`, validate, preview a diff,
-show conflicts, then finalize transactionally.
-
-Recommended columns:
-
-```text
-Product SKU* | Make* | Model* | Year From* | Year To* |
-Generation [if enabled] | Chassis Code [if enabled] |
-Engine Code / Size [if enabled] | Fuel Type [if enabled] |
-Trim [if enabled] | Transmission [if enabled] | Position [if enabled] | Notes
-```
-
-The generated template and the modal's required-header guide include core
-make/model/year columns plus only the criteria enabled in Optional Enhancements.
-Disabled-criterion columns in an uploaded workbook are reported as ignored or
-blocking according to the agreed import policy; they are never saved invisibly.
-
-Import rules:
-
-- Product SKU is the stable product identity; product names are display-only.
-- Existing makes/models and controlled qualifier values are matched
-  case-insensitively after normalization.
-- Unknown products are blocking conflicts.
-- Unknown makes/models are shown explicitly. The initial importer should either
-  create them as a clearly previewed action or require them to be created first;
-  it must never create misspelled values silently.
-- Unknown qualifier values, impossible model/generation/engine relationships,
-  and ambiguous aliases are conflicts; they are never silently reduced to notes.
-- Exact existing fitments are unchanged, changed ranges/qualifiers are explicit
-  updates, and duplicates/overlaps are conflicts or consolidation suggestions.
-- Preview performs no writes; finalization is atomic and audit logged.
-- Import limits, file safety checks, user-scoped preview tokens, and stale-token
-  behavior should match the hardened Opening Stock importer.
-
-### Pilot sequence
-
-1. Back up the retailer database.
-2. Enable automotive only in the pilot environment/store.
-3. Import make/model data and fitments from a reviewed workbook.
-4. Compare at least 30 parts against the retailer's source records.
-5. Run counter exercises with two employees:
-   - vehicle-first lookup;
-   - product-first reverse lookup;
-   - same SKU reached through two vehicles;
-   - out-of-stock and low-stock results;
-   - correction of an incorrect fitment.
-6. Collect search failures for two working weeks and classify them as missing
-   data, poor terminology, incorrect broad/all semantics, or matching defects.
-
-### Operational documentation
-
-- How to enable/disable the module.
-- Who may maintain compatibility.
-- Fitment import template and conflict resolution.
-- Backup/rollback and data correction procedure.
-- Explicit warning that fitment indicates catalog compatibility, not guaranteed
-  installation suitability when the source data is incomplete.
-
-### Exit gate
-
-The reviewed source and CRM agree on the pilot sample, staff can complete the
-common lookup flow without advanced filters, and no duplicated inventory was
-introduced. This is the retailer launch-candidate milestone.
-
----
-
-## Phase 5 — Fitment Quality and Counter-Workflow Refinement
-
-### Goal
-
-Improve the required qualifier workflow using evidence from the retailer pilot,
-without changing stock identity or burdening non-automotive stores.
-
-### Data-quality work
-
-- Merge duplicate aliases while retaining redirects/audit history.
-- Report products with no fitments and qualifier records used by no products.
-- Report contradictory broad/all and specific fitments for the same product.
-- Suggest consolidation of adjacent or overlapping year ranges with identical
-  qualifier sets.
-- Track whether a fitment was retailer-entered, imported, or externally sourced.
-
-### Workflow refinements
-
-- Remember a counter user's last selected vehicle only as a user preference, with
-  an obvious reset/change-vehicle action.
-- Add frequently used vehicles or recent vehicle paths if observed use supports it.
-- Offer batch assignment of one fitment set to several selected products.
-- Add printable/exportable “Fits Vehicles” information where staff need shelf or
-  customer-facing references.
-- Tune selector ordering and labels using failed-search logs rather than guesses.
-
-### Search behavior
-
-- Make/model/year remains the simple entry path.
-- Qualifiers progressively narrow results only when relevant.
-- A broad fitment with no engine qualifier means “all engines” only when that was
-  explicitly intended; document and test this matching rule.
-- Reverse lookup shows every qualifier needed to distinguish fitment rows.
-
-### Exit gate
-
-The dominant pilot search failures are resolved, compatibility maintenance has a
-repeatable audit workflow, and the feature remains invisible when disabled.
-
----
-
-## Phase 6 — Part Identity and External Catalog Intelligence
-
-### Goal
-
-Improve lookup quality once the retailer's own fitment data is stable.
-
-### Possible capabilities
-
-1. **Product references** — OEM number, manufacturer number, supplier number,
-   and aftermarket cross-reference aliases attached to one Product.
-2. **Barcode/SKU/reference search** — include references in product and vehicle
-   result search without changing stock identity.
-3. **VIN-assisted lookup** — decode a VIN into vehicle attributes, then apply the
-   local fitment query. Treat decoder results as input, not proof of compatibility.
-4. **External fitment catalog import/API** — only after evaluating coverage,
-   licensing, update frequency, regional vehicle naming, and data ownership.
-5. **Data-quality reports** — products without fitments, impossible ranges,
-   inactive models still in use, and overlapping/conflicting fitments.
-
-Each integration needs provenance and a last-updated timestamp so employees can
-distinguish retailer-entered compatibility from imported catalog claims.
-
----
-
-## Cross-Phase Test Matrix
-
-Every implementation phase must cover:
-
-- model constraints, year boundaries, duplicate and overlap handling;
-- permissions and direct-URL denial;
-- scope isolation where applicable;
-- missing configuration and master-off upgrade behavior;
-- every criterion toggle, dependency, and used-data disable guard;
-- master disable/re-enable data preservation;
-- make/model/year/category query correctness and `distinct()` behavior;
-- a multi-vehicle SKU retaining one stock balance;
-- Product card reverse fitment rendering;
-- English, Arabic, and RTL layout;
-- spreadsheet safety, dry preview, conflicts, atomic finalize, and replay denial;
-- migrations on fresh and upgraded databases;
-- full existing finance/catalog/sales regression suite.
-
-## Explicit Non-Goals for the MVP
-
-- No make/model/year columns on `catalog.Product`.
-- No automotive feature or criterion columns on Product, ProductVariant, stock,
-  purchase, or sales tables; only the optional extension relates back to Product.
-- No product duplication per vehicle.
-- No individual `VehicleYear` table.
-- No nested vehicle values inside `Category`.
-- No VIN decoder or paid third-party catalog dependency.
-- No separate stock balance per fitment.
-- No claim that compatibility data guarantees installation correctness.
-
-## Recommended Next Action
-
-Run Phase 0 with the retailer and obtain the sample workbook before writing the
-migration. Use it to validate controlled values, broad/all semantics, the
-retailer's initial criterion switches and the implemented Phases 1–3 workflow.
-Then use Phase 4 to load and validate the retailer's real catalog. Ship the
-Optional Enhancements namespace with Automotive Compatibility off by default,
-including for the smart-lock store and every already-running installation.
+- Years run from 1886 to the current year plus two.
+- A fitment's years must lie inside the chosen generation's range.
+- A fitment needs a model or a shared engine. A generation or trim needs a model.
+- Generation and trim must belong to the fitment's model, and an engine or trim
+  tied to a generation must match the chosen generation.
+- An engine must be the model's own or a shared engine fitted to that model. A
+  shared engine with no model fits every machine the engine is fitted to.
+- A generation cannot be attached to a shared engine.
+- Exact duplicates (same product, model, years, generation, engine, trim,
+  transmission and position among live rows) are rejected by a database constraint.
+- Foreign keys to lookup records use `PROTECT`; the product foreign keys of
+  fitments, part profiles and part numbers use `CASCADE`.
+- Indexes cover the product and the model/year range.
+- A vehicle model referenced by `MachineModel.legacy_vehicle_model` is excluded
+  from vehicle lists, forms, search, the browser and the Products Vehicle filter.
+  Its stored fitments remain in the database.
+
+## Data model (`machinery`)
+
+| Model | Fields |
+|---|---|
+| `MachineType` | name, is_active |
+| `Manufacturer` | name, is_active |
+| `MachineModel` | machine_type (required), manufacturer, name, alias, categories, products, services, legacy_vehicle_model, is_active |
+
+`MachineModel.products` and `.services` are plain many-to-many links; they hold no
+quantity, price or SKU. At most one machine exists per combination of machine type,
+manufacturer and model name (case-insensitive); manufacturer and name may be blank.
+`legacy_vehicle_model` links a machine to the `automotive.VehicleModel` it stands
+for. Machines carry no year, engine, trim or position qualifiers.
+
+## Permissions
+
+| Role (`seed_roles`) | Vehicles | Machinery |
+|---|---|---|
+| Sales Manager | view, add, change on equipment types, makes, models, generations, engines, trims; view, add, change, delete on product fitments and part numbers; view, add, change on part profiles | view, add, change on machine types, manufacturers, machine models |
+| Sales Representative | view on the same lookup records, product fitments, part profiles and part numbers | view on machine types, manufacturers, machine models |
+| Delivery Courier | none | none |
+
+Superusers hold everything and are the only users who can save the Optional
+enhancements card. No role receives delete on lookup records; their list rows
+offer View and Edit, and a record is switched inactive instead. While an
+enhancement is off its permissions leave the group and user permission editors;
+stored grants are kept.
+
+Permissions each surface requires (`automotive.` and `machinery.` prefixes):
+
+| Surface | Requires |
+|---|---|
+| Vehicles Hub | `view_vehiclemake` |
+| Browse by Vehicle | `view_vehiclemake`, `view_vehiclemodel`, `view_productfitment`, `catalog.view_product` |
+| Vehicle search, dependency lists | `view_vehiclemodel` |
+| Reference lists | the model's `view_` permission |
+| Fits picker (Product modal, purchase rows), Assign vehicles, Manage compatibility | `view_`, `add_`, `change_` and `delete_productfitment`; Assign vehicles also `catalog.view_product` |
+| Same cars as… source | `view_productfitment`, `catalog.view_product` |
+| Product card panel | `view_productfitment`; the Manage button also needs add, change and delete |
+| Machines Hub | `view_machinemodel` |
+| Browse machinery, machine search | `view_machinetype`, `view_manufacturer`, `view_machinemodel` |
+| Machine picker | `view_machinemodel` (and the form's own product or service permission) |
+| Assign machines | `catalog.view_product`, `catalog.change_product`, `view_machinemodel` |
+
+## Screens and URLs
+
+| URL | Purpose |
+|---|---|
+| `/staff/automotive/` | Vehicles Hub: Browse by vehicle, Equipment Types, Vehicle Makes, Vehicle Models, Vehicle Generations, Vehicle Engines, Vehicle Trims, Products. Cards for switched-off criteria are absent. |
+| `/staff/automotive/browse/` | Browse by Vehicle |
+| `/staff/automotive/types/`, `makes/`, `models/`, `generations/`, `engines/`, `trims/` | Reference lists with modal add and edit. Types, generations and trims answer 404 while their criterion is off. |
+| `/staff/automotive/products/<pk>/fitments/` | Manage compatibility editor for one product |
+| `/staff/automotive/vehicles/search/?q=` | JSON vehicle suggestions (`jump=1` omits shared-engine suggestions) |
+| `/staff/automotive/fits/source/` | JSON: products that have fitments (`q=`), or one product's fitments as unsaved tags (`product=`) |
+| `/staff/automotive/fits/bulk/` | Assign vehicles modal |
+| `/staff/automotive/dependencies/` | JSON models, generations, engines and trims for the dependent selectors |
+| `/staff/machinery/` | Machines Hub: Browse machinery, Machine types, Manufacturers, Machine models, Category branches, Parts, Services (each card needs its view permission) |
+| `/staff/machinery/browse/` | Browse machinery |
+| `/staff/machinery/types/`, `manufacturers/`, `models/` | Reference lists |
+| `/staff/machinery/models/search/?q=` | JSON machine suggestions (two or more characters, at most 20) |
+| `/staff/machinery/assign/` | Assign machines modal |
+
+The generic modal route `/staff/app-modals/<app>/<Model>/<pk>/` serves the
+reference models and answers 404 when the enhancement is off, when the model's
+criterion is off, and always for `ProductFitment` (fitments are edited through
+the picker and the editor).
+
+## Browse by Vehicle
+
+The path lives in query parameters, so Back, refresh and shared links work:
+`?type=&make=&model=&year=&generation=&engine=&trim=&transmission=&category=&position=`.
+`q=` runs a direct product search instead.
+
+1. **Machine type** chips above the make grid, when the criterion is on. Models
+   without a type are left out once a type is selected.
+2. **Make**, **Model**: active makes and models with a count of distinct
+   products. Parts tagged only to a shared engine count for every active model the
+   engine is fitted to.
+3. **Year**: listed when the model's fitments carry years (newest first); each
+   count includes undated fitments. A model with only undated fitments skips the
+   step.
+4. **Chassis / generation**, **Engine**, **Trim**, **Transmission**, **Category**,
+   **Part position**: chips shown only when more than one choice remains or one is
+   selected. Engine chips show name, code, displacement and, with the Fuel type
+   criterion, fuel. Category chips list the exact categories of the matching
+   products, without descendants.
+5. **Compatible products**: active products, by name, at most 100 (the page says
+   when the list is capped). Each card shows image, name, alias, category, SKU, LYD
+   price and a stock badge (Out of stock when the balance is zero or less, Low stock
+   at or below the reorder level, otherwise the quantity). A card opens the
+   product card.
+
+Matching for a chosen vehicle: the fitment's model equals the model; its years
+are blank or contain the year; its generation, engine, trim, transmission and
+position equal the selection or are blank. Results count each product once.
+Fitments whose generation, engine or trim is inactive (for enabled criteria) are not
+browsable, nor are fitments of inactive models, makes or products.
+
+Other elements of the page:
+
+- **Find a vehicle** jump search. It accepts text such as `camry 2014`, a chassis
+  code or an engine code, and opens the browser at the chosen path. It reaches any
+  active make, model and year, including a vehicle no product fits yet (count 0).
+- **Search products**: name, alias, SKU, barcode, an extra barcode (exact), OEM or
+  cross-reference number, or part brand, without choosing a vehicle. **Choose a
+  vehicle** returns to the guided path.
+- **Add part for this vehicle**: shown with a selected model to users who may add
+  products and manage fitments. It opens the Product modal with the vehicle
+  tagged (year or generation span included).
+- **Change vehicle** and breadcrumbs reset or step back along the path.
+- Results are scoped to the signed-in user's scope.
+
+## Entering compatibility
+
+**Product modal.** While automotive is on, the Product form carries **Fits
+vehicles** (a search-and-tag picker, shown to users with the four fitment
+permissions), **Part brand**, **OEM numbers** and **Cross-reference numbers**, in
+that order, directly after the category row.
+
+- Typing `camry 2014`, `golf 2010-2012`, a chassis code (`xv50`) or an engine
+  (`hilux 2.8`, `2ar`) suggests model, generation and engine matches (25 at most).
+  A typed year or range becomes the row's years; a generation chip carries its own
+  span; a model chip without a year means all years; a shared engine chip fits every
+  machine the engine is fitted to.
+- Tags for saved rows are kept unchanged (their trim, transmission, position and
+  notes are edited in the Manage compatibility editor, linked as **Advanced**).
+  Removing a tag deletes that fitment on save; each added tag creates a fitment.
+  Exact duplicates collapse. Criteria the store switched off are dropped from a tag.
+- **Same cars as…** searches products that already have fitments and adds their
+  fitments as unsaved tags, including engine, trim, transmission and position.
+- When an unsaved product has no name yet and a category is chosen, the first tag
+  suggests the name `<category> – <vehicle>`.
+- Part numbers are separated by commas, semicolons or lines, at most 80 characters
+  each.
+
+**Assign vehicles** (Products ribbon, vehicles on): adds the same tags to several
+active products in one save. It is additive, requires at least one vehicle, adds
+only rows that do not exist, and writes an audit entry per product that changed.
+
+**Manage compatibility** (`/staff/automotive/products/<pk>/fitments/`, from the
+product card): a multi-row editor with make/model, years and one input for each
+enabled criterion, plus notes. Selectors depend on each other (generation, engine
+and trim follow the chosen model), so an inconsistent combination cannot be picked.
+Rules on save: invalid years, a generation outside its range and engine, trim or
+generation mismatches are reported per row; two rows with the same identity and
+years are a duplicate error; rows with the same identity and overlapping years
+(blank years overlap every range) are rejected until **I reviewed and confirm
+intentional overlapping ranges** is ticked. A successful save is atomic, audited
+once for the product and returns to the Products list.
+
+**Purchase-invoice rows** (`/staff/catalog/purchase-invoices/new/`): each row has a
+collapsed **Fits vehicles** picker for users with the fitment permissions. On
+posting, the tags are added to the created or reused product in the same
+transaction as the stock-in; nothing is removed. Machine pickers on purchase and
+opening-stock rows behave the same way.
+
+Each intake row carries its compatibility pickers in a separate full-width row
+under the item fields. Each picker is collapsible, and its choices wrap and scroll
+within a bounded height.
+
+**Machinery.** While machinery is on and the user holds `view_machinemodel`, the
+Product, Service, purchase-row and opening-stock-row forms carry **Compatible
+machines**. The picker lists active machines of the record's scope whose type (and
+manufacturer, when set) is active. Saving a product or service replaces only the
+links the picker showed; links to inactive or out-of-scope machines are kept.
+**Assign machines** (Products ribbon) adds links to several products at once,
+additively, with an audit entry per product.
+
+The Products ribbon shows **Browse by vehicle** when only vehicles are on,
+**Browse machinery** when only machinery is on, and only **Assign vehicles** and
+**Assign machines** when both are on, each subject to permissions.
+
+## Where compatibility appears
+
+- **Product card** (`/staff/catalog/products/<pk>/card/`): a **Fits vehicles**
+  panel with a count, one label per fitment and the buttons Browse by vehicle,
+  Vehicle data and Manage compatibility; an empty state when none. Labels read
+  `Make Model · years · generation (chassis) · engine · fuel · trim · transmission ·
+  position`, using only enabled criteria (a shared-engine fitment reads `<engine> ·
+  every machine with this engine`). A **Compatible machines** panel lists machine
+  models. Product and service detail modals add a Compatible machines row.
+- **Products list**: **Vehicle** and **Vehicle year** filters join the front row
+  while automotive is on; both must match the same fitment row, and engine-only
+  fitments count for every model their shared engine is fitted to. The keyword
+  search additionally matches make, model, model alias and, per enabled
+  criterion, generation name and chassis code, engine name, code and manufacturer,
+  machine type, fuel and trim, plus OEM or cross-reference numbers and part
+  brand. Each product is returned once. The category filter includes descendants.
+- **Sidebar**: the Vehicles Hub (group `automotive`, icon `bi-car-front`) and Browse
+  by Vehicle (group `workspace`) are offered to the sidebar builder only while
+  automotive is on; the Machines Hub and Browse machinery follow the machinery
+  switch. Saved sidebar entries that point into a switched-off enhancement are
+  hidden at render time, empty groups disappear, and the saved order and labels
+  return when the switch is turned on.
+- **Workspace dashboard**: a Browse by vehicle quick action and a Vehicle Models
+  tile (model count and parts fitted) while automotive is on and the user may open
+  the browser; the machinery equivalents (Browse machinery, Machine models tile)
+  follow the machinery switch.
+- **Till** (`/staff/sales/pos/`): with automotive on, the **By vehicle** button
+  opens a panel that lists the products fitting a chosen vehicle
+  (`/staff/sales/pos/vehicle/`; `any_year` lists every year at once). An OEM or
+  cross-reference number of three or more significant characters that names one
+  product is an exact till match.
+
+## Part identity
+
+`PartProfile.part_brand` and `ProductPartNumber` rows keep automotive identity
+beside the product. Numbers are stored with an uppercase alphanumeric normal
+form, so `04465-33450` and `0446533450` are the same number. Product search and
+the browser match a typed value of three or more significant characters as a
+substring of the normal form, and match the brand as text. Saving the product
+form synchronises the brand and both number lists with the entered values.
+
+## Seed and bulk data
+
+- `python manage.py seed_roles` grants the role permissions above (idempotent;
+  it replaces each group's permission set with its list).
+- `python manage.py seed_machine_categories [--scope ID]` seeds the machinery
+  vocabulary; see [CLIENT_CATEGORIZATION.md](CLIENT_CATEGORIZATION.md).
+- There is no seed command for makes, models or fitments. Vehicle data is entered
+  through the Vehicles Hub; fitments through the pickers, Assign vehicles, the
+  editor and purchase rows.
+- The opening-stock workbook carries no compatibility columns. Opening-stock grid
+  rows can carry machine links but no vehicle tags.
+
+## Not implemented
+
+- No fitment spreadsheet import or export.
+- No serial-number criterion.
+- No VIN lookup and no external fitment catalog.
+- No source, provenance or last-updated field on fitments, and no data-quality
+  reports (products without fitments, unused qualifiers, contradictory rows).
+- No remembered vehicle per user and no printable "Fits vehicles" output.
+- No per-variant fitment.
