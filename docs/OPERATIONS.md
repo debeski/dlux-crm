@@ -204,7 +204,7 @@ vehicle browser.
 ## Scheduled work
 
 - **`worker`** runs DjangoLux's own tasks and `DLUX_TASK_SCHEDULE`, and the
-  system backups taken from Options > Backups.
+  system backups taken from Options > Backup & Restore.
 - **`celery`** (worker plus Beat, `config/celery.py`) runs one project task:
   `finance.tasks.refresh_market_rates`, every 3 hours and once when the worker
   starts. It scrapes the USD and EUR reference rates from
@@ -226,7 +226,7 @@ run comes within 3 hours and the last known rates stay in use.
 
 ## Updating
 
-Back up first (Options > Backups, and the `media/` folder), then either:
+Back up first (Options > Backup & Restore, and the `media/` folder), then either:
 
 - **In the app**: Options > Updates and maintenance shows a new application image
   when one is published; install it there. This updates the application image

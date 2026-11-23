@@ -95,7 +95,7 @@ Run everything from the deployment folder (the one holding `compose.yml` and
 that card installs only the application image and keeps the old `compose.yml`, and
 an image older than DjangoLux 1.16 cannot update itself to this one.
 
-1. **Back up.** In the app, create a backup under Options > Backups and download
+1. **Back up.** In the app, create a backup under Options > Backup & Restore and download
    it, and copy the `media/` folder. Keep a database dump too if you have one. Note
    the database name (`docker compose exec db psql -U <POSTGRES_USER> -l`): if it is
    not `sales_db`, `.secrets/.env` must set `POSTGRES_DB` to it before step 5.
@@ -194,7 +194,7 @@ stored-files exposure: do it only to recover.
 
 ## Updating later
 
-Back up first: **Options > Backups** in the app, or keep a database dump.
+Back up first: **Options > Backup & Restore** in the app, or keep a database dump.
 
 - In the app: **Options > Updates and maintenance** shows a new application
   image when one is published. Install it there.
