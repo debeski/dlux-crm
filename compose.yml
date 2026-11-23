@@ -1,7 +1,7 @@
 name: sales
 
 x-environment:
-  # Database settings
+  # Settings shared by the application services (db has its own, below).
   &de
   # The stack contract schema this file was written for (DjangoLux docs/stack-schema.md).
   DLUX_STACK_SCHEMA: "5"
@@ -435,7 +435,7 @@ networks:
   frontend:
     driver: bridge
   # Outbound internet for the narrow set of services that need it: smtp-relay
-  # (→ your SMTP provider), dlux-updater (→ PyPI), composer-agent (→ registry).
+  # (→ your SMTP provider) and composer-agent (→ registry, PyPI, rate sources).
   # Separate from `frontend` so the internet-facing proxy shares no network with
   # them; nothing may sit on both.
   egress:
