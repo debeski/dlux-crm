@@ -26,8 +26,7 @@ def _render_thumb(url):
     """
     if url:
         return format_html(
-            '<img src="{}" alt="" class="rounded border" '
-            'style="width:38px;height:38px;object-fit:cover">',
+            '<img src="{}" alt="" class="rounded border crm-thumb-38">',
             url,
         )
     # Static markup (no interpolation) — mark_safe, since Django 6's format_html

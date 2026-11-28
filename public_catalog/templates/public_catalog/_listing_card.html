@@ -47,7 +47,7 @@
             {% for variant in listing.public_variants|slice:":6" %}
             <span title="{{ variant.label }}">
                 {% if variant.color %}
-                <i style="background:{{ variant.color_hex }}"></i>
+                <i data-swatch="{{ variant.color_hex }}"></i>
                 {% endif %}
                 {{ variant.size|default:variant.color_label }}
             </span>

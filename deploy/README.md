@@ -7,9 +7,10 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
 
 | File | Purpose |
 | --- | --- |
-| `compose.yml` | The stack: db, redis, web, **worker**, celery, smtp-relay, caddy, docker-socket-proxy, composer-executor, composer-agent. Keep `name: sales`. Stack schema 5. |
-| `start.sh`, `start.ps1` | Composer wrapper 6 (Linux/macOS, Windows). |
+| `compose.yml` | The stack: db, redis, web, **worker**, celery, smtp-relay, caddy, composer-executor, composer-agent. Keep `name: sales`. Stack schema 5. |
+| `start.sh`, `start.ps1` | Composer wrapper 8 (Linux/macOS, Windows). |
 | `.composer-channel` | `stable`. Production stays on the stable channel. |
+| `.composer-image` | Not shipped: Composer writes it on this server when it pins its own signed release (`./start.sh agent update`), and the wrappers then run that digest. |
 | `.proxy/Caddyfile` | Reverse proxy and automatic HTTPS. |
 | `relay/` | Allow-listed outbound requests (exchange rates) made by the Composer agent. |
 | `config.json` | Initial system settings, imported on the first start only. |
@@ -21,7 +22,7 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
 - Linux with Docker Engine and Docker Compose 5.3 or later (DjangoLux uses
   `pre_start` hooks), or Docker Desktop (Windows with the WSL 2 backend, or macOS).
 - Internet access on the first start, to pull the images. The deployer
-  (`debeski/composer:latest`) must be 1.10.3 or newer; `./start.sh update self`
+  (`debeski/composer:latest`) must be 1.11.0 or newer; `./start.sh update self`
   refreshes it.
 - For a public site: DNS records for every hostname in `CADDY_SITE_ADDRESS`
   pointing at this machine, and inbound TCP 80 and 443 open.
@@ -41,6 +42,14 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
   and `./start.sh check` shows a `front-proxy` warning. That warning is by design
   and harmless when Caddy itself faces the internet (see
   [DLUX_FRONT_PROXY](#dlux_front_proxy)).
+- `composer-agent` has no Docker access: `composer-executor` alone holds the Docker
+  socket, performs updates and answers the agent's few reads.
+- **`DLUX_UPDATE_POLICY`** (`all` by default, `inline` or `none`) limits which
+  updates the app's Updates card may request. Commands run from this folder are
+  not limited.
+- Redis keeps RDB snapshots (`--appendonly no --save 60 1`): a hard stop of the
+  server loses at most about a minute of cache and sessions, and Redis always
+  starts again.
 - The database container's environment is only what PostgreSQL reads, so changing
   the application image never restarts it. The database name is `POSTGRES_DB`
   (default `sales_db`); keep the name your server's database already has.
@@ -71,15 +80,89 @@ uploaded files and the certificates live in Docker volumes and in `media/`.
 
    The first start pulls the images, applies the migrations, imports
    `config.json` and starts every service.
-4. Open `BASE_URL/staff/` and sign in as `admin` with `ADMIN_PASS`.
-5. Run `./start.sh check --fix`, then `./start.sh check`. It must exit 0. The fix
+4. Open `BASE_URL/staff/` and sign in as `admin` with `ADMIN_PASS`. With
+   `ADMIN_PASS` left empty or `admin`, no account is created: `./start.sh` asks for
+   the password at a terminal on the first start, and `./start.sh check --fix` asks
+   while it is empty.
+5. Pin Composer to its signed release: `./start.sh agent update`. It writes
+   `.composer-image` and pins the resident pair to the same digest; from then on
+   the wrappers run that digest.
+6. Run `./start.sh check --fix`, then `./start.sh check`. It must exit 0. The fix
    gives the app's non-root user group access to `media/`, `logs/` and the data
    volumes (without it `check` shows an `app-permissions` warning). The
-   `front-proxy` line stays a warning until `DLUX_FRONT_PROXY` is set.
+   `front-proxy` line stays a warning until `DLUX_FRONT_PROXY` is set, and
+   `postgres-password` warns while `POSTGRES_PASSWORD` is the published default
+   `admin_pass`.
 
 ## Upgrading an existing deployment
 
-This is **one upgrade, whichever release the server runs now**. A server on v0.11.x
+Run everything from the deployment folder (the one holding `compose.yml` and
+`.secrets/`) and keep the server's `.secrets/.env`, `media/`, `logs/` and
+`imports/`. Do **not** use **Options > Updates and maintenance** for this release:
+that card installs only the application image, and this release also needs
+Composer 1.11 and its stack-file repairs.
+
+### From v0.13.0
+
+A server on v0.13.0 runs Composer 1.10.x with wrapper 6. `check --fix` brings its
+stack files to this release's shape, so no file needs copying by hand.
+
+1. **Back up.** In the app, create a backup under Options > Backup & Restore and
+   download it, and copy the `media/` folder. Keep a database dump too if you have
+   one. The rollback below needs this backup.
+2. **Pull the new application image first.** This restarts nothing: the stack keeps
+   running the old image until step 5, and `check --fix` never recreates a service
+   onto a pulled image.
+
+   ```bash
+   docker pull debeski/dlux-crm:sales
+   ```
+
+   If `.secrets/.env` has a `WEB_IMAGE=` line pinning an old version, remove it.
+3. **Update Composer to 1.11.0 or newer:** `./start.sh update self`. Wrapper 6
+   pulls `debeski/composer:latest`; `./start.sh check` then reports
+   `versions: Deploying composer 1.11.x`.
+4. **Repair the stack files:** `./start.sh check --fix`. At a terminal it lists the
+   repairs and asks once, and asks whether to switch Redis to snapshots (answer
+   `y`). It:
+   - replaces `start.sh` and `start.ps1` with wrapper 8;
+   - removes `docker-socket-proxy`: its service, the agent's `DOCKER_HOST` and its
+     `depends_on` entry, and the running container (`composer-executor` answers the
+     agent's Docker reads);
+   - adds the stored-file headers to `.proxy/Caddyfile` (`nosniff`, a sandbox
+     `Content-Security-Policy`, `Content-Disposition: attachment` for anything but
+     images and PDF) and the maintenance page's `Content-Security-Policy`;
+   - passes `DLUX_UPDATE_POLICY` (`all` unless `.secrets/.env` sets it) to `web`,
+     `worker`, `celery`, `composer-executor` and `composer-agent`;
+   - switches Redis from the append-only file to RDB snapshots
+     (`--appendonly no --save 60 1`, its memory limit kept). A few users may have to
+     sign in again.
+
+   Each replaced file is kept under `.xclude/composer-check/`. It recreates `caddy`,
+   `redis` and the resident pair; `web`, `worker` and `celery` keep the old image
+   until step 5. If it says `composer-agent` must be running to publish the
+   maintenance page, run step 5 and then `check --fix` once more.
+5. **Deploy:** `./start.sh`. It recreates the application services on the new
+   image; `worker` applies the migrations before `web` serves. Wait for it to
+   finish. `docker compose ps` must list no `docker-socket-proxy`; if it does,
+   `docker compose up -d --remove-orphans` removes it.
+6. **Pin Composer:** `./start.sh agent update`. It verifies Composer's signed
+   release, writes its digest to `.composer-image` and to the resident block in
+   `compose.yml`, and recreates the pair on it. From then on the wrappers run that
+   digest, and `update self` / `agent update` move it.
+7. **Verify:** `./start.sh check` exits 0, with `stored-files`, `redis-persistence`,
+   `update-policy` and `docker-proxy` OK. It warns on an empty or `admin`
+   `ADMIN_PASS` (`admin-pass`; harmless when the admin account exists, which is
+   never changed) and on the published default `POSTGRES_PASSWORD`
+   (`postgres-password`: change it inside PostgreSQL first, then in `.secrets/.env`).
+   `front-proxy` stays a warning until `DLUX_FRONT_PROXY` is set. Sign in, open
+   the **Sales Report** page (`/staff/sales/report/`) and download the Excel file,
+   and check that `./start.sh log -n 100 celery` shows
+   `finance.tasks.refresh_market_rates` succeeding.
+
+### From v0.12.x or older
+
+This is **one upgrade, whichever older release the server runs**. A server on v0.11.x
 or v0.12.x does not need an intermediate step: the steps below also deliver what
 the releases in between changed. In particular, **stored files
 (purchase-invoice and expense attachments) were reachable without signing in up to
@@ -91,11 +174,9 @@ public site served from an old portfolio folder, a `dlux-updater`, `pgadmin` or
 `db-backup` service) takes the same steps; step 6 removes what the new stack no
 longer has.
 
-Run everything from the deployment folder (the one holding `compose.yml` and
-`.secrets/`) and keep the server's `.secrets/.env`, `media/`, `logs/` and
-`imports/`. Do **not** use **Options > Updates and maintenance** for this release:
-that card installs only the application image and keeps the old `compose.yml`, and
-an image older than DjangoLux 1.16 cannot update itself to this one.
+These steps copy this release's files over the server's (step 4) rather than
+leaving them to `check --fix`. An image older than DjangoLux 1.16 cannot
+update itself to this one.
 
 1. **Back up.** In the app, create a backup under Options > Backup & Restore and download
    it, and copy the `media/` folder. Keep a database dump too if you have one. Note
@@ -151,14 +232,15 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
 6. **Remove containers the new stack no longer has.** Compose leaves the container
    of a service that left `compose.yml` running. The new stack has exactly these
    services: `db`, `redis`, `smtp-relay`, `caddy`, `web`, `worker`, `celery`,
-   `docker-socket-proxy`, `composer-executor` and `composer-agent`.
+   `composer-executor` and `composer-agent`.
 
    ```bash
    docker ps -a --filter label=com.docker.compose.project=sales \
      --format '{{.Label "com.docker.compose.service"}}\t{{.Names}}\t{{.Status}}'
    ```
 
-   Remove any other row's container (`dlux-updater`, `pgadmin`, `db-backup`) with
+   Remove any other row's container (`dlux-updater`, `pgadmin`, `db-backup`,
+   `docker-socket-proxy`) with
    `docker rm -f <name>`; its volume stays. If the stack was started under another
    project name than `sales`, use that name in the filter.
 7. **Restart the proxy.** Caddy reads `.proxy/Caddyfile` only when it starts, and
@@ -168,6 +250,7 @@ an image older than DjangoLux 1.16 cannot update itself to this one.
    ./start.sh restart caddy
    ```
 8. **Verify.**
+   - `./start.sh agent update` pins Composer to its signed release.
    - `./start.sh check` exits 0: `stack-schema` 5, `stored-files` and the task
      worker check OK (`front-proxy` stays a warning until it is set).
    - Signed out, a stored attachment must answer `403`. With your `BASE_URL` in
@@ -201,22 +284,17 @@ facing the internet directly there is nothing to name: the default
 
 ### Rolling back
 
-This release adds database tables and renames stored settings, so going back
-means restoring the backup from step 1, in this order:
+Composer's downgrade guard refuses to deploy an older application image, or one
+that does not know the migrations this release applied, so going back means
+restoring the backup from step 1 and forcing the deploy, in this order:
 
-1. Stop the whole stack while this release's `compose.yml` is still in place:
-   `./start.sh --down`. Starting the old files first would leave `worker`
-   running on this release's image, since Composer does not remove services that
-   left `compose.yml`.
-2. Put back the previous `compose.yml`, `start.sh`, `start.ps1`,
-   `.proxy/Caddyfile`, `.composer-channel` and `relay/`. In `.secrets/.env` set
-   `WEB_IMAGE=debeski/dlux-crm:sales-v<the version you came from>` and, if
-   `check --fix` restamped it, change the first line back to the old
-   `# dlux stack schema` number (its copy is in `.xclude/composer-check/`).
-3. `./start.sh`, then restore the backup (Options > Backup & Restore, or your
-   database dump). The database still carries this release's DjangoLux
-   migrations, so the in-app restore may report a database version mismatch:
-   choose to ignore it, since the backup is from the version now running.
+1. In `.secrets/.env` set `WEB_IMAGE=debeski/dlux-crm:sales-v<the version you came
+   from>`. Keep this release's stack files and Composer: they run that image too.
+2. Restore the backup from step 1: Options > Backup & Restore, choosing **Ignore
+   database version mismatch** (the backup is from the version you are going back
+   to), or load your database dump.
+3. Deploy the older image at once: `./start.sh --force`. The forced deploy becomes
+   the guard's new record.
 4. Clear the cache, which still holds this release's settings, and restart:
 
    ```bash

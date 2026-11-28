@@ -145,5 +145,5 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% asset 'sales/pos/js/main.js' %}"></script>
+<script src="{% asset 'sales/pos/js/main.js' %}" nonce="{{ request.csp_nonce }}"></script>
 {% endblock %}

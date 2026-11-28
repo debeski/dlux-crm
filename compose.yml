@@ -22,6 +22,10 @@ x-environment:
   DEBUG_STATUS: "${DEBUG_STATUS:-False}"
   # DjangoLux verified inline updater (generated Compose deployments only)
   DLUX_INLINE_UPDATES_ENABLED: "True"
+  # Which update paths this deployment allows: all, inline (DjangoLux only) or none.
+  # Web, worker and the resident Composer pair enforce it (DjangoLux
+  # docs/inline-updater.md).
+  DLUX_UPDATE_POLICY: "${DLUX_UPDATE_POLICY:-all}"
   DLUX_UPDATE_CHECK_INTERVAL: "${DLUX_UPDATE_CHECK_INTERVAL:-86400}"
   DLUX_UPDATE_RUNTIME_ROOT: "/opt/dlux-runtime"
   # App email settings. The app talks to the internal SMTP relay; only the relay has public egress.
@@ -73,7 +77,9 @@ services:
     restart: always
     labels:
       org.dlux.restart: "protected"
-    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "500mb", "--maxmemory-policy", "allkeys-lru"]
+    # RDB snapshots, not an append-only file: a snapshot is renamed into place
+    # only when complete, so a hard stop leaves the last good one and Redis starts.
+    command: ["redis-server", "--appendonly", "no", "--save", "60", "1", "--maxmemory", "500mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -168,10 +174,10 @@ services:
     command: >
       python -m dlux.updater.supervisor -- bash -c ' if [ "$$DEBUG_STATUS" = "True" ]; then
           echo "Starting in DEBUG mode with Django development server..."
-          python manage.py runserver 0.0.0.0:8000
+          exec python manage.py runserver 0.0.0.0:8000
       else
           echo "Starting in PRODUCTION mode with Gunicorn..."
-          gunicorn -c gunicorn.py config.wsgi:application
+          exec gunicorn -c gunicorn.py config.wsgi:application
       fi'
     entrypoint: ["/app/entrypoint.sh"]
     volumes:
@@ -185,7 +191,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_pass}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local_secret}
-      ADMIN_PASS: ${ADMIN_PASS:-admin}
+      ADMIN_PASS: ${ADMIN_PASS:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=5).read()"]
       interval: 30s
@@ -246,7 +252,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_pass}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local_secret}
-      ADMIN_PASS: ${ADMIN_PASS:-admin}
+      ADMIN_PASS: ${ADMIN_PASS:-}
     healthcheck:
       test: ["CMD", "python", "manage.py", "dlux_worker", "--check"]
       interval: 30s
@@ -264,8 +270,9 @@ services:
   # Project-only Celery (finance.tasks.refresh_market_rates: the exchange-rate
   # scrape, beat every 3 hours and once at start). DjangoLux's own work runs on
   # `worker`; this service stays until the project moves its task to
-  # dlux.taskrunner (Celery goes away in DjangoLux 1.17). It runs no migrations:
-  # it waits on the ones `worker` applies (entrypoint.sh).
+  # dlux.taskrunner (DjangoLux supports project Celery through 1.17.x and drops
+  # it in 1.18.0). It runs no migrations: it waits on the ones `worker` applies
+  # (entrypoint.sh).
   celery:
     image: ${WEB_IMAGE:-debeski/dlux-crm:sales}
     restart: always
@@ -283,7 +290,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin_pass}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local_secret}
-      ADMIN_PASS: ${ADMIN_PASS:-admin}
+      ADMIN_PASS: ${ADMIN_PASS:-}
     healthcheck:
       test: ["CMD", "python", "-m", "celery", "-A", "config", "inspect", "ping"]
       interval: 30s
@@ -302,33 +309,9 @@ services:
       - internal
 
   # DjangoLux Composer agent start
-  docker-socket-proxy:
-    # Pinned by digest, the same reference Composer's check --fix enforces: this
-    # image holds the host's docker.sock, so whoever can move a tag is root here.
-    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
-    restart: always
-    labels:
-      org.dlux.restart: "protected"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    environment:
-      CONTAINERS: 1
-      IMAGES: 1
-      EVENTS: 1
-      INFO: 1
-      PING: 1
-      VERSION: 1
-      NETWORKS: 0
-      VOLUMES: 0
-      POST: 0
-      EXEC: 0
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - docker_proxy
-
+  # Holds the real Docker socket and performs every Docker operation. Not
+  # network-facing: it watches the update trigger and serves the agent typed
+  # operations, including the few reads the agent needs, as bare fields only.
   composer-executor:
     image: debeski/composer:latest
     restart: unless-stopped
@@ -365,6 +348,7 @@ services:
       COMPOSER_REGISTRY_USERNAME: "${COMPOSER_REGISTRY_USERNAME:-}"
       COMPOSER_REGISTRY_PASSWORD: "${COMPOSER_REGISTRY_PASSWORD:-}"
       COMPOSER_REGISTRY_HOST: "${COMPOSER_REGISTRY_HOST:-}"
+      DLUX_UPDATE_POLICY: "${DLUX_UPDATE_POLICY:-all}"
       COMPOSER_EXECUTOR_SOCKET: "/run/composer-exec/composer-exec.sock"
       COMPOSER_VERSION_LABEL: "org.dlux_crm.dlux_baked_version"
       COMPOSER_RELEASE_MANIFEST_LABEL: "org.dlux.project.release-manifest"
@@ -372,7 +356,7 @@ services:
       COMPOSER_ACTIVE_VERSION_KEY: "version"
       COMPOSER_STATUS_FILE: "/opt/dlux-runtime/state/deploy-status.json"
       COMPOSER_WATCH_SELF_SERVICE: "composer-executor"
-      COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,docker-socket-proxy,db,redis"
+      COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,db,redis"
       COMPOSER_AGENT_RESTART_SERVICES: "web,worker,celery,smtp-relay,caddy"
     volumes:
       - "${PWD}:${PWD}:ro"
@@ -382,6 +366,9 @@ services:
     networks:
       - docker_proxy
 
+  # Outbound-only control-plane agent. Has no Docker access: it asks
+  # composer-executor for its reads and writes, and relays status. DLUX owns
+  # backup/maintenance.
   composer-agent:
     image: debeski/composer:latest
     restart: unless-stopped
@@ -410,12 +397,12 @@ services:
       - --check-interval
       - "3600"
     environment:
-      DOCKER_HOST: "tcp://docker-socket-proxy:2375"
       WEB_IMAGE: "${WEB_IMAGE:-debeski/dlux-crm:sales}"
       # The same login, for the update check.
       COMPOSER_REGISTRY_USERNAME: "${COMPOSER_REGISTRY_USERNAME:-}"
       COMPOSER_REGISTRY_PASSWORD: "${COMPOSER_REGISTRY_PASSWORD:-}"
       COMPOSER_REGISTRY_HOST: "${COMPOSER_REGISTRY_HOST:-}"
+      DLUX_UPDATE_POLICY: "${DLUX_UPDATE_POLICY:-all}"
       COMPOSER_CONTROL_URL: "${COMPOSER_CONTROL_URL:-}"
       COMPOSER_ENROLLMENT_TOKEN: "${COMPOSER_ENROLLMENT_TOKEN:-}"
       COMPOSER_AGENT_STATE_DIR: "/var/lib/composer-agent"
@@ -426,7 +413,7 @@ services:
       COMPOSER_ACTIVE_VERSION_KEY: "version"
       COMPOSER_STATUS_FILE: "/opt/dlux-runtime/state/deploy-status.json"
       COMPOSER_WATCH_SELF_SERVICE: "composer-agent"
-      COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,docker-socket-proxy,db,redis"
+      COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,db,redis"
       COMPOSER_AGENT_RESTART_SERVICES: "web,worker,celery,smtp-relay,caddy"
     volumes:
       - "${PWD}:${PWD}:ro"
@@ -434,8 +421,6 @@ services:
       - composer_agent_state:/var/lib/composer-agent:rw
       - composer_exec_sock:/run/composer-exec:rw
     depends_on:
-      docker-socket-proxy:
-        condition: service_started
       composer-executor:
         condition: service_started
     networks:
@@ -467,6 +452,7 @@ networks:
   # Inter-service traffic with NO internet access — db, redis, web, worker, celery, …
   internal:
     internal: true
-  # Isolated path from composer-agent to the docker-socket-proxy only.
+  # Private network of the Docker-control services: composer-executor and
+  # composer-agent.
   docker_proxy:
     internal: true

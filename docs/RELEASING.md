@@ -35,8 +35,10 @@ highlights of at most 160 characters each, and an HTTPS release URL of the form
   the pin moves to a version with a different schema, take the structure from that
   version's scaffold, keep the project parts (services, relay, Caddy routing,
   `db` environment), and run `./start.sh check --fix` on a scratch copy of the
-  files to compare. The resident Composer commands keep the `agent run` /
-  `executor run` form.
+  files to compare; the scratch copy's `check --fix` must change nothing, and its
+  `scaffold-drift` line must be OK. The resident Composer commands keep the
+  `agent run` / `executor run` form. `start.sh` and `start.ps1` are the pinned
+  DjangoLux's scaffold wrappers byte for byte (`tests/test_scaffold.py`).
 - **Image floor**: a DjangoLux version with a new image floor or schema cannot be
   installed inline by an existing deployment; it moves with the application image
   plus the release files (see `deploy/README.md`).

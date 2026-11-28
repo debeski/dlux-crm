@@ -49,9 +49,7 @@ class ColorPaletteWidget(forms.Widget):
         buttons = format_html_join(
             "",
             '<button type="button" class="color-swatch" data-color-value="{}" data-color-label="{}" '
-            'title="{}" aria-label="{}" '
-            'style="width:1.45rem;height:1.45rem;margin:0 .18rem .18rem 0;border:2px solid {};'
-            'border-radius:999px;background:{};box-shadow:inset 0 0 0 1px rgba(255,255,255,.45);"></button>',
+            'title="{}" aria-label="{}" data-swatch-border="{}" data-swatch="{}"></button>',
             ((option_value, label, label, label, border, bg) for option_value, label, bg, border in options),
         )
         current_label = t("ui_no_color", "No color")
@@ -67,11 +65,10 @@ class ColorPaletteWidget(forms.Widget):
             '<div class="color-palette-widget position-relative" data-color-palette data-empty-label="{}">{}'
             '<button type="button" class="btn btn-sm btn-outline-secondary w-100 d-flex align-items-center justify-content-between gap-2" data-color-trigger>'
             '<span class="d-inline-flex align-items-center gap-2">'
-            '<span data-color-current-swatch style="display:inline-block;width:1rem;height:1rem;border-radius:999px;border:2px solid {};background:{}"></span>'
+            '<span data-color-current-swatch data-swatch-border="{}" data-swatch="{}"></span>'
             '<span data-color-current-label>{}</span>'
             '</span><i class="bi bi-chevron-down"></i></button>'
-            '<div class="color-palette-popover shadow border rounded bg-body p-2" data-color-popover hidden '
-            'style="position:absolute;z-index:1080;min-width:12rem;max-width:14rem;inset-inline-start:0;top:calc(100% + .25rem)">{}'
+            '<div class="color-palette-popover shadow border rounded bg-body p-2" data-color-popover hidden>{}'
             '<button type="button" class="btn btn-sm btn-link px-1 py-0" data-color-value="" data-color-label="{}">{}</button>'
             '</div></div>',
             t("ui_no_color", "No color"),

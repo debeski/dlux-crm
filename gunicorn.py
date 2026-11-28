@@ -20,6 +20,10 @@ loglevel = "info"
 # Application module
 wsgi_app = "config.wsgi:application"
 
+# No runtime control socket (gunicornc): the stack does not use it, and its
+# default path under $HOME is not writable for a non-root user.
+control_socket_disable = True
+
 # Maximum number of requests a worker will process before restarting
 max_requests = 1000
 

@@ -659,7 +659,7 @@ class FinancialReportView(RibbonPageMixin, LoginRequiredMixin, PermissionRequire
                 '<form method="get" class="d-flex align-items-center gap-2 no-print">'
                 '<label class="text-muted small mb-0" for="fiscal-year">{}</label>'
                 '<select id="fiscal-year" name="year" class="form-select form-select-sm w-auto"'
-                ' onchange="this.form.submit()">{}</select></form>',
+                ' data-submit-on-change>{}</select></form>',
                 strings.get("ui_fiscal_year", "Fiscal year"),
                 options,
             ),

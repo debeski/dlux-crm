@@ -1,15 +1,14 @@
 {
   "schema_version": 1,
-  "version": "0.13.0",
-  "summary": "DjangoLux 1.16.3 runtime with its own task worker, tighter record ownership, per-colour/size stock takes, and hardened stack files (schema 5).",
+  "version": "0.14.0",
+  "summary": "DjangoLux 1.17.0 runtime: pages run only the scripts the server signs, the stack follows Composer 1.11 (no Docker proxy, snapshot Redis), and sessions survive a cache outage.",
   "highlights": [
-    "Updated the application framework to DjangoLux 1.16.3; it needs Composer 1.10.3 or newer and the new stack files.",
-    "DjangoLux's tasks and backups run in a new worker service; the exchange-rate refresh keeps its own Celery service.",
-    "Sales Report to Excel keeps customer names, descriptions and numbers as text, so a value starting with = can never run as a formula.",
-    "Stored files stay private: a server still on an older release gets this fix in the same upgrade.",
-    "New DLUX_FRONT_PROXY setting names the proxy in front of this server, so login lockout and the activity log record real client addresses.",
-    "Invoices, payments, deposits and deliveries only link to records the user may see; issued invoices can no longer be deleted.",
-    "Stock takes count each colour and size on its own line, and product cost is shown only to product editors."
+    "Updated the application framework to DjangoLux 1.17.0; it needs Composer 1.11.0 and the new stack files (run ./start.sh check --fix once).",
+    "Every page runs only scripts the server signs and no inline styles, so injected script cannot run and the office security scan passes.",
+    "Redis keeps its data in snapshots, so a damaged log file can no longer stop the whole system from starting.",
+    "A short cache outage no longer signs everyone out.",
+    "The Docker proxy service is gone; Composer reads container state itself.",
+    "Deployments can limit which updates the application may request (DLUX_UPDATE_POLICY)."
   ],
-  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.13.0"
+  "release_url": "https://github.com/debeski/dlux-crm/releases/tag/v0.14.0"
 }

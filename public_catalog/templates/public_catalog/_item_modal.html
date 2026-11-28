@@ -22,7 +22,7 @@
         <div class="public-swatches public-swatches--large">
             {% for variant in listing.public_variants %}
             <span title="{{ variant.label }}">
-                {% if variant.color %}<i style="background:{{ variant.color_hex }}"></i>{% endif %}
+                {% if variant.color %}<i data-swatch="{{ variant.color_hex }}"></i>{% endif %}
                 {{ variant.label }}
             </span>
             {% endfor %}

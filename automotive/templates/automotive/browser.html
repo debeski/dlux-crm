@@ -121,6 +121,6 @@
 
 {% block scripts %}
 {{ block.super }}
-<script src="{% asset 'automotive/js/fits_picker.js' %}"></script>
-<script src="{% asset 'catalog/js/price_sync.js' %}"></script>
+<script src="{% asset 'automotive/js/fits_picker.js' %}" nonce="{{ request.csp_nonce }}"></script>
+<script src="{% asset 'catalog/js/price_sync.js' %}" nonce="{{ request.csp_nonce }}"></script>
 {% endblock %}

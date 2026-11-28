@@ -1,0 +1,3 @@
+{% load asset_tags %}
+<link rel="stylesheet" href="{% asset 'common/css/page_hooks.css' %}">
+<script src="{% asset 'common/js/page_hooks.js' %}" nonce="{{ request.csp_nonce }}"></script>

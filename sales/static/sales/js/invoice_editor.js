@@ -49,7 +49,7 @@
 
         // ---- Picker rendering --------------------------------------------- //
         function swatch(hex) {
-            return '<span class="picker-chip__swatch" style="background:' + esc(hex || "#ccc") + '"></span>';
+            return '<span class="picker-chip__swatch" data-swatch="' + esc(hex || "#ccc") + '"></span>';
         }
 
         function productTile(p) {
@@ -165,7 +165,7 @@
             row.querySelector("[data-cart-label]").textContent = p.name;
             row.querySelector("[data-cart-meta]").textContent = v ? [v.color_label, v.size].filter(Boolean).join(" · ") : "";
             row.querySelector("[data-cart-thumb]").innerHTML = v && v.color
-                ? '<span class="cart-swatch" style="background:' + esc(v.color_hex) + '"></span>'
+                ? '<span class="cart-swatch" data-swatch="' + esc(v.color_hex) + '"></span>'
                 : '<i class="bi bi-box-seam"></i>';
             attachRow(row);
         }

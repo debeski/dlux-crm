@@ -18,18 +18,11 @@
     <link rel="stylesheet" href="{% asset 'public_catalog/css/public_catalog.css' %}">
     <link rel="icon" href="{{ APP_CONFIG.favicon_url|default:'/static/img/base_logo.svg' }}">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    {% if public_accent or public_accent_secondary %}
-    <style>
-        .public-shell {
-            {% if public_accent %}--public-accent:{{ public_accent }};{% endif %}
-            {% if public_accent_secondary %}--public-accent-2:{{ public_accent_secondary }};{% endif %}
-        }
-    </style>
-    {% endif %}
+    <script src="{% asset 'common/js/page_hooks.js' %}" nonce="{{ request.csp_nonce }}"></script>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-<main class="public-shell {{ public_shell_classes|default:'public-style--signature public-bg--clean public-nav--glass public-cardstyle--showcase public-density--comfortable public-motion--subtle' }}{% if public_bare %} public-shell--bare{% endif %}">
+<main class="public-shell {{ public_shell_classes|default:'public-style--signature public-bg--clean public-nav--glass public-cardstyle--showcase public-density--comfortable public-motion--subtle' }}{% if public_bare %} public-shell--bare{% endif %}"{% if public_accent or public_accent_secondary %} data-css-vars='{ {% if public_accent %}"--public-accent": "{{ public_accent }}"{% endif %}{% if public_accent and public_accent_secondary %}, {% endif %}{% if public_accent_secondary %}"--public-accent-2": "{{ public_accent_secondary }}"{% endif %} }'{% endif %}>
     {% if not public_bare %}
     <header class="public-nav">
         <a class="public-brand" href="{% url 'public_catalog:landing' %}">

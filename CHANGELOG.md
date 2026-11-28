@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.14.0
+- **DjangoLux 1.17.0**: `requirements.txt` pins `django-lux[updater]==1.17.0`, paired with Composer 1.11.0. A deployment moves by an application-image update plus the release files, then one `./start.sh check --fix` (stack schema stays 5). Framework migrations are additive (`dlux.0032_singleton_cache_revision` and later); the CRM adds none. Developed and tested against 1.17.0b3 through a local venv only. No beta pin was ever committed.
+- **Nonce-Only Scripts, No Inline Styles (ZAP 10055, `dlux.W201`)**: `CONTENT_SECURITY_POLICY` is `script-src [SELF, NONCE]` and `style-src [SELF]`, adds `base-uri [SELF]` and `object-src [NONE]`, and `connect-src` takes `SCANLINK_CONNECT_ORIGINS` as the scaffold does.
+  - Inline handlers (`onclick="window.print()"`, `onsubmit="return confirm(…)"`, the `onchange="this.form.submit()"` that `sales/views.py` emitted) become `data-*` hooks in the new `common/static/common/js/page_hooks.js`, loaded on every staff page by `common/templates/dlux/includes/custom_head.html` and bound once.
+  - The purchase-invoice and deposit inline scripts move to `catalog/js/purchase_invoice_form.js` and `sales/js/deposit_combobox.js`.
+  - `style=""` attributes and `<style>` blocks in about 25 templates, forms, tables and views become classes in `common/css/page_hooks.css` and app CSS. Swatch, progress and accent values are set from `data-*` through the CSSOM.
+  - `products_layout.js` binds its document listeners once, since DjangoLux re-runs a modal's scripts after a failed submit.
+  - `common/tests/test_csp.py` pins the directives and checks rendered staff and storefront pages for un-nonced scripts and `on…=` attributes.
+- **Sessions Survive A Cache Outage**: `SESSION_ENGINE = "dlux.cache_sessions"`. Django's cache store read any Redis error as a missing session and signed the user out for good; DjangoLux's engine answers the outage page and keeps the session.
+- **One Static Version Query**: the `{% asset %}` tag (`common/templatetags/asset_tags.py`) returns DjangoLux's `VersionedStaticFilesStorage` URL (`?v=<dlux>-<project>`) as is and adds its own content hash only when that storage is off. On 1.17 it had appended a second `v`.
+- **Stack Files From The DjangoLux 1.17 Scaffold And Composer 1.11**:
+  - `start.sh` / `start.ps1` are wrapper 8, and `.gitignore` lists `.composer-image` and `.composer-channel`. The first Composer update after the move pins the resident Composer images by digest.
+  - `compose.yml` drops `docker-socket-proxy`, the agent's `DOCKER_HOST` and its `depends_on`, since Composer's executor does the reads.
+  - `DLUX_UPDATE_POLICY` (`all` by default) reaches web, worker, celery, agent and executor.
+  - Redis runs on RDB snapshots (`--appendonly no --save 60 1`, same memory limits), so a damaged AOF can no longer crash-loop Redis and keep the whole stack down.
+  - `web` `exec`s runserver/gunicorn, so the supervisor stops the real server.
+  - `ADMIN_PASS` defaults to empty.
+  - `.proxy/Caddyfile` imports the `dlux_media_headers` snippet on both `/media/` routes and sends the maintenance-page CSP on `/_dlux/maintenance/*` and `handle @down`.
+  - `Dockerfile` prepares the mount points group-writable (`/opt/dlux-runtime` included); the image still runs as root.
+  - `manage.py` carries the scaffold's `_activate_runtime_release()`, which exports `PYTHONPATH` and drops the baked `dlux` modules, so `docker compose exec web python manage.py …` runs the active inline release.
+  - `gunicorn.py` sets `control_socket_disable = True`.
+  - Composer 1.11.0b3's `check` exits 0 on these files, and a second `check --fix` changes nothing. `tests/test_scaffold.py` gains 6 tests for this shape.
+- **Celery Kept For The Rate Refresh**: `celery` stays for `finance.tasks.refresh_market_rates` through DjangoLux 1.17.x. Generated stacks stop installing Celery in 1.18.0, so the task moves to `dlux.taskrunner` before that release.
+- **Upgrade From v0.13.0**: `deploy/README.md` gives the order:
+  1. back up;
+  2. pull the image;
+  3. `./start.sh update self` (Composer 1.11);
+  4. `./start.sh check --fix` (wrapper 8, proxy removed, media headers, maintenance CSP, update policy, Redis snapshots);
+  5. `./start.sh` (`docker compose up -d --remove-orphans` if a proxy container is left);
+  6. `./start.sh agent update` to pin the digest;
+  7. `./start.sh check`.
+
+  Rollback follows Composer 1.11's downgrade guard: restore the pre-upgrade backup, set the old `WEB_IMAGE`, run `./start.sh --force`, then flush Redis db 1. `check` now warns on an empty or `admin` `ADMIN_PASS` and a default `POSTGRES_PASSWORD`. `deploy/env.template`, `docs/OPERATIONS.md`, `docs/ARCHITECTURE.md` and `docs/RELEASING.md` follow.
+- **Release Validation**: 545 cases pass on SQLite (6 PostgreSQL-only skipped) against DjangoLux 1.17.0b3; `check` and `makemigrations --check` are clean.
+
 ## v0.13.0
 - **DjangoLux 1.16.3**: `requirements.txt` carries one pin line, `django-lux[updater]==1.16.3` (PyPI wheel and sdist); the v0.12.0 wheel-URL+sha256 line, a CDN-lag workaround for 1.15.3, is gone. Paired with Composer 1.10.3 (`debeski/composer:latest`); a deployment moves by an application-image update plus the release files, never an inline install (DjangoLux 1.16 needs stack schema 5). Framework migrations are additive; the CRM adds none.
 - **Stack Schema 5 With A `worker` Service**: `compose.yml` stamps `DLUX_STACK_SCHEMA: "5"` and gains `worker` (`manage.py dlux_worker` under the supervisor, healthcheck `dlux_worker --check`, `stop_grace_period: 30s`, `DLUX_BOOT_GATE: "apply"`, read-write `dlux_runtime`). It takes over the `dlux_reconcile` and `migrator` `pre_start` steps from `celery`; `entrypoint.sh` is the scaffold's boot gate (`off` / `apply` / wait), so `web` and `celery` wait for the migrations `worker` applies. `COMPOSER_AGENT_RESTART_SERVICES` is `web,worker,celery,smtp-relay,caddy` in the agent and the executor. `compose.dev.yml` gets the matching `worker` override. `Dockerfile`, `entrypoint.sh`, `gunicorn.py`, `.proxy/Caddyfile`, `compose.dev.yml` and `deploy/env.template` carry the schema 5 stamp.
