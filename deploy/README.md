@@ -136,6 +136,15 @@ lowers it. Bring the site back first:
 Then upgrade. Start no other update from the card on that stack: each one raises
 the flag again.
 
+Such a stack has run nothing of DjangoLux's task runner since its image moved to
+1.16: no scheduled backups, update checks, state ticks, OCR or mail jobs. Two
+things follow once the upgrade brings up `worker`:
+- **Take a fresh backup** straight away under Options > Backup & Restore, and
+  download it. The last scheduled one predates the image update.
+- **The old card update finishes on the worker's first tick.** It completes, or fails
+  as timed out, and the Updates card then shows it as finished. Either result is
+  expected; it does not touch the deployed stack.
+
 ### From v0.13.0
 
 A server on v0.13.0 runs Composer 1.10.x with wrapper 6. `check --fix` brings its
