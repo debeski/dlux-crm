@@ -44,7 +44,7 @@ group-writable, and `entrypoint.sh` sets `umask 0002` and runs
 `python -m dlux.mount_access gate`, so the data is also ready for a non-root
 (uid 10001, gid 0) image. `manage.py` puts the active inline DjangoLux release on
 `sys.path` and `PYTHONPATH` before Django loads, so a command run outside the
-runtime supervisor (`docker compose exec web python manage.py collectstatic`) uses
+runtime supervisor (`./start.sh run -m web collectstatic`) uses
 the release the site runs.
 
 ## Starting the stack
@@ -160,7 +160,7 @@ script-src 'self'; …`), so no inline script runs there.
    DjangoLux setup wizard (`/staff/sys/setup/`: Arabic/English system name, logo,
    language, theme). The name and logo brand printed invoices, receipts and
    purchase invoices.
-2. Create the permission groups: `docker compose exec web python manage.py seed_roles` (from the deployment folder)
+2. Create the permission groups: `./start.sh run -m web seed_roles` (from the deployment folder)
    (Sales Manager, Sales Representative, Delivery Courier; see
    [PERMISSIONS.md](PERMISSIONS.md)). Create staff users and add each to one group.
 3. Options (`/staff/sys/options/`): turn on what the store uses: the *CRM options*

@@ -102,10 +102,13 @@ Run everything from the deployment folder (the one holding `compose.yml` and
 that card installs only the application image, and this release also needs
 Composer 1.11 and its stack-file repairs.
 
+Every command here goes through the Composer wrapper: `./start.sh` on Linux and macOS,
+`.\start.ps1` on Windows (same arguments).
+
 **Which section applies depends on the stack files, not on the image.** Run
-`docker compose ps --services`. If the list has no `worker` but still has
-`docker-socket-proxy` and `celery`, the server runs stack schema 4, the v0.12.x
-files. That is still true if the Updates card has already moved its image to v0.13.0.
+`./start.sh log -n 1 worker`. If it answers `no such service: worker`, and
+`compose.yml` still has `docker-socket-proxy` and `celery`, the server runs stack
+schema 4, the v0.12.x files. That is still true if the Updates card has already moved its image to v0.13.0.
 Such a server follows **From v0.12.x or older**, which copies this release's files
 and adds `worker`.
 
@@ -117,18 +120,18 @@ lowers it. Bring the site back first:
 2. Check that `deploy-status.json` reads `ready`:
 
    ```bash
-   docker compose exec caddy cat /opt/dlux-runtime/state/deploy-status.json
+   ./start.sh run caddy cat /opt/dlux-runtime/state/deploy-status.json
    ```
 
 3. Move the flag aside. The file is kept for review:
 
    ```bash
-   docker run --rm -v sales_dlux_runtime:/rt alpine \
-     mv /rt/state/maintenance /rt/failed/maintenance-manual
+   ./start.sh run -s celery "mkdir -p /opt/dlux-runtime/failed && mv /opt/dlux-runtime/state/maintenance /opt/dlux-runtime/failed/maintenance-manual"
+   ./start.sh run caddy ls /opt/dlux-runtime/state
    ```
 
-   `sales_dlux_runtime` is the runtime volume's name in this stack; check it with
-   `docker volume ls`.
+   `celery` mounts the runtime volume read-write in that layout; `caddy` and `web`
+   mount it read-only. The second command must no longer list `maintenance`.
 
 Then upgrade. Start no other update from the card on that stack: each one raises
 the flag again.
@@ -146,7 +149,7 @@ stack files to this release's shape, so no file needs copying by hand.
    onto a pulled image.
 
    ```bash
-   docker pull debeski/dlux-crm:sales
+   ./start.sh pull web
    ```
 
    If `.secrets/.env` has a `WEB_IMAGE=` line pinning an old version, remove it.
@@ -175,8 +178,8 @@ stack files to this release's shape, so no file needs copying by hand.
    maintenance page, run step 5 and then `check --fix` once more.
 5. **Deploy:** `./start.sh`. It recreates the application services on the new
    image; `worker` applies the migrations before `web` serves. Wait for it to
-   finish. `docker compose ps` must list no `docker-socket-proxy`; if it does,
-   `docker compose up -d --remove-orphans` removes it.
+   finish. `./start.sh check` must show `docker-proxy` OK; if a `docker-socket-proxy`
+   container is left, `./start.sh check --fix` removes it.
 6. **Pin Composer:** `./start.sh agent update`. It verifies Composer's signed
    release, writes its digest to `.composer-image` and to the resident block in
    `compose.yml`, and recreates the pair on it. From then on the wrappers run that
@@ -211,9 +214,10 @@ update itself to this one.
 
 1. **Back up.** In the app, create a backup under Options > Backup & Restore and download
    it, and copy the `media/` folder. Keep a database dump too if you have one. Note
-   the database name (`docker compose exec db psql -U <POSTGRES_USER> -l`): if it is
+   the database name (`./start.sh run db psql -U <POSTGRES_USER> -l`): if it is
    not `sales_db`, `.secrets/.env` must set `POSTGRES_DB` to it before step 5. Note
-   the Compose project name too (`docker compose ls`): this stack is `sales`. A
+   the Compose project name too (the `name:` line at the top of the server's
+   `compose.yml`): this stack is `sales`. A
    server still running under another name (`switch_pos` or `sales-crm`, the
    earliest releases) keeps its data in volumes of that name, which the new stack
    does not see: stop here and move the data first (back up, start the new stack,
@@ -223,7 +227,7 @@ update itself to this one.
    check, which only the new image answers.
 
    ```bash
-   docker pull debeski/dlux-crm:sales
+   ./start.sh pull web
    ```
 
    If `.secrets/.env` has a `WEB_IMAGE=` line pinning an old version, remove it.
@@ -329,7 +333,7 @@ restoring the backup from step 1 and forcing the deploy, in this order:
 4. Clear the cache, which still holds this release's settings, and restart:
 
    ```bash
-   docker compose exec redis redis-cli -n 1 FLUSHDB
+   ./start.sh run redis redis-cli -n 1 FLUSHDB
    ./start.sh restart
    ```
 
