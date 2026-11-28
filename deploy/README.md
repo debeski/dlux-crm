@@ -198,7 +198,7 @@ stack files to this release's shape, so no file needs copying by hand.
    `ADMIN_PASS` (`admin-pass`; harmless when the admin account exists, which is
    never changed) and on the published default `POSTGRES_PASSWORD`
    (`postgres-password`: change it inside PostgreSQL first, then in `.secrets/.env`).
-   `front-proxy` stays a warning until `DLUX_FRONT_PROXY` is set. Sign in, open
+   `front-proxy` stays a warning until `DLUX_FRONT_PROXY` is set. The logs show a start-up `UserWarning` that `dlux.context_processors.dlux_context` is not in `TEMPLATES`. It is harmless: the project wraps it in `common.context_processors.crm_context`, and `./start.sh dlux doctor` reports it as wired. Sign in, open
    the **Sales Report** page (`/staff/sales/report/`) and download the Excel file,
    and check that `./start.sh log -n 100 celery` shows
    `finance.tasks.refresh_market_rates` succeeding.
