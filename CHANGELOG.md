@@ -25,16 +25,29 @@
 - **Celery Kept For The Rate Refresh**: `celery` stays for `finance.tasks.refresh_market_rates` through DjangoLux 1.17.x. Generated stacks stop installing Celery in 1.18.0, so the task moves to `dlux.taskrunner` before that release.
 - **Upgrade From v0.13.0**: `deploy/README.md` gives the order:
   1. back up;
-  2. pull the image;
+  2. `./start.sh pull web`;
   3. `./start.sh update self` (Composer 1.11);
-  4. `./start.sh check --fix` (wrapper 8, proxy removed, media headers, maintenance CSP, update policy, Redis snapshots);
-  5. `./start.sh` (`docker compose up -d --remove-orphans` if a proxy container is left);
-  6. `./start.sh agent update` to pin the digest;
-  7. `./start.sh check`.
+  4. copy `compose.yml`, the wrappers and `.proxy/` from the release (`check --fix` alone leaves `web` without `exec` and keeps the old `ADMIN_PASS` default);
+  5. `./start.sh check --fix` (wrapper 8, proxy removed, media headers, maintenance CSP, update policy, Redis snapshots; it asks front-proxy, update-policy and Redis questions);
+  6. `./start.sh`;
+  7. `./start.sh agent update`, the only step that digest-pins Composer;
+  8. `./start.sh check`.
 
   Rollback follows Composer 1.11's downgrade guard: restore the pre-upgrade backup, set the old `WEB_IMAGE`, run `./start.sh --force`, then flush Redis db 1. `check` now warns on an empty or `admin` `ADMIN_PASS` and a default `POSTGRES_PASSWORD`. `deploy/env.template`, `docs/OPERATIONS.md`, `docs/ARCHITECTURE.md` and `docs/RELEASING.md` follow.
 - **Schema-4 Stacks Stuck Behind The Maintenance Page**: `deploy/README.md` says the upgrade section depends on the stack files, not the image. A server whose Updates card moved the image to v0.13.0 but which still has no `worker` (schema 4: `celery` + `docker-socket-proxy`) follows **From v0.12.x or older**. That section copies this release's files and adds `worker`. Such a stack sits behind the maintenance page after the card's image update with every service healthy, because in DjangoLux 1.16 only `worker` lowers the flag. The README moves the flag aside (`state/maintenance` → `failed/`, kept for review) before the upgrade.
-- **Release Validation**: 545 cases pass on SQLite (6 PostgreSQL-only skipped) against DjangoLux 1.17.0b3 and again against the published 1.17.0; `check` and `makemigrations --check` are clean.
+- **Release Validation**: 545 cases pass on SQLite (6 PostgreSQL-only skipped) against DjangoLux 1.17.0b3 and again against the published 1.17.0; `check` and `makemigrations --check` are clean. The `crm-sales` testbed accepted the candidate on 1.17.0b3 + Composer 1.11.0b3 and again on the 1.17.0 + 1.11.0 stables:
+  - upgrade from v0.13.0;
+  - every project table and 227 media files identical, `dlux.0031`/`0032` applied;
+  - 34 browser steps with the nonce-only headers and no CSP violation, console error or 5xx;
+  - signed-in session kept through a Redis pause;
+  - relay refresh 4/4;
+  - 51/51 edge probes, including the `/media/` headers and the maintenance-page CSP;
+  - 1,856 requests from 40 clients with no 5xx;
+  - rollback to v0.13.0 and re-upgrade with data identical;
+  - a schema-4 stack behind a stale maintenance flag brought back and upgraded;
+  - the customer start (Composer 1.10.4, wrapper 6, v0.13.0 with `worker`) to Composer 1.11.0 pinned + v0.14.0.
+
+  Evidence is in `testbeds/crm-sales/.xclude/acceptance-1.17.0b3/` and `acceptance-1.17.0-stable/`.
 
 ## v0.13.0
 - **DjangoLux 1.16.3**: `requirements.txt` carries one pin line, `django-lux[updater]==1.16.3` (PyPI wheel and sdist); the v0.12.0 wheel-URL+sha256 line, a CDN-lag workaround for 1.15.3, is gone. Paired with Composer 1.10.3 (`debeski/composer:latest`); a deployment moves by an application-image update plus the release files, never an inline install (DjangoLux 1.16 needs stack schema 5). Framework migrations are additive; the CRM adds none.

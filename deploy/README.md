@@ -116,14 +116,19 @@ A schema-4 stack whose image an Updates card moved to DjangoLux 1.16 can sit
 behind the maintenance page ("Application update in progress") with every service
 healthy. The update raised the maintenance flag, and only the `worker` service
 lowers it. Bring the site back first:
-1. Back up.
-2. Check that `deploy-status.json` reads `ready`:
+1. Check that `deploy-status.json` reads an end state (`ready`, `failed`,
+   `completed` or `rolled_back`):
 
    ```bash
    ./start.sh run caddy cat /opt/dlux-runtime/state/deploy-status.json
    ```
 
-3. Move the flag aside. The file is kept for review:
+   If the file is missing, check that `./start.sh log -n 80 web celery` shows no
+   update still running. The in-app backup cannot run yet: the app answers 503 while
+   the flag is up. Back up right after step 2 instead. Moving the flag is a rename,
+   and moving the file back undoes it.
+
+2. Move the flag aside. The file is kept for review:
 
    ```bash
    ./start.sh run -s celery "mkdir -p /opt/dlux-runtime/failed && mv /opt/dlux-runtime/state/maintenance /opt/dlux-runtime/failed/maintenance-manual"
@@ -147,14 +152,16 @@ things follow once the upgrade brings up `worker`:
 
 ### From v0.13.0
 
-A server on v0.13.0 runs Composer 1.10.x with wrapper 6. `check --fix` brings its
-stack files to this release's shape, so no file needs copying by hand.
+A server on v0.13.0 runs Composer 1.10.x with wrapper 6. `check --fix` repairs most
+of the stack files, but not all: it leaves `web` without `exec` in front of its
+server command and keeps the old `ADMIN_PASS` default. So step 4 copies this
+release's files first, and `check --fix` repairs the rest.
 
 1. **Back up.** In the app, create a backup under Options > Backup & Restore and
    download it, and copy the `media/` folder. Keep a database dump too if you have
    one. The rollback below needs this backup.
 2. **Pull the new application image first.** This restarts nothing: the stack keeps
-   running the old image until step 5, and `check --fix` never recreates a service
+   running the old image until step 6, and `check --fix` never recreates a service
    onto a pulled image.
 
    ```bash
@@ -165,9 +172,17 @@ stack files to this release's shape, so no file needs copying by hand.
 3. **Update Composer to 1.11.0 or newer:** `./start.sh update self`. Wrapper 6
    pulls `debeski/composer:latest`; `./start.sh check` then reports
    `versions: Deploying composer 1.11.x`.
-4. **Repair the stack files:** `./start.sh check --fix`. At a terminal it lists the
-   repairs and asks once, and asks whether to switch Redis to snapshots (answer
-   `y`). It:
+4. **Copy this release's files over the server's:** `compose.yml`, `start.sh`,
+   `start.ps1` and `.proxy/`. Keep `.secrets/`, `media/`, `logs/` and `imports/`.
+   Any hand edit made to the server's `compose.yml` is replaced; carry it over again
+   if it is still needed.
+5. **Repair the stack files:** `./start.sh check --fix`. At a terminal it lists the
+   repairs and asks once. Then it asks three questions:
+   - `front-proxy`: `s` skips it until `DLUX_FRONT_PROXY` is set;
+   - the update policy: Enter keeps `all`;
+   - Redis snapshots: answer `y`.
+
+   It:
    - replaces `start.sh` and `start.ps1` with wrapper 8;
    - removes `docker-socket-proxy`: its service, the agent's `DOCKER_HOST` and its
      `depends_on` entry, and the running container (`composer-executor` answers the
@@ -183,18 +198,18 @@ stack files to this release's shape, so no file needs copying by hand.
 
    Each replaced file is kept under `.xclude/composer-check/`. It recreates `caddy`,
    `redis` and the resident pair; `web`, `worker` and `celery` keep the old image
-   until step 5. If it says `composer-agent` must be running to publish the
-   maintenance page, run step 5 and then `check --fix` once more.
-5. **Deploy:** `./start.sh`. It recreates the application services on the new
+   until step 6. If it says `composer-agent` must be running to publish the
+   maintenance page, run step 6 and then `check --fix` once more.
+6. **Deploy:** `./start.sh`. It recreates the application services on the new
    image; `worker` applies the migrations before `web` serves. Wait for it to
-   finish. `./start.sh check` must show `docker-proxy` OK; if a `docker-socket-proxy`
-   container is left, `./start.sh check --fix` removes it.
-6. **Pin Composer:** `./start.sh agent update`. It verifies Composer's signed
+   finish. `check` no longer lists `docker-proxy` once the proxy is gone; if a
+   `docker-socket-proxy` container still runs, `./start.sh check --fix` removes it.
+7. **Pin Composer:** `./start.sh agent update`. It verifies Composer's signed
    release, writes its digest to `.composer-image` and to the resident block in
    `compose.yml`, and recreates the pair on it. From then on the wrappers run that
    digest, and `update self` / `agent update` move it.
-7. **Verify:** `./start.sh check` exits 0, with `stored-files`, `redis-persistence`,
-   `update-policy` and `docker-proxy` OK. It warns on an empty or `admin`
+8. **Verify:** `./start.sh check` exits 0, with `stored-files`, `redis-persistence`
+   and `update-policy` OK. It warns on an empty or `admin`
    `ADMIN_PASS` (`admin-pass`; harmless when the admin account exists, which is
    never changed) and on the published default `POSTGRES_PASSWORD`
    (`postgres-password`: change it inside PostgreSQL first, then in `.secrets/.env`).
@@ -265,7 +280,9 @@ update itself to this one.
    the `static` and `dlux_runtime` volumes; it prints a manifest that
    `composer app-permissions revert` undoes). If it
    says `composer-agent` must be running to publish the maintenance page, run
-   step 5 and then `check --fix` once more.
+   step 5 and then `check --fix` once more. On a stack that had no `worker`, it exits
+   1 with `services: worker has no container` until step 5 creates it. That is
+   expected.
 5. **Deploy:** `./start.sh`. This adds the `worker` service, restarts the
    application containers, applies DjangoLux's own migrations and, on a server
    coming from an earlier stack, restarts the database once for a few seconds (its
