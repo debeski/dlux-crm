@@ -26,7 +26,7 @@
 - SMTP credentials unset on the deployment, so the contact relay cannot authenticate. Updates card can show a stale "Could not read the DjangoLux release index" until a check completes.
 ### Incomplete Tasks: [Max 20 lines]
 - **Priority 1 — follow-ups:**
-  - [ ] v0.14.0: bump `django-lux[updater]==1.17.0` (+ exact-pin test) once 1.17.0 + Composer 1.11.0 stables exist, b3 testbed acceptance, then PR/tag on the owner's OK.
+  - [ ] v0.14.0: pinned to 1.17.0 and testbed-accepted; push, PR, tag and deploy zip on the owner's OK.
   - [ ] Customer instance stuck on the maintenance page (owner-only; operator steps in the 1.17 notes folder `crm-sales-stuck-maintenance.md`).
 - **Priority 2 — owner decisions and follow-ups:**
   - [ ] Keep the project `celery` through 1.17.x (removed in 1.18.0) or move `refresh_market_rates` to `dlux.taskrunner` (about 2-3 h plus a testbed run; no test covers the task). `currency-switch` and `automotive-parts-first` carry uncommitted work on old pins.
@@ -39,7 +39,7 @@
   - [x] 2026-11-23: docs audit Phase A (rename to Sales CRM, real README and app READMEs, OPERATIONS/RELEASING rebuilt, doc fixes).
   - [x] 2026-11-23: ownership on writes (customer, deposit, delivery, deposit review), issued invoices undeletable, cost on the card, POS CSRF, stock-take bucket, Add Stock gating, machinery live uniqueness, till vehicle-panel permissions, no cross-store bulk links, browsable-only vehicle tile, product record view = item card on both modal routes, per-bucket stock takes (`catalog.0014`), stored-identifier renames + `common.0001`, neutral defaults, `portfolio/` retired.
 ### One-line info about last verified Tests: [Max 5 lines]
-- 2026-11-28 (DjangoLux 1.17.0b3 venv): 545 pass on SQLite (6 PG-only skips), `check` clean (no W201), `makemigrations --check` clean; Composer 1.11.0b3 `check` exit 0 on the stack files.
+- 2026-11-28: 545 pass on SQLite against 1.17.0b3 and 1.17.0 (6 PG-only skips), `check`/`makemigrations --check` clean; testbed accepted on b3 and on the stables (upgrade, data identical, 34 browser steps CSP-clean, Redis pause keeps sessions, relay 4/4, edge 51/51, load, rollback, schema-4 stale flag, customer order from Composer 1.10.4). Evidence `testbeds/crm-sales/.xclude/acceptance-1.17.0b3/` + `acceptance-1.17.0-stable/`.
 - 2026-11-23 (DjangoLux 1.16.3): 531 pass on SQLite (6 PG-only skips) and 531 on PostgreSQL 17 + Redis; testbed upgrade from published v0.12.0 and v0.11.4: data identical, settings moved, sign-out once, till sale, relay 4/4, journeys 20/20, edge probes 42/42, load 40 clients no 5xx, rollback + re-upgrade. Evidence `testbeds/crm-sales/.xclude/acceptance-1.16.3/REPORT.md`.
 ### One-line info about last time edited Docs: [Max 2 lines]
 - 2026-11-28: `deploy/README.md` v0.13.0 → v0.14.0 upgrade + rollback, `deploy/env.template`, `docs/OPERATIONS.md`/`ARCHITECTURE.md` (stack, static assets, CSP)/`RELEASING.md`.
