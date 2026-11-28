@@ -1,57 +1,14 @@
-<!DOCTYPE html>
+{% load asset_tags %}<!DOCTYPE html>
 <html lang="{{ doc_lang|default:'en' }}" {% if is_rtl %}dir="rtl"{% endif %}>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ DLUX_STRINGS.pr_payment_receipt }} {{ payment.receipt_number }}</title>
-    <style>
-        :root { --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --brand:#0d6efd; --soft:#f8fafc; }
-        * { box-sizing: border-box; }
-        body { font-family: -apple-system, "Segoe UI", Tahoma, Arial, sans-serif; color: var(--ink); margin: 0; padding: 24px; background: #f3f4f6; }
-        .actions { max-width: 760px; margin: 0 auto 16px; text-align: right; }
-        [dir="rtl"] .actions { text-align: left; }
-        .actions button { background: var(--brand); color: #fff; border: 0; padding: 9px 18px; border-radius: 20px; cursor: pointer; font-size: 14px; }
-        .sheet { max-width: 760px; margin: 0 auto; background: #fff; padding: 40px; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
-        .top { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; border-bottom: 3px solid var(--brand); padding-bottom: 20px; margin-bottom: 24px; }
-        .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
-        .brand-logo { display: block; width: auto; max-width: 170px; max-height: 68px; object-fit: contain; }
-        .brand h1 { margin: 0; font-size: 24px; }
-        .brand p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
-        .doc { text-align: right; }
-        [dir="rtl"] .doc { text-align: left; }
-        .doc h2 { margin: 0; font-size: 28px; letter-spacing: 0; text-transform: uppercase; color: var(--brand); }
-        .doc .meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
-        .doc .meta strong { color: var(--ink); }
-        .summary { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
-        .summary th, .summary td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-        .summary th { width: 34%; text-align: left; color: var(--muted); font-weight: 600; background: var(--soft); }
-        [dir="rtl"] .summary th { text-align: right; }
-        .summary td { text-align: right; font-weight: 600; }
-        [dir="rtl"] .summary td { text-align: left; }
-        .amount-row th, .amount-row td { color: var(--brand); font-size: 18px; }
-        .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 8px; }
-        .box { font-size: 13px; }
-        .label { text-transform: uppercase; font-size: 11px; color: var(--muted); letter-spacing: 0; margin-bottom: 4px; }
-        .name { font-weight: 700; font-size: 16px; }
-        .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 54px; }
-        .signature { border-top: 1px solid var(--ink); padding-top: 8px; color: var(--muted); font-size: 12px; text-align: center; }
-        .foot { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-        @media (max-width: 640px) {
-            body { padding: 12px; }
-            .sheet { padding: 24px; }
-            .top, .parties, .signatures { grid-template-columns: 1fr; display: grid; }
-            .doc, [dir="rtl"] .doc { text-align: start; }
-            .brand-logo { max-width: 150px; max-height: 58px; }
-        }
-        @media print {
-            body { background: #fff; padding: 0; }
-            .sheet { box-shadow: none; padding: 24px; }
-            .actions { display: none; }
-        }
-    </style>
+    <link rel="stylesheet" href="{% asset 'sales/css/payment_receipt.css' %}">
+    <script src="{% asset 'common/js/page_hooks.js' %}" nonce="{{ request.csp_nonce }}" defer></script>
 </head>
 <body>
-    <div class="actions"><button onclick="window.print()">{{ DLUX_STRINGS.pr_print_save }}</button></div>
+    <div class="actions"><button type="button" data-print-page>{{ DLUX_STRINGS.pr_print_save }}</button></div>
     <div class="sheet">
         <div class="top">
             <div class="brand">

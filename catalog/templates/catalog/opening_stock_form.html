@@ -48,20 +48,20 @@
                     <table class="table align-middle mb-0" id="items-table">
                         <thead class="table-light">
                             <tr>
-                                <th style="min-width:200px">{{ DLUX_STRINGS.label_product_name|default:"Name" }}</th>
-                                <th style="min-width:160px">{{ DLUX_STRINGS.label_product_alias|default:"Local alias" }}</th>
-                                <th {% if formset.empty_form.currency.is_hidden %}hidden{% endif %} style="min-width:130px">{{ DLUX_STRINGS.label_product_currency|default:"Product currency" }}</th>
-                                <th style="min-width:150px">{{ DLUX_STRINGS.label_product_category|default:"Category" }}</th>
-                                <th style="min-width:110px">{{ DLUX_STRINGS.label_product_unit|default:"Unit" }}</th>
-                                <th style="min-width:130px">{{ DLUX_STRINGS.label_product_barcode|default:"Barcode" }}</th>
-                                <th style="min-width:150px">{{ DLUX_STRINGS.label_product_color|default:"Color" }}</th>
-                                <th style="min-width:150px">{{ DLUX_STRINGS.label_product_size|default:"Size / Spec" }}</th>
-                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }}</th>
-                                <th class="text-end" style="width:90px">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup %" }}</th>
-                                <th class="text-end" style="min-width:110px">{{ DLUX_STRINGS.ui_doc_price|default:"Selling price" }}</th>
-                                <th class="text-end" style="min-width:120px">{{ DLUX_STRINGS.label_product_price_lyd_override|default:"Manual LYD" }}</th>
-                                <th class="text-end" style="width:100px">{{ DLUX_STRINGS.label_openingstockline_quantity|default:"In Storage" }}</th>
-                                <th style="width:48px"></th>
+                                <th class="crm-col-min-200">{{ DLUX_STRINGS.label_product_name|default:"Name" }}</th>
+                                <th class="crm-col-min-160">{{ DLUX_STRINGS.label_product_alias|default:"Local alias" }}</th>
+                                <th {% if formset.empty_form.currency.is_hidden %}hidden{% endif %} class="crm-col-min-130">{{ DLUX_STRINGS.label_product_currency|default:"Product currency" }}</th>
+                                <th class="crm-col-min-150">{{ DLUX_STRINGS.label_product_category|default:"Category" }}</th>
+                                <th class="crm-col-min-110">{{ DLUX_STRINGS.label_product_unit|default:"Unit" }}</th>
+                                <th class="crm-col-min-130">{{ DLUX_STRINGS.label_product_barcode|default:"Barcode" }}</th>
+                                <th class="crm-col-min-150">{{ DLUX_STRINGS.label_product_color|default:"Color" }}</th>
+                                <th class="crm-col-min-150">{{ DLUX_STRINGS.label_product_size|default:"Size / Spec" }}</th>
+                                <th class="text-end crm-col-min-110">{{ DLUX_STRINGS.ui_doc_cost|default:"Cost" }}</th>
+                                <th class="text-end crm-col-w-90">{{ DLUX_STRINGS.label_product_markup_percent|default:"Markup %" }}</th>
+                                <th class="text-end crm-col-min-110">{{ DLUX_STRINGS.ui_doc_price|default:"Selling price" }}</th>
+                                <th class="text-end crm-col-min-120">{{ DLUX_STRINGS.label_product_price_lyd_override|default:"Manual LYD" }}</th>
+                                <th class="text-end crm-col-w-100">{{ DLUX_STRINGS.label_openingstockline_quantity|default:"In Storage" }}</th>
+                                <th class="crm-col-w-48"></th>
                             </tr>
                         </thead>
                         <tbody id="items-body">
@@ -134,7 +134,7 @@
                     <a class="btn btn-outline-primary rounded-pill" href="{% url 'catalog:opening_stock_import_template' %}" download>
                         <i class="bi bi-download me-1"></i>{{ DLUX_STRINGS.ui_excel_template|default:"Download template" }}
                     </a>
-                    <div class="small text-muted flex-grow-1" style="min-width: 16rem;">{{ DLUX_STRINGS.ui_excel_template_help|default:"Start from the template: it has the right headers, drop-down lists for Unit, Color and Category, and a note on every column." }}</div>
+                    <div class="small text-muted flex-grow-1 crm-min-w-16rem">{{ DLUX_STRINGS.ui_excel_template_help|default:"Start from the template: it has the right headers, drop-down lists for Unit, Color and Category, and a note on every column." }}</div>
                 </div>
                 <p class="small mb-2">{{ DLUX_STRINGS.ui_excel_required_note|default:"Only Name and Quantity in Storage are required; every other column is optional and can be left blank or deleted. One item, or one color/size variant, per row." }}</p>
                 <details class="mb-3">

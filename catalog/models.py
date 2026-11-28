@@ -109,7 +109,7 @@ def _image_detail_row(instance, label):
         "label": label,
         "is_html": True,
         "value": format_html(
-            '<img src="{}" alt="" class="img-fluid rounded border" style="max-height:180px">',
+            '<img src="{}" alt="" class="img-fluid rounded border crm-detail-image">',
             url,
         ),
     }
@@ -346,8 +346,7 @@ class Product(ImageAssetMixin, ScopedModel):
             title = variant.display_label
             parts.append(format_html(
                 '<span class="d-inline-flex align-items-center gap-1 me-2 mb-1" title="{}">'
-                '<span style="display:inline-block;width:.95rem;height:.95rem;border-radius:999px;'
-                'border:2px solid {};background:{};box-shadow:inset 0 0 0 1px rgba(255,255,255,.45);"></span>'
+                '<span class="crm-dot-swatch" data-swatch-border="{}" data-swatch="{}"></span>'
                 '<span class="small">{} × {}</span>'
                 '</span>',
                 f"{title}: {variant.stock_qty:g}",

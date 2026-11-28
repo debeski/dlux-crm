@@ -89,7 +89,7 @@ class ProjectScaffoldTests(SimpleTestCase):
             re.MULTILINE,
         )
         self.assertIsNotNone(requirement)
-        self.assertEqual(requirement.group("version"), "1.16.3")
+        self.assertEqual(requirement.group("version"), "1.17.0")
         self.assertEqual(contents.count("django-lux"), 1, "one pin line, no wheel URL beside it")
         self.assertNotIn("files.pythonhosted.org", contents)
 
@@ -223,3 +223,72 @@ class ProjectScaffoldTests(SimpleTestCase):
         exempt = re.findall(r'"/media/([^"*]+)\*"', gate)
         self.assertEqual(sorted(exempt), sorted(django_settings.DLUX_PUBLIC_MEDIA))
         self.assertLess(caddy.index("respond @cross_site_request 403"), caddy.index("handle /media/* {"))
+
+    def test_resident_pair_runs_without_a_docker_socket_proxy(self):
+        compose = (Path(__file__).resolve().parents[1] / "compose.yml").read_text(encoding="utf-8")
+        self.assertNotIn("docker-socket-proxy", compose)
+        self.assertNotIn("DOCKER_HOST", compose)
+        agent = service_block(compose, "composer-agent")
+        self.assertNotIn("/var/run/docker.sock", agent)
+        self.assertIn("/var/run/docker.sock:/var/run/docker.sock", service_block(compose, "composer-executor"))
+        self.assertEqual(compose.count('COMPOSER_EXCLUDE_SERVICES: "composer-agent,composer-executor,db,redis"'), 2)
+
+    def test_update_policy_reaches_the_app_and_the_resident_pair(self):
+        compose = (Path(__file__).resolve().parents[1] / "compose.yml").read_text(encoding="utf-8")
+        line = 'DLUX_UPDATE_POLICY: "${DLUX_UPDATE_POLICY:-all}"'
+        shared = re.search(r"^x-environment:\n(.*?)(?=^\S)", compose, re.M | re.S).group(1)
+        self.assertIn(line, shared)
+        for name in ("web", "worker", "celery"):
+            with self.subTest(service=name):
+                self.assertIn("<<: *de", service_block(compose, name))
+        for name in ("composer-agent", "composer-executor"):
+            with self.subTest(service=name):
+                self.assertIn(line, service_block(compose, name))
+
+    def test_redis_keeps_rdb_snapshots(self):
+        compose = (Path(__file__).resolve().parents[1] / "compose.yml").read_text(encoding="utf-8")
+        redis = service_block(compose, "redis")
+        self.assertIn('"--appendonly", "no", "--save", "60", "1"', redis)
+        self.assertNotIn("appendfsync", redis)
+
+    def test_web_server_replaces_its_shell_and_no_default_admin_password(self):
+        compose = (Path(__file__).resolve().parents[1] / "compose.yml").read_text(encoding="utf-8")
+        web = service_block(compose, "web")
+        self.assertIn("exec python manage.py runserver 0.0.0.0:8000", web)
+        self.assertIn("exec gunicorn -c gunicorn.py config.wsgi:application", web)
+        self.assertNotIn("${ADMIN_PASS:-admin}", compose)
+        self.assertEqual(compose.count("ADMIN_PASS: ${ADMIN_PASS:-}"), 3)
+
+    def test_stored_files_and_maintenance_page_headers(self):
+        caddy = (Path(__file__).resolve().parents[1] / ".proxy" / "Caddyfile").read_text(encoding="utf-8")
+        self.assertIn("(dlux_media_headers) {", caddy)
+        self.assertLess(caddy.index("(dlux_media_headers) {"), caddy.index("import dlux_media_headers"))
+        self.assertEqual(caddy.count("import dlux_media_headers"), 2)
+        self.assertIn('header X-Content-Type-Options "nosniff"', caddy)
+        self.assertIn('Content-Security-Policy "default-src \'none\'; sandbox"', caddy)
+        self.assertIn('Content-Disposition "attachment"', caddy)
+        maintenance_csp = (
+            "header Content-Security-Policy \"default-src 'none'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; "
+            "form-action 'none'; frame-ancestors 'self'\""
+        )
+        self.assertEqual(caddy.count(maintenance_csp), 2)
+
+    def test_image_and_manage_py_follow_the_scaffold(self):
+        project_root = Path(__file__).resolve().parents[1]
+        dockerfile = (project_root / "Dockerfile").read_text(encoding="utf-8")
+        mounts = "/app/imports /app/logs /app/media /app/staticfiles /opt/dlux-runtime"
+        self.assertIn(f"RUN mkdir -p {mounts}", dockerfile)
+        self.assertIn(f"&& chgrp 0 {mounts}", dockerfile)
+        self.assertIn(f"&& chmod g+rwX {mounts}", dockerfile)
+        self.assertLess(dockerfile.index("COPY . /app/"), dockerfile.index(f"RUN mkdir -p {mounts}"))
+        manage = (project_root / "manage.py").read_text(encoding="utf-8")
+        self.assertIn("from dlux.updater.supervisor import baked_version, resolve_release", manage)
+        self.assertIn('os.environ["PYTHONPATH"]', manage)
+        self.assertIn('if name == "dlux" or name.startswith("dlux.")', manage)
+        self.assertLess(manage.index("    _activate_runtime_release()"), manage.index("from django.core.management"))
+        self.assertIn('os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")', manage)
+        self.assertIn("control_socket_disable = True", (project_root / "gunicorn.py").read_text(encoding="utf-8"))
+        gitignore = (project_root / ".gitignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn(".composer-channel", gitignore)
+        self.assertIn(".composer-image", gitignore)

@@ -64,8 +64,8 @@ class WorkspaceDashboardTests(TestCase):
         self.assertIn("data-workspace-dashboard", html)
         self.assertIn("data-dashboard-grid", html)
         self.assertIn("data-dashboard-customize", html)
-        self.assertRegex(html, r"common/css/workspace_dashboard\.css\?v=[0-9a-f]{12}")
-        self.assertRegex(html, r"common/js/workspace_dashboard\.js\?v=[0-9a-f]{12}")
+        self.assertRegex(html, r'common/css/workspace_dashboard\.css\?v=[0-9A-Za-z.+-]+"')
+        self.assertRegex(html, r'common/js/workspace_dashboard\.js\?v=[0-9A-Za-z.+-]+"')
         self.assertIn(WORKSPACE_PREF_NAMESPACE, html)
         self.assertIn('data-app-pref-url-template="/staff/sys/api/preferences/app/__namespace__/"', html)
         self.assertIn('data-widget-id="quick_actions"', html)
@@ -263,15 +263,31 @@ class WorkspaceEnhancementTilesTests(TestCase):
 
 
 class AssetVersionTests(TestCase):
-    def test_asset_url_changes_with_the_file_contents(self):
+    def test_asset_url_is_the_release_versioned_static_url(self):
+        from django.templatetags.static import static
+        from dlux.static_storage import release_revision
+
+        from common.templatetags import asset_tags
+
+        url = asset_tags.asset("common/css/workspace_dashboard.css")
+        self.assertEqual(url, static("common/css/workspace_dashboard.css"))
+        self.assertIn(f"?v={release_revision()}", url)
+        self.assertEqual(url.count("v="), 1)
+
+    def test_asset_url_changes_with_the_file_contents_without_versioned_storage(self):
         from unittest.mock import patch
 
         from common.templatetags import asset_tags
 
-        first = asset_tags.asset("common/css/workspace_dashboard.css")
-        self.assertRegex(first, r"^/static/common/css/workspace_dashboard\.css\?v=[0-9a-f]{12}$")
-        with patch.object(asset_tags.hashlib, "sha256") as sha:
-            sha.return_value.hexdigest.return_value = "f" * 64
+        plain = {
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+            "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+        }
+        with self.settings(STORAGES=plain):
+            first = asset_tags.asset("common/css/workspace_dashboard.css")
+            self.assertRegex(first, r"^/static/common/css/workspace_dashboard\.css\?v=[0-9a-f]{12}$")
+            with patch.object(asset_tags.hashlib, "sha256") as sha:
+                sha.return_value.hexdigest.return_value = "f" * 64
+                asset_tags._HASHES.clear()
+                self.assertNotEqual(asset_tags.asset("common/css/workspace_dashboard.css"), first)
             asset_tags._HASHES.clear()
-            self.assertNotEqual(asset_tags.asset("common/css/workspace_dashboard.css"), first)
-        asset_tags._HASHES.clear()

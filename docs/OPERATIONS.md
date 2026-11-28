@@ -16,19 +16,19 @@ The files an operator receives (`compose.yml`, `.proxy/`, `relay/`, `start.sh`,
 | Service | Image | Role | Networks |
 | --- | --- | --- | --- |
 | `db` | `postgres:17` | Database (`postgres_data` volume). Its environment is only what PostgreSQL reads. | `internal` |
-| `redis` | `redis:7` | Cache and Celery broker (`redis_data` volume, append-only file). | `internal` |
+| `redis` | `redis:7` | Cache, sessions and Celery broker (`redis_data` volume). RDB snapshots (`--appendonly no --save 60 1`), 500 MB with `allkeys-lru`. | `internal` |
 | `smtp-relay` | app image | Local SMTP relay (`python -m dlux.smtp_relay`). The app sends mail to it; only it reaches the upstream provider. | `egress`, `internal` |
 | `web` | app image | Gunicorn on port 8000 (Django development server when `DEBUG_STATUS=True`). | `internal` |
 | `worker` | app image | DjangoLux task worker (`manage.py dlux_worker`): queued tasks, `DLUX_TASK_SCHEDULE`, backups. Its `pre_start` steps run `dlux_reconcile` and `migrator`, so it applies the migrations before the application starts. | `internal` |
 | `celery` | app image | The project's own Celery worker with Beat (`celery -A config worker -B`): the exchange-rate refresh. Runs no migrations. | `internal` |
 | `caddy` | `caddy:latest` | Reverse proxy, automatic HTTPS, stored-file access check, maintenance page. | `frontend`, `internal` |
-| `docker-socket-proxy` | `tecnativa/docker-socket-proxy:v0.5.0` (pinned by digest) | Least-privilege Docker API for Composer. | `docker_proxy` |
-| `composer-executor` | `debeski/composer:latest` | Holds Docker authority; performs the updates the agent requests. | `docker_proxy` |
-| `composer-agent` | `debeski/composer:latest` | Resident Composer: image-update requests from the app, the outbound relay, the maintenance page. No Docker authority. | `egress`, `docker_proxy` |
+| `composer-executor` | `debeski/composer:latest` | Holds the Docker socket: performs the updates the agent requests and answers its few Docker reads. | `docker_proxy` |
+| `composer-agent` | `debeski/composer:latest` | Resident Composer: image-update requests from the app, the outbound relay, the maintenance page. No Docker access; it asks `composer-executor`. | `egress`, `docker_proxy` |
 
 Networks: `frontend` (published ingress), `egress` (the only networks with
 internet access, used by `smtp-relay` and `composer-agent`), `internal` (no
-internet) and `docker_proxy` (no internet; the Docker API path). Volumes:
+internet) and `docker_proxy` (no internet; private to `composer-executor` and
+`composer-agent`). Volumes:
 `postgres_data`, `redis_data`, `static`, `dlux_runtime` (release pointer, update
 state, maintenance flag), `composer_agent_state`, `composer_exec_sock`,
 `caddy_data` (certificates and ACME account; must persist) and `caddy_config`.
@@ -38,7 +38,14 @@ The app image runs on the DjangoLux version pinned in `requirements.txt` and
 carries these labels: `org.dlux_crm.dlux_baked_version` (the baked DjangoLux
 version, used by Composer's version gate), `org.dlux.project.release-manifest`
 (the project's `release-manifest.json`, shown in the in-app update review) and
-`org.dlux.stack-schema`.
+`org.dlux.stack-schema`. It runs as root. Its mount points (`/app/imports`,
+`/app/logs`, `/app/media`, `/app/staticfiles`, `/opt/dlux-runtime`) are group 0 and
+group-writable, and `entrypoint.sh` sets `umask 0002` and runs
+`python -m dlux.mount_access gate`, so the data is also ready for a non-root
+(uid 10001, gid 0) image. `manage.py` puts the active inline DjangoLux release on
+`sys.path` and `PYTHONPATH` before Django loads, so a command run outside the
+runtime supervisor (`./start.sh run -m web collectstatic`) uses
+the release the site runs.
 
 ## Starting the stack
 
@@ -48,12 +55,18 @@ version, used by Composer's version gate), `org.dlux.project.release-manifest`
 ./start.sh                # production: the published image, HTTPS on the configured domain
 ```
 
-`start.sh` (Windows: `start.ps1`) runs the `debeski/composer` deployer, which
-reads `.secrets/.env`, starts the stack, waits for health and reports. The
+`start.sh` (Windows: `start.ps1`, both Composer wrapper 8) runs the
+`debeski/composer` deployer, which reads `.secrets/.env`, starts the stack, waits
+for health and reports. The wrapper runs the digest pinned in `.composer-image`
+(written by Composer's `update self` / `agent update`; per host, not committed),
+else the channel tag. It refuses a stray `.env` that shadows keys of
+`.secrets/.env` and a secrets line written `export KEY=…` or `KEY = value`. The
 resident services use the `agent run` and `executor run` command form. Other
 commands: `check`, `check --fix`, `update`, `update self`, `restart <service>`,
-`log -n 200 <service>`, `stop`. `./start.sh check` must exit 0; its
-`front-proxy` line is a warning until `DLUX_FRONT_PROXY` is set. Never pass `-v`
+`agent update`, `log -n 200 <service>`, `stop`. `./start.sh check` must exit 0;
+its `front-proxy` line is a warning until `DLUX_FRONT_PROXY` is set, and it warns
+on an empty `ADMIN_PASS` (`admin-pass`) and on the default `POSTGRES_PASSWORD`
+(`postgres-password`). Never pass `-v`
 or `-p` to `stop`: they delete the database and the other volumes.
 
 The development override builds the image from the working tree, bind-mounts
@@ -75,7 +88,7 @@ Compose reads them; nothing in `compose.yml` needs editing for a normal install.
 | --- | --- |
 | `DJANGO_SECRET_KEY`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Secrets. Never change `POSTGRES_PASSWORD` after the first start. |
 | `POSTGRES_DB` | Database name; default `sales_db`. A server whose database has another name keeps that name here. |
-| `ADMIN_PASS` | Password of the `admin` account created on the first start. |
+| `ADMIN_PASS` | Password of the `admin` account created on the first start. Empty or `admin`: no account is created until it is set (`./start.sh` and `check --fix` ask for it at a terminal). An existing admin is never changed. |
 | `BASE_URL`, `ALLOWED_URLS`, `ALLOWED_HOSTS` | Public address, trusted origins and hostnames (cookies and CSRF follow `BASE_URL`). |
 | `CADDY_SITE_ADDRESS` | Hostname(s), space-separated, served by the app; each gets its own Let's Encrypt certificate. `:80` serves plain HTTP. |
 | `CADDY_PRIMARY_URL`, `CADDY_ERP_ADDRESS` | Canonical URL; optional legacy hostname that redirects to `CADDY_PRIMARY_URL/staff/`. |
@@ -85,6 +98,7 @@ Compose reads them; nothing in `compose.yml` needs editing for a normal install.
 | `COMPOSER_REGISTRY_USERNAME`, `COMPOSER_REGISTRY_PASSWORD`, `COMPOSER_REGISTRY_HOST` | Login for a private `WEB_IMAGE` registry (a read-only deploy token); empty for the public image. |
 | `WEB_IMAGE` | Application image; default `debeski/dlux-crm:sales`. |
 | `DLUX_UPDATE_CHECK_INTERVAL` | Seconds between update checks (default 86400). |
+| `DLUX_UPDATE_POLICY` | Which updates the app may request: `all` (default), `inline` (DjangoLux inline updates only) or `none`. `web`, `worker` and the Composer pair enforce it; run `./start.sh` after changing it. Commands run from the deployment folder are not restricted. |
 | `DEBUG_STATUS` | `True` only in development. |
 | `COMPOSER_CONTROL_URL`, `COMPOSER_ENROLLMENT_TOKEN` | Optional: control-plane URL and one-use enrolment token for the Composer agent. Leave unset otherwise. |
 
@@ -123,6 +137,11 @@ with a one-year immutable cache and sends everything else to `web`. It reads
   only to a signed-in user who may view its document; signed out the answer is `403`;
 - `/media/dlux_backups/` is never served (`404`).
 
+Every file under `/media/` carries `X-Content-Type-Options: nosniff`. Anything but
+a PDF gets `Content-Security-Policy: default-src 'none'; sandbox`, and anything but
+a raster image or PDF is sent as `Content-Disposition: attachment`, so an uploaded
+HTML or SVG file never runs as the site (the `dlux_media_headers` snippet).
+
 `./start.sh check` reports the `stored-files` check; a Caddy still running an old
 Caddyfile shows there.
 
@@ -131,7 +150,9 @@ Caddyfile shows there.
 During an image update Composer publishes a progress page on the `dlux_runtime`
 volume and Caddy serves it (HTTP 503) while `web` is recreated; the page returns
 the visitor to the URL they were on once the application answers again. Caddy
-serves `/_update/status.json` and `/_update/log.txt` even then.
+serves `/_update/status.json` and `/_update/log.txt` even then. The page and its
+assets are sent with a strict `Content-Security-Policy` (`default-src 'none';
+script-src 'self'; …`), so no inline script runs there.
 
 ## First-run checklist
 
@@ -139,7 +160,7 @@ serves `/_update/status.json` and `/_update/log.txt` even then.
    DjangoLux setup wizard (`/staff/sys/setup/`: Arabic/English system name, logo,
    language, theme). The name and logo brand printed invoices, receipts and
    purchase invoices.
-2. Create the permission groups: `docker compose exec web python manage.py seed_roles` (from the deployment folder)
+2. Create the permission groups: `./start.sh run -m web seed_roles` (from the deployment folder)
    (Sales Manager, Sales Representative, Delivery Courier; see
    [PERMISSIONS.md](PERMISSIONS.md)). Create staff users and add each to one group.
 3. Options (`/staff/sys/options/`): turn on what the store uses: the *CRM options*
@@ -239,7 +260,10 @@ A release that changes the stack files (`compose.yml`, `.proxy/Caddyfile`,
 `relay/`, the wrappers) needs those files copied over before `./start.sh`; the
 order is in `deploy/README.md`. Composer's version gate refuses to recreate onto
 an image whose baked DjangoLux version is older than the running one
-(`org.dlux_crm.dlux_baked_version`, `--force` overrides). `./start.sh check --fix`
+(`org.dlux_crm.dlux_baked_version`), and its downgrade guard refuses an older
+application image, or one that does not know the database's migrations. Going
+back on purpose means restoring a database backup from before the newer release,
+then `./start.sh --force`. `./start.sh check --fix`
 repairs stack-file drift and keeps the replaced files under `.xclude/`.
 
 ## Local development

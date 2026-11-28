@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.14.0
+- **DjangoLux 1.17.0**: `requirements.txt` pins `django-lux[updater]==1.17.0`, paired with Composer 1.11.0. A deployment moves by an application-image update plus the release files, then one `./start.sh check --fix` (stack schema stays 5). Framework migrations are additive (`dlux.0032_singleton_cache_revision` and later); the CRM adds none. Developed against 1.17.0b3 through a local venv and a testbed overlay only; no beta pin was ever committed. The pin moved once the stables were published (wheel sha256 `ff5c4466…`).
+- **Nonce-Only Scripts, No Inline Styles (ZAP 10055, `dlux.W201`)**: `CONTENT_SECURITY_POLICY` is `script-src [SELF, NONCE]` and `style-src [SELF]`, adds `base-uri [SELF]` and `object-src [NONE]`, and `connect-src` takes `SCANLINK_CONNECT_ORIGINS` as the scaffold does.
+  - Inline handlers (`onclick="window.print()"`, `onsubmit="return confirm(…)"`, the `onchange="this.form.submit()"` that `sales/views.py` emitted) become `data-*` hooks in the new `common/static/common/js/page_hooks.js`, loaded on every staff page by `common/templates/dlux/includes/custom_head.html` and bound once.
+  - The purchase-invoice and deposit inline scripts move to `catalog/js/purchase_invoice_form.js` and `sales/js/deposit_combobox.js`.
+  - `style=""` attributes and `<style>` blocks in about 25 templates, forms, tables and views become classes in `common/css/page_hooks.css` and app CSS. Swatch, progress and accent values are set from `data-*` through the CSSOM.
+  - `products_layout.js` binds its document listeners once, since DjangoLux re-runs a modal's scripts after a failed submit.
+  - `common/tests/test_csp.py` pins the directives and checks rendered staff and storefront pages for un-nonced scripts and `on…=` attributes.
+- **Sessions Survive A Cache Outage**: `SESSION_ENGINE = "dlux.cache_sessions"`. Django's cache store read any Redis error as a missing session and signed the user out for good; DjangoLux's engine answers the outage page and keeps the session.
+- **One Static Version Query**: the `{% asset %}` tag (`common/templatetags/asset_tags.py`) returns DjangoLux's `VersionedStaticFilesStorage` URL (`?v=<dlux>-<project>`) as is and adds its own content hash only when that storage is off. On 1.17 it had appended a second `v`.
+- **Stack Files From The DjangoLux 1.17 Scaffold And Composer 1.11**:
+  - `start.sh` / `start.ps1` are wrapper 8, and `.gitignore` lists `.composer-image` and `.composer-channel`. The first Composer update after the move pins the resident Composer images by digest.
+  - `compose.yml` drops `docker-socket-proxy`, the agent's `DOCKER_HOST` and its `depends_on`, since Composer's executor does the reads.
+  - `DLUX_UPDATE_POLICY` (`all` by default) reaches web, worker, celery, agent and executor.
+  - Redis runs on RDB snapshots (`--appendonly no --save 60 1`, same memory limits), so a damaged AOF can no longer crash-loop Redis and keep the whole stack down.
+  - `web` `exec`s runserver/gunicorn, so the supervisor stops the real server.
+  - `ADMIN_PASS` defaults to empty.
+  - `.proxy/Caddyfile` imports the `dlux_media_headers` snippet on both `/media/` routes and sends the maintenance-page CSP on `/_dlux/maintenance/*` and `handle @down`.
+  - `Dockerfile` prepares the mount points group-writable (`/opt/dlux-runtime` included); the image still runs as root.
+  - `manage.py` carries the scaffold's `_activate_runtime_release()`, which exports `PYTHONPATH` and drops the baked `dlux` modules, so `docker compose exec web python manage.py …` runs the active inline release.
+  - `gunicorn.py` sets `control_socket_disable = True`.
+  - Composer 1.11.0b3's `check` exits 0 on these files, and a second `check --fix` changes nothing. `tests/test_scaffold.py` gains 6 tests for this shape.
+- **Celery Kept For The Rate Refresh**: `celery` stays for `finance.tasks.refresh_market_rates` through DjangoLux 1.17.x. Generated stacks stop installing Celery in 1.18.0, so the task moves to `dlux.taskrunner` before that release.
+- **Upgrade From v0.13.0**: `deploy/README.md` gives the order:
+  1. back up;
+  2. `./start.sh pull web`;
+  3. `./start.sh update self` (Composer 1.11);
+  4. `./start.sh check --fix` on the server's files (wrapper 8, proxy service and running container removed, media headers, maintenance CSP, update policy, Redis snapshots; it asks front-proxy, update-policy and Redis questions);
+  5. copy `compose.yml`, the wrappers and `.proxy/` from the release (`check --fix` alone leaves `web` without `exec` and keeps the old `ADMIN_PASS` default; copying before step 4 leaves the proxy container running unnoticed);
+  6. `./start.sh check --fix` again;
+  7. `./start.sh`;
+  8. `./start.sh agent update`, the only step that digest-pins Composer;
+  9. `./start.sh check`.
+
+  Rollback follows Composer 1.11's downgrade guard: restore the pre-upgrade backup, set the old `WEB_IMAGE`, run `./start.sh --force`, then flush Redis db 1. `check` now warns on an empty or `admin` `ADMIN_PASS` and a default `POSTGRES_PASSWORD`. `deploy/env.template`, `docs/OPERATIONS.md`, `docs/ARCHITECTURE.md` and `docs/RELEASING.md` follow.
+- **Schema-4 Stacks Stuck Behind The Maintenance Page**: `deploy/README.md` says the upgrade section depends on the stack files, not the image. A server whose Updates card moved the image to v0.13.0 but which still has no `worker` (schema 4: `celery` + `docker-socket-proxy`) follows **From v0.12.x or older**. That section copies this release's files and adds `worker`. Such a stack sits behind the maintenance page after the card's image update with every service healthy, because in DjangoLux 1.16 only `worker` lowers the flag. The README moves the flag aside (`state/maintenance` → `failed/`, kept for review) before the upgrade.
+- **Release Validation**: 545 cases pass on SQLite (6 PostgreSQL-only skipped) against DjangoLux 1.17.0b3 and again against the published 1.17.0, and 545 on PostgreSQL 17 + Redis 7 (none skipped); `check` and `makemigrations --check` are clean, and `scripts/smoke-test.sh` passes on the candidate image. The `crm-sales` testbed accepted the candidate on 1.17.0b3 + Composer 1.11.0b3 and again on the 1.17.0 + 1.11.0 stables:
+  - upgrade from v0.13.0;
+  - every project table and 227 media files identical, `dlux.0031`/`0032` applied;
+  - 34 browser steps with the nonce-only headers and no CSP violation, console error or 5xx;
+  - signed-in session kept through a Redis pause;
+  - relay refresh 4/4;
+  - 51/51 edge probes, including the `/media/` headers and the maintenance-page CSP;
+  - 1,856 requests from 40 clients with no 5xx;
+  - rollback to v0.13.0 and re-upgrade with data identical;
+  - a schema-4 stack behind a stale maintenance flag brought back and upgraded;
+  - the customer start (Composer 1.10.4, wrapper 6, v0.13.0 with `worker`) to Composer 1.11.0 pinned + v0.14.0.
+
+  Evidence is in `testbeds/crm-sales/.xclude/acceptance-1.17.0b3/` and `acceptance-1.17.0-stable/`.
+
 ## v0.13.0
 - **DjangoLux 1.16.3**: `requirements.txt` carries one pin line, `django-lux[updater]==1.16.3` (PyPI wheel and sdist); the v0.12.0 wheel-URL+sha256 line, a CDN-lag workaround for 1.15.3, is gone. Paired with Composer 1.10.3 (`debeski/composer:latest`); a deployment moves by an application-image update plus the release files, never an inline install (DjangoLux 1.16 needs stack schema 5). Framework migrations are additive; the CRM adds none.
 - **Stack Schema 5 With A `worker` Service**: `compose.yml` stamps `DLUX_STACK_SCHEMA: "5"` and gains `worker` (`manage.py dlux_worker` under the supervisor, healthcheck `dlux_worker --check`, `stop_grace_period: 30s`, `DLUX_BOOT_GATE: "apply"`, read-write `dlux_runtime`). It takes over the `dlux_reconcile` and `migrator` `pre_start` steps from `celery`; `entrypoint.sh` is the scaffold's boot gate (`off` / `apply` / wait), so `web` and `celery` wait for the migrations `worker` applies. `COMPOSER_AGENT_RESTART_SERVICES` is `web,worker,celery,smtp-relay,caddy` in the agent and the executor. `compose.dev.yml` gets the matching `worker` override. `Dockerfile`, `entrypoint.sh`, `gunicorn.py`, `.proxy/Caddyfile`, `compose.dev.yml` and `deploy/env.template` carry the schema 5 stamp.

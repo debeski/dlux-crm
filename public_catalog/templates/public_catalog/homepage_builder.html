@@ -148,7 +148,7 @@
                             <span class="hpb-accent__label">{{ DLUX_STRINGS.hp_accent_primary|default:"Primary accent" }}</span>
                             <input type="color" name="accent" value="{{ homepage_config.accent|default:'#345b86' }}" data-accent-input>
                             <div class="hpb-swatches" data-accent-presets>
-                                {% for hex in accent_presets %}<button type="button" class="hpb-swatch" style="background:{{ hex }}" data-accent="{{ hex }}" title="{{ hex }}"></button>{% endfor %}
+                                {% for hex in accent_presets %}<button type="button" class="hpb-swatch" data-swatch="{{ hex }}" data-accent="{{ hex }}" title="{{ hex }}"></button>{% endfor %}
                             </div>
                             <button type="button" class="btn btn-sm btn-link" data-accent-reset>{{ DLUX_STRINGS.hp_accent_reset|default:"Use theme default" }}</button>
                         </div>
@@ -156,7 +156,7 @@
                             <span class="hpb-accent__label">{{ DLUX_STRINGS.hp_accent_secondary|default:"Secondary accent" }}</span>
                             <input type="color" name="accent_secondary" value="{{ homepage_config.accent_secondary|default:'#14b8a6' }}" data-accent-secondary-input>
                             <div class="hpb-swatches" data-accent-secondary-presets>
-                                {% for hex in accent_secondary_presets %}<button type="button" class="hpb-swatch" style="background:{{ hex }}" data-accent-secondary="{{ hex }}" title="{{ hex }}"></button>{% endfor %}
+                                {% for hex in accent_secondary_presets %}<button type="button" class="hpb-swatch" data-swatch="{{ hex }}" data-accent-secondary="{{ hex }}" title="{{ hex }}"></button>{% endfor %}
                             </div>
                             <button type="button" class="btn btn-sm btn-link" data-accent-secondary-reset>{{ DLUX_STRINGS.hp_accent_secondary_reset|default:"Use paired default" }}</button>
                         </div>

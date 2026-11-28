@@ -1,17 +1,5 @@
 {% extends "public_catalog/public_base.html" %}
 
-{% block extra_head %}
-<style>
-.public-comingsoon { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
-.public-comingsoon__card { text-align: center; max-width: 44ch; }
-.public-comingsoon__logo { width: clamp(96px, 22vw, 168px); height: auto; margin-bottom: 1.25rem; object-fit: contain; }
-.public-comingsoon__card > i { font-size: 3.2rem; opacity: .5; display: block; margin-bottom: 1rem; }
-.public-comingsoon__card h1 { font-size: 2rem; font-weight: 800; margin: 0 0 .5rem; }
-.public-comingsoon__card p { opacity: .75; margin: 0 0 1.25rem; }
-.public-comingsoon__badge { display: inline-block; padding: .4rem 1rem; border-radius: 999px; background: rgba(var(--primal-rgb, 35, 99, 195), .12); color: var(--primal, #2363c3); font-weight: 700; letter-spacing: .03em; }
-</style>
-{% endblock %}
-
 {% block public_content %}
 <section class="public-comingsoon">
     <div class="public-comingsoon__card">

@@ -6,9 +6,45 @@ Generated on: 2026-06-22.
 """
 import os
 import sys
+from pathlib import Path
+
+
+def _activate_runtime_release():
+    """Import the runtime-active DjangoLux release, not the baked image package.
+
+    The web process serves templates through the runtime supervisor, which puts
+    the active release (a volume-staged inline update, when present) on the path.
+    A management command run without that supervisor (the worker's pre_start
+    migrator, or an operator shell running `collectstatic`) would instead import
+    the baked image version and write another version's CSS/JS into the shared
+    static volume. Resolving the same release here, before Django is imported,
+    makes every `manage.py` invocation consistent. No-op when the active release
+    is the baked image, when runtime state is absent or corrupt, or when dlux is
+    not importable.
+    """
+    try:
+        from dlux.updater.supervisor import baked_version, resolve_release
+    except Exception:
+        return
+    # Record the immutable image version before a release shadows the package,
+    # mirroring the supervisor so DLUX_BAKED_VERSION means the same thing here.
+    os.environ.setdefault("DLUX_BAKED_VERSION", baked_version() or "")
+    root = Path(os.getenv("DLUX_UPDATE_RUNTIME_ROOT", "/opt/dlux-runtime"))
+    release = resolve_release(root)
+    if release is None:
+        return
+    sys.path.insert(0, str(release))
+    current = os.environ.get("PYTHONPATH", "")
+    if str(release) not in current.split(os.pathsep):
+        os.environ["PYTHONPATH"] = os.pathsep.join(filter(None, (str(release), current)))
+    # Resolving the release imported the baked package; drop it so the next
+    # `import dlux` loads the release instead.
+    for name in [name for name in sys.modules if name == "dlux" or name.startswith("dlux.")]:
+        del sys.modules[name]
 
 
 def main():
+    _activate_runtime_release()
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     try:
         from django.core.management import execute_from_command_line

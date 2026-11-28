@@ -7,7 +7,8 @@ import os
 from pathlib import Path
 import logging
 from urllib.parse import urlparse
-from csp.constants import SELF, UNSAFE_EVAL, UNSAFE_INLINE
+from csp.constants import NONCE, NONE, SELF
+from dlux.system.constants import SCANLINK_CONNECT_ORIGINS
 from dlux.utils import get_secret, get_project_version
 from dlux.utils import dlux_settings  # noqa: separate line so dlux_setup's literal substring check sees it and stops re-appending its block
 
@@ -70,7 +71,8 @@ USE_X_FORWARDED_HOST = True
 CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
 X_FRAME_OPTIONS = "SAMEORIGIN"
 
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+# Cache sessions that answer 503 through a cache outage instead of signing users out.
+SESSION_ENGINE = "dlux.cache_sessions"
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week
@@ -203,13 +205,23 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "webmast
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": [SELF],
-        "script-src": [SELF, UNSAFE_INLINE, UNSAFE_EVAL],
-        "style-src": [SELF, UNSAFE_INLINE],
+        # Scripts come from this site, or inline with nonce="{{ request.csp_nonce }}".
+        # No 'unsafe-inline' or 'unsafe-eval': neither DjangoLux nor this project needs them.
+        "script-src": [SELF, NONCE],
+        # Styles come only from this site's stylesheets. Computed values (swatches,
+        # progress widths, storefront accents) are set through the CSSOM by
+        # common/js/page_hooks.js, which style-src does not govern.
+        "style-src": [SELF],
         "img-src": [SELF, "data:", "blob:"],
         "font-src": [SELF, "data:"],
-        "connect-src": [SELF, BASE_URL],
+        # ScanLink talks to a tray app on the operator's own workstation; listing
+        # the origins causes no request until ScanLink is switched on.
+        "connect-src": [SELF, BASE_URL, *SCANLINK_CONNECT_ORIGINS],
         "frame-ancestors": [SELF],
         "form-action": [SELF],
+        # An injected <base> cannot repoint the page's relative script URLs.
+        "base-uri": [SELF],
+        "object-src": [NONE],
     }
 }
 

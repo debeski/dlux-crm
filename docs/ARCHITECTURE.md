@@ -361,11 +361,32 @@ namespace `sales_crm.workspace_dashboard.v1` through `update_app_preference`, wi
 
 ## Static assets
 
-Project CSS and JS are linked with `{% load asset_tags %}{% asset 'app/css/file.css' %}`,
-which appends a short hash of the file's contents. Caddy serves `/static/` as
-`immutable` for a year, so the URL must change whenever the file does; hand-written
-`?v=` stamps are forgotten, and `{% dlux_static %}` only changes with the DjangoLux
-release. Keep `dlux_static` for DjangoLux's own files.
+Project CSS and JS are linked with `{% load asset_tags %}{% asset 'app/css/file.css' %}`.
+Caddy serves `/static/` as `immutable` for a year, so the URL must change whenever the
+file does. DjangoLux's `VersionedStaticFilesStorage` (set by `dlux_settings()`) gives
+every static URL `?v=<DjangoLux version>-<project version>`, plus the file's modification
+time in DEBUG, and `{% asset %}` returns that URL unchanged; only without that storage
+does it append a short hash of the file's contents. A project release therefore has to
+bump `release-manifest.json` for changed CSS or JS to reach browsers.
+
+Templates and scripts follow the Content-Security-Policy (`script-src 'self'` plus the
+request nonce, `style-src 'self'`):
+
+- Every `<script>` carries `nonce="{{ request.csp_nonce }}"`; page logic lives in static
+  files, and data reaches it through `json_script` or `data-*` attributes.
+- No `on…=` handlers, `javascript:` URLs, `style=""` attributes or `<style>` blocks.
+  Static styling goes in a class in the app's stylesheet (shared staff utilities in
+  `common/css/page_hooks.css`).
+- `common/js/page_hooks.js`, loaded in the head of every staff page (through
+  `dlux/includes/custom_head.html`), of the storefront and of the print pages, replaces
+  the inline forms: `data-print-page` (print button), `form[data-confirm]` (confirm before
+  submit), `data-submit-on-change` (a select that submits its form), and, through the
+  CSSOM, `data-swatch` / `data-swatch-border` (colours), `data-progress` (a width in
+  percent) and `data-css-vars` (a JSON object of custom properties, such as the
+  storefront accents and the hero scrim). It also styles markup added later (modals,
+  rows built by scripts).
+- A script that the dynamic modal can load binds document- or window-level listeners
+  once, since the modal runs a form's scripts again after a failed submit.
 
 ## Money & currency
 
@@ -437,18 +458,20 @@ and the procedures.
   access, so the page fetches go through the Composer agent's relay
   (`relay/operations.json`: `finance.cbl_rates_page`, `finance.ean_rates_page`); `web`
   only reads the cache. The service stays until the task moves to `dlux.taskrunner`
-  (`compose.yml` notes that Celery leaves DjangoLux in 1.17).
+  (DjangoLux supports project Celery through 1.17.x and drops it in 1.18.0).
 - **`db`** (PostgreSQL) and **`redis`**: Redis database 1 holds the Django cache and the
   sessions (`SESSION_ENGINE` is cache-backed), 2 the Celery broker and 3 the Celery result
-  backend; it runs with an append-only file.
+  backend. Redis keeps RDB snapshots (`--appendonly no --save 60 1`), so a hard stop
+  leaves the last complete snapshot and loses at most about a minute of cache, sessions
+  and queued Celery messages; `--maxmemory 500mb` with `allkeys-lru` evicts any key,
+  sessions and broker messages included, when memory runs out.
 - **`caddy`** is the only published ingress (`frontend` network): TLS, `/static/`, the
   `/media/` access check, the maintenance page and the proxy to `web`.
 - **`smtp-relay`** (`python -m dlux.smtp_relay`) receives the app's mail on port 1025
   (`EMAIL_HOST`); it and `composer-agent` are the only services on the `egress` network.
 - **`composer-agent`** (image-update requests, the outbound relay, the maintenance page)
-  has no Docker authority: it reaches the Docker API only through `docker-socket-proxy`
-  (read-only, no POST) on the `docker_proxy` network, and `composer-executor` alone has
-  write access to the Docker socket and performs the updates.
+  has no Docker access: it asks `composer-executor`, through the socket on the
+  `composer_exec_sock` volume, for the few Docker reads it needs and for every write. `composer-executor` alone holds the Docker socket and performs the updates.
 
 `internal` and `docker_proxy` have no internet access; no service sits on both `frontend`
 and `egress`. Volumes are `postgres_data`, `redis_data`, `static`, `dlux_runtime`,
@@ -473,9 +496,15 @@ and `egress`. Volumes are `postgres_data`, `redis_data`, `static`, `dlux_runtime
   at the read boundaries (lists, the dynamic-modal lookup, invoice detail and reports), so an
   employee sees only their own records unless they hold the model's `view_all_<model>`
   permission.
-- `config/settings.py` sets the Content-Security-Policy (`csp.middleware.CSPMiddleware`),
-  CSRF and session cookies (secure when `BASE_URL` is https, `SameSite=Lax`, cache-backed
-  sessions of one week) and HSTS outside DEBUG.
+- `config/settings.py` sets the Content-Security-Policy (`csp.middleware.CSPMiddleware`):
+  `script-src 'self'` plus the request nonce, `style-src 'self'`, `default-src`,
+  `frame-ancestors`, `form-action` and `base-uri 'self'`, `object-src 'none'`, images
+  from the site, `data:` and `blob:`, and `connect-src` limited to the site and the
+  ScanLink tray origins; no directive allows `'unsafe-inline'` or `'unsafe-eval'`
+  (`common/tests/test_csp.py` renders staff and storefront pages to keep it so). It also
+  sets CSRF and session cookies (secure when `BASE_URL` is https, `SameSite=Lax`,
+  one-week sessions in the Redis cache through `dlux.cache_sessions`, which answers 503
+  during a cache outage instead of signing users out) and HSTS outside DEBUG.
 - Stored paperwork (`PurchaseInvoice.attachment`, `Expense.attachment`) uses
   `common.files.ProtectedFileField`: its `.url` is `common:stored_file`
   (`/staff/files/<app>/<model>/<pk>/<field>/`), which checks login, the record's

@@ -37,7 +37,7 @@
 
     {% if can_apply %}
     <form method="post" action="{% url 'catalog:stock_take_apply' take.pk %}" class="mb-4"
-          onsubmit="return confirm('{{ DLUX_STRINGS.ui_apply_confirm|default:"Post adjustments and set stock to the counted quantities?" }}');">
+          data-confirm="{{ DLUX_STRINGS.ui_apply_confirm|default:"Post adjustments and set stock to the counted quantities?" }}">
         {% csrf_token %}
         <button type="submit" class="btn btn-success rounded-pill">
             <i class="bi bi-check2-circle me-1"></i>{{ DLUX_STRINGS.ui_apply_stock_take|default:"Apply — post adjustments" }}

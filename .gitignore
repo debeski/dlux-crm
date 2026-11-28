@@ -33,5 +33,10 @@ celerybeat-*
 .agents
 .claude
 .codex
+
+# Per-host Composer state: the channel a host follows and the digest it pinned.
+.composer-channel
+.composer-image
+
 /CLAUDE.md
 db.sqlite3

@@ -123,7 +123,7 @@ class OpeningStockViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode()
 
-        self.assertRegex(html, r"catalog/js/price_sync\.js\?v=[0-9a-f]{12}")
+        self.assertRegex(html, r'catalog/js/price_sync\.js\?v=[0-9A-Za-z.+-]+"')
         self.assertIn('data-price-sync-row', html)
         self.assertIn('data-price-cost="1"', html)
         self.assertIn('data-price-lyd="1"', html)
@@ -159,7 +159,7 @@ class OpeningStockViewTests(TestCase):
         self.assertEqual(row["unit"], Product.UNIT_BOX)
         self.assertEqual(row["color"], Product.COLOR_BLACK)
         self.assertEqual(row["size"], "Small / 12x8x3 cm")
-        self.assertRegex(html, r"catalog/js/opening_stock\.js\?v=[0-9a-f]{12}")
+        self.assertRegex(html, r'catalog/js/opening_stock\.js\?v=[0-9A-Za-z.+-]+"')
 
     def test_save_draft_preserves_partial_rows_without_writing_inventory(self):
         existing = Product.objects.create(name="Unchanged", cost_usd=10, price_usd=15)

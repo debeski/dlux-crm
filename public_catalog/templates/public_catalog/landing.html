@@ -5,7 +5,7 @@
 
 {% block public_content %}
 <section class="public-hero public-hero--{{ homepage_config.hero_media }} public-hero-layout--{{ hero_layout|default:'poster' }} public-hero-height--{{ homepage_config.hero_height }} public-hero-focus--{{ homepage_config.hero_focus }}"
-         style="--scrim:{{ homepage_config.hero_overlay }}"
+         data-css-vars='{"--scrim": "{{ homepage_config.hero_overlay }}"}'
          data-motion-level="{{ homepage_config.motion_level }}"
          {% if hero_slides|length > 1 and hero_layout != 'mosaic' %}data-hero-carousel{% endif %}>
     {% if hero_slides %}

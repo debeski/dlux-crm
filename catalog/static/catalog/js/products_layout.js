@@ -1,6 +1,10 @@
 (function () {
     "use strict";
 
+    // The options modal can run this file again; bind the document listeners once.
+    if (window.CrmProductsLayoutBound) return;
+    window.CrmProductsLayoutBound = true;
+
     var DEFAULT_NS = "sales_crm.products_layout";
 
     function csrfToken() {

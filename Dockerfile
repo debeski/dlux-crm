@@ -49,8 +49,13 @@ LABEL org.dlux.stack-schema="5"
 # Copy the project files
 COPY . /app/
 
-# Create directories for volumes
-RUN mkdir -p /app/.backups /app/imports /app/logs /app/media /app/staticfiles
+# Create every mount point the app containers use, group 0 and group-writable.
+# A named volume Docker creates on the first start copies its mount point's mode,
+# so an image that runs as uid 10001 (group 0) can write to `static` and the
+# runtime volume from that start on. Root ignores the group bits.
+RUN mkdir -p /app/imports /app/logs /app/media /app/staticfiles /opt/dlux-runtime \
+    && chgrp 0 /app/imports /app/logs /app/media /app/staticfiles /opt/dlux-runtime \
+    && chmod g+rwX /app/imports /app/logs /app/media /app/staticfiles /opt/dlux-runtime
 
 # Make entrypoint script executable
 RUN chmod +x /app/entrypoint.sh

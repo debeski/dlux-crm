@@ -8,15 +8,14 @@
     <div class="col">
         <div class="dlux-table-shell h-100 p-3 d-flex flex-column">
             <div class="d-flex gap-3">
-                <span class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded border overflow-hidden"
-                      style="width:56px;height:56px;background:var(--table-row,#f8f9fa)">
+                <span class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded border overflow-hidden crm-thumb-56-placeholder">
                     {% if p.image_url %}
-                    <img src="{{ p.image_url }}" alt="" style="width:56px;height:56px;object-fit:cover">
+                    <img src="{{ p.image_url }}" alt="" class="crm-thumb-56">
                     {% else %}
                     <i class="bi bi-image text-muted fs-4"></i>
                     {% endif %}
                 </span>
-                <div class="flex-grow-1" style="min-width:0">
+                <div class="flex-grow-1 crm-min-w-0">
                     <div class="fw-semibold text-truncate" title="{{ p.name }}">{{ p.name }}</div>
                     {% if p.category %}<div class="text-muted small text-truncate">{{ p.category }}</div>{% endif %}
                     {% if p.barcode %}<div class="text-muted small font-monospace text-truncate">{{ p.barcode }}</div>{% endif %}

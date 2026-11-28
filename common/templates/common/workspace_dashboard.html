@@ -128,7 +128,7 @@
                 <div class="metric-value">{{ tile.value }}{% if tile.unit %}<span>{{ tile.unit }}</span>{% endif %}</div>
                 {% if tile.meta %}<div class="metric-meta">{{ tile.meta }}</div>{% endif %}
                 {% if tile.progress != None %}
-                <div class="tile-progress" aria-hidden="true"><span style="width: {{ tile.progress }}%"></span></div>
+                <div class="tile-progress" aria-hidden="true"><span data-progress="{{ tile.progress }}"></span></div>
                 {% endif %}
                 {% if tile.footer %}<div class="metric-footer">{{ tile.footer }}</div>{% endif %}
             </div>
