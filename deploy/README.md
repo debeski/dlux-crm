@@ -102,6 +102,37 @@ Run everything from the deployment folder (the one holding `compose.yml` and
 that card installs only the application image, and this release also needs
 Composer 1.11 and its stack-file repairs.
 
+**Which section applies depends on the stack files, not on the image.** Run
+`docker compose ps --services`. If the list has no `worker` but still has
+`docker-socket-proxy` and `celery`, the server runs stack schema 4, the v0.12.x
+files. That is still true if the Updates card has already moved its image to v0.13.0.
+Such a server follows **From v0.12.x or older**, which copies this release's files
+and adds `worker`.
+
+A schema-4 stack whose image an Updates card moved to DjangoLux 1.16 can sit
+behind the maintenance page ("Application update in progress") with every service
+healthy. The update raised the maintenance flag, and only the `worker` service
+lowers it. Bring the site back first:
+1. Back up.
+2. Check that `deploy-status.json` reads `ready`:
+
+   ```bash
+   docker compose exec caddy cat /opt/dlux-runtime/state/deploy-status.json
+   ```
+
+3. Move the flag aside. The file is kept for review:
+
+   ```bash
+   docker run --rm -v sales_dlux_runtime:/rt alpine \
+     mv /rt/state/maintenance /rt/failed/maintenance-manual
+   ```
+
+   `sales_dlux_runtime` is the runtime volume's name in this stack; check it with
+   `docker volume ls`.
+
+Then upgrade. Start no other update from the card on that stack: each one raises
+the flag again.
+
 ### From v0.13.0
 
 A server on v0.13.0 runs Composer 1.10.x with wrapper 6. `check --fix` brings its

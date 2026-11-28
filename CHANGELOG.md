@@ -33,6 +33,7 @@
   7. `./start.sh check`.
 
   Rollback follows Composer 1.11's downgrade guard: restore the pre-upgrade backup, set the old `WEB_IMAGE`, run `./start.sh --force`, then flush Redis db 1. `check` now warns on an empty or `admin` `ADMIN_PASS` and a default `POSTGRES_PASSWORD`. `deploy/env.template`, `docs/OPERATIONS.md`, `docs/ARCHITECTURE.md` and `docs/RELEASING.md` follow.
+- **Schema-4 Stacks Stuck Behind The Maintenance Page**: `deploy/README.md` says the upgrade section depends on the stack files, not the image. A server whose Updates card moved the image to v0.13.0 but which still has no `worker` (schema 4: `celery` + `docker-socket-proxy`) follows **From v0.12.x or older**. That section copies this release's files and adds `worker`. Such a stack sits behind the maintenance page after the card's image update with every service healthy, because in DjangoLux 1.16 only `worker` lowers the flag. The README moves the flag aside (`state/maintenance` → `failed/`, kept for review) before the upgrade.
 - **Release Validation**: 545 cases pass on SQLite (6 PostgreSQL-only skipped) against DjangoLux 1.17.0b3; `check` and `makemigrations --check` are clean.
 
 ## v0.13.0
