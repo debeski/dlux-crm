@@ -89,7 +89,7 @@ class ProjectScaffoldTests(SimpleTestCase):
             re.MULTILINE,
         )
         self.assertIsNotNone(requirement)
-        self.assertEqual(requirement.group("version"), "1.16.3")
+        self.assertEqual(requirement.group("version"), "1.17.0")
         self.assertEqual(contents.count("django-lux"), 1, "one pin line, no wheel URL beside it")
         self.assertNotIn("files.pythonhosted.org", contents)
 

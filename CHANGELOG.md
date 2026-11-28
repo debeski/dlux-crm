@@ -1,7 +1,7 @@
 # Changelog
 
 ## v0.14.0
-- **DjangoLux 1.17.0**: `requirements.txt` pins `django-lux[updater]==1.17.0`, paired with Composer 1.11.0. A deployment moves by an application-image update plus the release files, then one `./start.sh check --fix` (stack schema stays 5). Framework migrations are additive (`dlux.0032_singleton_cache_revision` and later); the CRM adds none. Developed and tested against 1.17.0b3 through a local venv only. No beta pin was ever committed.
+- **DjangoLux 1.17.0**: `requirements.txt` pins `django-lux[updater]==1.17.0`, paired with Composer 1.11.0. A deployment moves by an application-image update plus the release files, then one `./start.sh check --fix` (stack schema stays 5). Framework migrations are additive (`dlux.0032_singleton_cache_revision` and later); the CRM adds none. Developed against 1.17.0b3 through a local venv and a testbed overlay only; no beta pin was ever committed. The pin moved once the stables were published (wheel sha256 `ff5c4466…`).
 - **Nonce-Only Scripts, No Inline Styles (ZAP 10055, `dlux.W201`)**: `CONTENT_SECURITY_POLICY` is `script-src [SELF, NONCE]` and `style-src [SELF]`, adds `base-uri [SELF]` and `object-src [NONE]`, and `connect-src` takes `SCANLINK_CONNECT_ORIGINS` as the scaffold does.
   - Inline handlers (`onclick="window.print()"`, `onsubmit="return confirm(…)"`, the `onchange="this.form.submit()"` that `sales/views.py` emitted) become `data-*` hooks in the new `common/static/common/js/page_hooks.js`, loaded on every staff page by `common/templates/dlux/includes/custom_head.html` and bound once.
   - The purchase-invoice and deposit inline scripts move to `catalog/js/purchase_invoice_form.js` and `sales/js/deposit_combobox.js`.
@@ -34,7 +34,7 @@
 
   Rollback follows Composer 1.11's downgrade guard: restore the pre-upgrade backup, set the old `WEB_IMAGE`, run `./start.sh --force`, then flush Redis db 1. `check` now warns on an empty or `admin` `ADMIN_PASS` and a default `POSTGRES_PASSWORD`. `deploy/env.template`, `docs/OPERATIONS.md`, `docs/ARCHITECTURE.md` and `docs/RELEASING.md` follow.
 - **Schema-4 Stacks Stuck Behind The Maintenance Page**: `deploy/README.md` says the upgrade section depends on the stack files, not the image. A server whose Updates card moved the image to v0.13.0 but which still has no `worker` (schema 4: `celery` + `docker-socket-proxy`) follows **From v0.12.x or older**. That section copies this release's files and adds `worker`. Such a stack sits behind the maintenance page after the card's image update with every service healthy, because in DjangoLux 1.16 only `worker` lowers the flag. The README moves the flag aside (`state/maintenance` → `failed/`, kept for review) before the upgrade.
-- **Release Validation**: 545 cases pass on SQLite (6 PostgreSQL-only skipped) against DjangoLux 1.17.0b3; `check` and `makemigrations --check` are clean.
+- **Release Validation**: 545 cases pass on SQLite (6 PostgreSQL-only skipped) against DjangoLux 1.17.0b3 and again against the published 1.17.0; `check` and `makemigrations --check` are clean.
 
 ## v0.13.0
 - **DjangoLux 1.16.3**: `requirements.txt` carries one pin line, `django-lux[updater]==1.16.3` (PyPI wheel and sdist); the v0.12.0 wheel-URL+sha256 line, a CDN-lag workaround for 1.15.3, is gone. Paired with Composer 1.10.3 (`debeski/composer:latest`); a deployment moves by an application-image update plus the release files, never an inline install (DjangoLux 1.16 needs stack schema 5). Framework migrations are additive; the CRM adds none.
