@@ -153,15 +153,18 @@ things follow once the upgrade brings up `worker`:
 ### From v0.13.0
 
 A server on v0.13.0 runs Composer 1.10.x with wrapper 6. `check --fix` repairs most
-of the stack files, but not all: it leaves `web` without `exec` in front of its
-server command and keeps the old `ADMIN_PASS` default. So step 4 copies this
-release's files first, and `check --fix` repairs the rest.
+of the stack files and removes the running `docker-socket-proxy` container. It does
+not touch everything, though: it leaves `web` without `exec` in front of its server
+command and keeps the old `ADMIN_PASS` default. So `check --fix` runs first, on the
+server's files, while it can still see the proxy. Step 5 then copies this release's
+files, and step 6 runs `check --fix` once more on them. Copying first would leave the
+proxy container running unnoticed.
 
 1. **Back up.** In the app, create a backup under Options > Backup & Restore and
    download it, and copy the `media/` folder. Keep a database dump too if you have
    one. The rollback below needs this backup.
 2. **Pull the new application image first.** This restarts nothing: the stack keeps
-   running the old image until step 6, and `check --fix` never recreates a service
+   running the old image until step 7, and `check --fix` never recreates a service
    onto a pulled image.
 
    ```bash
@@ -172,11 +175,7 @@ release's files first, and `check --fix` repairs the rest.
 3. **Update Composer to 1.11.0 or newer:** `./start.sh update self`. Wrapper 6
    pulls `debeski/composer:latest`; `./start.sh check` then reports
    `versions: Deploying composer 1.11.x`.
-4. **Copy this release's files over the server's:** `compose.yml`, `start.sh`,
-   `start.ps1` and `.proxy/`. Keep `.secrets/`, `media/`, `logs/` and `imports/`.
-   Any hand edit made to the server's `compose.yml` is replaced; carry it over again
-   if it is still needed.
-5. **Repair the stack files:** `./start.sh check --fix`. At a terminal it lists the
+4. **Repair the server's stack files:** `./start.sh check --fix`. At a terminal it lists the
    repairs and asks once. Then it asks three questions:
    - `front-proxy`: `s` skips it until `DLUX_FRONT_PROXY` is set;
    - the update policy: Enter keeps `all`;
@@ -198,17 +197,22 @@ release's files first, and `check --fix` repairs the rest.
 
    Each replaced file is kept under `.xclude/composer-check/`. It recreates `caddy`,
    `redis` and the resident pair; `web`, `worker` and `celery` keep the old image
-   until step 6. If it says `composer-agent` must be running to publish the
-   maintenance page, run step 6 and then `check --fix` once more.
-6. **Deploy:** `./start.sh`. It recreates the application services on the new
+   until step 7. If it says `composer-agent` must be running to publish the
+   maintenance page, run step 7 and then `check --fix` once more.
+5. **Copy this release's files over the server's:** `compose.yml`, `start.sh`,
+   `start.ps1` and `.proxy/`. Keep `.secrets/`, `media/`, `logs/` and `imports/`.
+   Any hand edit made to the server's `compose.yml` is replaced; carry it over again
+   if it is still needed.
+6. **Check the copied files:** `./start.sh check --fix` again. It asks the same
+   questions and has little or nothing left to change.
+7. **Deploy:** `./start.sh`. It recreates the application services on the new
    image; `worker` applies the migrations before `web` serves. Wait for it to
-   finish. `check` no longer lists `docker-proxy` once the proxy is gone; if a
-   `docker-socket-proxy` container still runs, `./start.sh check --fix` removes it.
-7. **Pin Composer:** `./start.sh agent update`. It verifies Composer's signed
+   finish. `check` no longer lists `docker-proxy` once the proxy is gone.
+8. **Pin Composer:** `./start.sh agent update`. It verifies Composer's signed
    release, writes its digest to `.composer-image` and to the resident block in
    `compose.yml`, and recreates the pair on it. From then on the wrappers run that
    digest, and `update self` / `agent update` move it.
-8. **Verify:** `./start.sh check` exits 0, with `stored-files`, `redis-persistence`
+9. **Verify:** `./start.sh check` exits 0, with `stored-files`, `redis-persistence`
    and `update-policy` OK. It warns on an empty or `admin`
    `ADMIN_PASS` (`admin-pass`; harmless when the admin account exists, which is
    never changed) and on the published default `POSTGRES_PASSWORD`

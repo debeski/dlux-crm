@@ -27,11 +27,12 @@
   1. back up;
   2. `./start.sh pull web`;
   3. `./start.sh update self` (Composer 1.11);
-  4. copy `compose.yml`, the wrappers and `.proxy/` from the release (`check --fix` alone leaves `web` without `exec` and keeps the old `ADMIN_PASS` default);
-  5. `./start.sh check --fix` (wrapper 8, proxy removed, media headers, maintenance CSP, update policy, Redis snapshots; it asks front-proxy, update-policy and Redis questions);
-  6. `./start.sh`;
-  7. `./start.sh agent update`, the only step that digest-pins Composer;
-  8. `./start.sh check`.
+  4. `./start.sh check --fix` on the server's files (wrapper 8, proxy service and running container removed, media headers, maintenance CSP, update policy, Redis snapshots; it asks front-proxy, update-policy and Redis questions);
+  5. copy `compose.yml`, the wrappers and `.proxy/` from the release (`check --fix` alone leaves `web` without `exec` and keeps the old `ADMIN_PASS` default; copying before step 4 leaves the proxy container running unnoticed);
+  6. `./start.sh check --fix` again;
+  7. `./start.sh`;
+  8. `./start.sh agent update`, the only step that digest-pins Composer;
+  9. `./start.sh check`.
 
   Rollback follows Composer 1.11's downgrade guard: restore the pre-upgrade backup, set the old `WEB_IMAGE`, run `./start.sh --force`, then flush Redis db 1. `check` now warns on an empty or `admin` `ADMIN_PASS` and a default `POSTGRES_PASSWORD`. `deploy/env.template`, `docs/OPERATIONS.md`, `docs/ARCHITECTURE.md` and `docs/RELEASING.md` follow.
 - **Schema-4 Stacks Stuck Behind The Maintenance Page**: `deploy/README.md` says the upgrade section depends on the stack files, not the image. A server whose Updates card moved the image to v0.13.0 but which still has no `worker` (schema 4: `celery` + `docker-socket-proxy`) follows **From v0.12.x or older**. That section copies this release's files and adds `worker`. Such a stack sits behind the maintenance page after the card's image update with every service healthy, because in DjangoLux 1.16 only `worker` lowers the flag. The README moves the flag aside (`state/maintenance` → `failed/`, kept for review) before the upgrade.
